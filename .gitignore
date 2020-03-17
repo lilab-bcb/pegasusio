@@ -1,0 +1,6 @@
+ext_modules/*.c
+__pycache__
+build/
+dist/
+pegasusio.egg-info/
+pegasusio/cylib/*.so
