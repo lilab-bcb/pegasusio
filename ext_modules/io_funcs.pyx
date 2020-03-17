@@ -1,4 +1,4 @@
-# cython: c_string_type=str, c_string_encoding=default
+# cython: language_level=3, c_string_type=str, c_string_encoding=default
 
 import numpy as np
 

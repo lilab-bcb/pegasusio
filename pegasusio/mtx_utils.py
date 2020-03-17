@@ -6,14 +6,13 @@ from scipy.io import mmread, mmwrite
 from scipy.sparse import csr_matrix
 import tempfile
 import subprocess
-import gzip
-import shutil
 from typing import List, Dict, Tuple, Union
 
 import logging
-logger = logging.getLogger("pegasusio")
+logger = logging.getLogger(__name__)
 
-from pegasusio import UnimodalData, MultimodalData, io_funcs
+from pegasusio import UnimodalData, MultimodalData
+from pegasusio.cylib.io import read_mtx, write_mtx
 
 
 
@@ -137,10 +136,10 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, exptype: str, ngen
         mtx_fifo = os.path.join(tempfile.gettempdir(), file_name + ".fifo")
         os.mkfifo(mtx_fifo)
         subprocess.Popen("gunzip -c {0} > {1}".format(mtx_file, mtx_fifo), shell = True)
-        row_ind, col_ind, data, shape = io_funcs.read_mtx(mtx_fifo)
+        row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
         os.unlink(mtx_fifo)
     else:
-        row_ind, col_ind, data, shape = io_funcs.read_mtx(mtx_file)
+        row_ind, col_ind, data, shape = read_mtx(mtx_file)
 
     if shape[1] == barcode_metadata.shape[0]: # Column is barcode, swap the coordinates
         row_ind, col_ind = col_ind, row_ind
@@ -238,14 +237,15 @@ def _write_mtx(unidata: UnimodalData, output_dir: str):
         os.mkdir(output_dir)
     
     for key in unidata.list_keys():
-        mtx_file = os.path.join(output_dir, ("matrix" if key == "X" else key) + ".mtx")
-        mmwrite(mtx_file, unidata.matrices[key], precision = 2)
-        mtx_file_gz = mtx_file + ".gz"
-        with open(mtx_file, "rb") as fin:
-            with gzip.open(mtx_file_gz, "wb") as gout:
-                shutil.copyfileobj(fin, gout)
-        os.remove(mtx_file)
-        logger.info("{} is written.".format(mtx_file_gz))
+        matrix = unidata.matrices[key]
+        mtx_file = os.path.join(output_dir, ("matrix" if key == "X" else key) + ".mtx.gz")
+        fifo_file = mtx_file + ".fifo"
+        os.mkfifo(fifo_file)
+        pobj = subprocess.Popen("cat {0} | gzip -c - > {1}".format(fifo_file, mtx_file), shell = True)
+        write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = 2) # matrix is cell x gene csr_matrix, will write as gene x cell
+        assert pobj.wait() == 0
+        os.unlink(fifo_file)
+        logger.info("{} is written.".format(mtx_file))
 
     unidata.barcode_metadata.to_csv(os.path.join(output_dir, "barcodes.tsv.gz"), sep = '\t')
     logger.info("barcodes.tsv.gz is written.")

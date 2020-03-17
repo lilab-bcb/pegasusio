@@ -1,6 +1,6 @@
-====================================
-Pegasus for Single Cell Analysis
-====================================
+=========================================================
+Pegasusio for reading / writing single-cell genomics data
+=========================================================
 
 |PyPI|
 
@@ -8,6 +8,6 @@ Pegasus for Single Cell Analysis
    :target: https://pypi.org/project/pegasuspy
 
 
-Pegasus is a tool for analyzing transcriptomes of millions of single cells. It is a command line tool, a python package and a base for Cloud-based analysis workflows.
+Pegasusio is the IO package for Pegasus.
 
 `Read documentation <http://pegasus.readthedocs.io>`__
