@@ -1,0 +1,282 @@
+#!/usr/bin/env python
+
+import numpy as np
+import pandas as pd
+from scipy.sparse import csr_matrix, hstack, vstack
+
+from typing import List, Dict
+import anndata
+
+from unimodal_data import UnimodalData
+
+
+
+def polish_featurename(
+    feature_names: List[str], feature_keys: List[str], genomes: List[str]
+) -> List[str]:
+    """    Remove prefixing genome strings and deduplicate feature names
+    """
+    import re
+    from collections import Counter
+
+    prefix = re.compile("^(" + "|".join(genomes) + ")_+")
+    if prefix.match(feature_names[0]):
+        feature_names = [prefix.sub("", x) for x in feature_names]
+        feature_keys = [prefix.sub("", x) for x in feature_keys]
+
+    dup_ids = Counter()
+    for i in range(len(feature_names)):
+        idn = dup_ids[feature_names[i]]
+        dup_ids[feature_names[i]] += 1
+        if idn > 0:
+            feature_names[i] = feature_names[i] + ".#~{}".format(idn + 1) # duplicate ID starts from 2. .#~ makes it unique.
+
+    return feature_names, feature_keys
+
+
+def get_fillna_dict(df: "pd.DataFrame") -> dict:
+    """ Generate a fillna dict for columns in a df
+    """
+    fillna_dict = {}
+    for column in df:
+        if df[column].dtype.kind in {"O", "S"}:
+            fillna_dict[column] = ""
+        else:
+            fillna_dict[column] = 0
+    return fillna_dict
+
+
+class MultimodalData:
+    def __init__(self, data_dict: Dict[str, UnimodalData] = {}):
+        self.data = data_dict
+        self._selected = None
+
+
+    def list_keys(self) -> List[str]:
+        return list(self.data.keys())
+
+
+    def select_data(self, key: str) -> None:
+        if key not in self.data:
+            raise ValueError("Key {} does not exist!".format(key))
+        self._selected = key
+        self.set_proxy()
+
+
+    def set_proxy(self) -> None:
+        """ Set selected data X obs etc.
+        """
+        self._unidata = self.data[self._selected]
+        self.obs = self._unidata.obs
+        self.obs_names = self._unidata.obs_names
+        self.var = self._unidata.var
+        self.var_names = self._unidata.var_names
+        self.X = self._unidata.X
+        self.obsm = self._unidata.obsm
+        self.varm = self._unidata.varm
+        self.uns = self._unidata.uns
+
+
+    def add_data(self, key: str, uni_data: UnimodalData) -> None:
+        if key in self.data:
+            raise ValueError("Key {} already exists!".format(key))
+        self.data[key] = uni_data
+
+
+    def restrain_keywords(self, keywords: str) -> None:
+        """May load more data, this will restrain keys to the ones listed in keywords, which is a comma-separated list
+        """
+        if keywords is None:
+            return None
+
+        keywords = set(keywords.split(","))
+        available = set(self.data)
+
+        invalid_set = keywords - available
+        if len(invalid_set) > 0:
+            raise ValueError(
+                "Keywords {} do not exist.".format(",".join(list(invalid_set)))
+            )
+
+        remove_set = available - keywords
+        for keyword in remove_set:
+            self.data.pop(keyword)
+
+
+    def update_barcode_metadata_info(
+        self, sample_name: str, row: "pd.Series", attributes: List[str]
+    ) -> None:
+        """ Update barcodekey, update channel and add attributes for each array2d array
+        """
+        for array2d in self.data.values():
+            array2d.update_barcode_metadata_info(sample_name, row, attributes)
+
+
+    def addAggrData(self, data: "MemData") -> None:
+        """ Add Aggr Data
+        """
+        for keyword, array2d in data.data.items():
+            if keyword in self.data:
+                self.data[keyword].append(array2d)
+            else:
+                self.data[keyword] = [array2d]
+
+    @pg_deco.TimeLogger()
+    def aggregate(self) -> None:
+        """ Merge aggregated count matrices
+        """
+        import gc
+        import warnings
+
+        for keyword in self.data:
+            array2d_list = self.data[keyword]
+            self.data[keyword] = None
+
+            if len(array2d_list) == 1:
+                self.data[keyword] = array2d_list[0]
+            else:
+                barcode_metadata_dfs = [
+                    array2d.barcode_metadata for array2d in array2d_list
+                ]
+                barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False)
+                fillna_dict = get_fillna_dict(barcode_metadata)
+                barcode_metadata.fillna(value=fillna_dict, inplace=True)
+
+                feature_metadata = array2d_list[0].feature_metadata
+                for other in array2d_list[1:]:
+                    keys = ["featurekey"] + feature_metadata.columns.intersection(
+                        other.feature_metadata.columns
+                    ).values.tolist()
+                    feature_metadata = feature_metadata.merge(
+                        other.feature_metadata, on=keys, how="outer", sort=False
+                    )  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
+                fillna_dict = get_fillna_dict(feature_metadata)
+                feature_metadata.fillna(value=fillna_dict, inplace=True)
+
+                matrix_list = []
+                f2idx = pd.Series(
+                    data=range(feature_metadata.shape[0]), index=feature_metadata.index
+                )
+                for array2d in array2d_list:
+                    if (
+                        feature_metadata.shape[0] > array2d.feature_metadata.shape[0]
+                        or (
+                            feature_metadata.index != array2d.feature_metadata.index
+                        ).sum()
+                        > 0
+                    ):
+                        mat = csr_matrix(
+                            (array2d.matrix.shape[0], f2idx.size),
+                            dtype=array2d.matrix.dtype,
+                        )
+
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            mat[
+                                :, f2idx[array2d.feature_metadata.index].values
+                            ] = array2d.matrix
+
+                        array2d.matrix = mat
+                        gc.collect()
+
+                    matrix_list.append(array2d.matrix)
+
+                newmat = vstack(matrix_list)
+                matrix_list = array2d_list = None
+                gc.collect()
+                self.data[keyword] = Array2D(barcode_metadata, feature_metadata, newmat)
+
+
+    def convert_to_anndata(self, concat_matrices: bool =False, channel_attr: str = None, black_list: List[str] = []) -> "AnnData or List[AnnData]":
+        """Convert an MemData object into SCANPY's AnnData object
+
+        Parameters
+        ----------
+
+        concat_matrices : `bool`, optional (default: False)
+            If concatenate multiple matrices. If so, return only one AnnData object, otherwise, might return a list of AnnData objects.
+
+        channel_attr : `str`, optional (default: None)
+            Use channel_attr to represent different samples. This will set a 'Channel' column field with channel_attr.
+
+        black_list : `List[str]`, optional (default: [])
+            Attributes in black list will be poped out.
+
+        Returns
+        -------
+
+        `anndata` object or a dictionary of `anndata` objects
+            An `anndata` object or a list of `anndata` objects containing the count matrices.
+
+        Warning
+        -------
+        This procedure will convert all int matrix into float32 matrix in place!
+
+        Examples
+        --------
+        >>> adata = MemData.convert_to_anndata()
+        """
+
+        Xs = []
+        feature_dfs = []
+        results = []
+
+        genomes = self.listKeys()
+        for genome in genomes:
+            array2d = self.data[genome]
+
+            if (
+                array2d.matrix.dtype == np.int32
+            ):  # caution, change matrix from int to float32 permanently!
+                array2d.matrix.dtype = np.float32
+                orig_data = array2d.matrix.data.view(np.int32)
+                array2d.matrix.data[:] = orig_data
+
+            obs_dict = array2d.barcode_metadata.to_dict(orient="list")
+            obs_dict["obs_names"] = array2d.barcode_metadata.index.values
+            if (channel_attr is not None) and (channel_attr in obs_dict):
+                obs_dict["Channel"] = obs_dict[channel_attr]
+            if "Channel" not in obs_dict:
+                obs_dict["Channel"] = [""] * array2d.barcode_metadata.shape[0]
+            for attr in black_list:
+                if attr in obs_dict:
+                    obs_dict.pop(attr)
+
+            if not concat_matrices or len(genomes) == 1:
+                var_dict = array2d.feature_metadata.to_dict(orient="list")
+                feature_names, feature_keys = polish_featurename(
+                    var_dict.pop("featurename"),
+                    array2d.feature_metadata.index.values,
+                    [genome],
+                )
+                var_dict["var_names"] = feature_names
+                var_dict["gene_ids"] = feature_keys
+
+                adata = anndata.AnnData(X=array2d.matrix, obs=obs_dict, var=var_dict)
+                adata.uns["genome"] = genome
+                results.append(adata)
+            else:
+                Xs.append(array2d.matrix)
+                feature_dfs.append(array2d.feature_metadata)
+
+        if len(results) == 0:
+            fdf = pd.concat(feature_dfs, axis=0)
+            fdf.fillna(value="N/A", inplace=True)
+            var_dict = fdf.to_dict(orient="list")
+            feature_names, feature_keys = polish_featurename(
+                var_dict.pop("featurename"), fdf.index.values, genomes
+            )
+            var_dict["var_names"] = feature_names
+            var_dict["gene_ids"] = feature_keys
+
+            results = anndata.AnnData(
+                X=hstack(Xs, format="csr"), obs=obs_dict, var=var_dict
+            )
+            results.uns["genome"] = ",".join(genomes)
+        elif len(results) == 1:
+            results = results[0]
+
+        return results
+
+
+

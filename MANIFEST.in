@@ -1,0 +1,3 @@
+include LICENSE
+include versioneer.py
+include pegasus/_version.py
