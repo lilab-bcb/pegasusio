@@ -100,6 +100,12 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.select_matrix(key)
 
+    def get_matrix(self, key: str) -> csr_matrix:
+        """ Surrogate function for UnimodalData, return a matrix indexed by key
+        """
+        assert self._unidata is not None
+        return self._unidata.get_matrix(key)
+
     def get_exptype(self) -> str:
         """ Surrogate function for UnimodalData, return experiment tpye, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
         """

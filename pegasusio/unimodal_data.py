@@ -42,7 +42,7 @@ class UnimodalData:
                 if "barcodekey" not in self.barcode_metadata:
                     raise ValueError("Cannot locate barcode index barcodekey!")
                 barcodekey = self.barcode_metadata.pop("barcodekey")
-                self.barcode_metadata = pd.DataFrame(data = self.barcode_metadata, index = barcodekey)
+                self.barcode_metadata = pd.DataFrame(data = self.barcode_metadata, index = pd.Index(barcodekey, name = "barcodekey"))
             else:
                 if not isinstance(self.barcode_metadata, pd.DataFrame):
                     raise ValueError("Unknown barcode_metadata type: {}!".format(type(self.barcode_metadata)))
@@ -234,6 +234,14 @@ class UnimodalData:
         if key not in self.matrices:
             raise ValueError("Matrix key {} does not exist!".format(key))
         self.cur_matrix = key
+
+
+    def get_matrix(self, key: str) -> csr_matrix:
+        """ Return a matrix indexed by key
+        """
+        if key not in self.matrices:
+            raise ValueError("Matrix key {} does not exist!".format(key))
+        return self.matrices[key]
 
 
     def trim(self, selected: List[bool]) -> None:
