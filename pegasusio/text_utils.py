@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pegasusio import UnimodalData, MultimodalData
-from pegasusio.cylib.io import read_mtx, write_mtx
+from pegasusio.cylib.io import read_mtx, write_mtx, read_csv
 
 
 
@@ -60,10 +60,10 @@ def _locate_barcode_and_feature_files(path: str, fname: str) -> Tuple[str, str]:
     return barcode_file, feature_file
 
 
-def _load_barcode_metadata(barcode_file: str) -> Tuple[pd.DataFrame, str]:
+def _load_barcode_metadata(barcode_file: str, sep: str = "\t") -> Tuple[pd.DataFrame, str]:
     """ Load cell barcode information """
     format_type = None
-    barcode_metadata = pd.read_csv(barcode_file, sep="\t", header=None)
+    barcode_metadata = pd.read_csv(barcode_file, sep=sep, header=None)
 
     if "cellkey" in barcode_metadata.iloc[0].values:
         # HCA DCP format
@@ -82,9 +82,9 @@ def _load_barcode_metadata(barcode_file: str) -> Tuple[pd.DataFrame, str]:
     return barcode_metadata, format_type
 
 
-def _load_feature_metadata(feature_file: str, format_type: str) -> Tuple[pd.DataFrame, str]:
+def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t") -> Tuple[pd.DataFrame, str]:
     """ Load feature information """
-    feature_metadata = pd.read_csv(feature_file, sep="\t", header=None)
+    feature_metadata = pd.read_csv(feature_file, sep=sep, header=None)
 
     if format_type == "HCA DCP":
         # HCA DCP format genes.tsv.gz
@@ -267,3 +267,95 @@ def write_mtx_file(data: MultimodalData, output_directory: str):
         _write_mtx(data.get_data(key), os.path.join(output_dir, key))
     
     logger.info("Mtx files are written.")
+
+
+
+
+
+
+def load_csv_file(
+    input_csv: str,
+    sep: str = ",",
+    genome: str = None,
+    exptype: str = None,
+    ngene: int = None
+) -> MultimodalData:
+    """Load count matrix from a CSV-style file, such as CSV file or DGE style tsv file.
+
+    Parameters
+    ----------
+
+    input_csv : `str`
+        The CSV file, gzipped or not, containing the count matrix.
+    sep: `str`, optional (default: ',')
+        Separator between fields, either ',' or '\t'.
+    genome : `str`, optional (default None)
+        The genome reference. If None, use "unknown" instead.
+    exptype: `str`, optional (default None)
+        Experiment type. If None, use "rna" instead.
+    ngene : `int`, optional (default: None)
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
+
+    Returns
+    -------
+
+    A MultimodalData object containing a (genome, UnimodalData) pair.
+
+    Examples
+    --------
+    >>> io.load_csv_file('example_ADT.csv')
+    >>> io.load_csv_file('example.umi.dge.txt.gz', genome = 'GRCh38', sep = '\t')
+    """
+    barcode_metadata = feature_metadata = None
+
+    input_csv = os.path.abspath(input_csv)
+    path = os.path.dirname(input_csv)
+    fname = os.path.basename(input_csv)
+
+    barcode_file = os.path.join(path, "cells.csv")
+    if not os.path.isfile(barcode_file):
+        barcode_file += ".gz"
+    feature_file = os.path.join(path, "genes.csv")
+    if not os.path.isfile(feature_file):
+        feature_file += ".gz"
+
+    if os.path.isfile(barcode_file) and os.path.isfile(feature_file):
+        barcode_metadata, format_type = _load_barcode_metadata(barcode_file, sep = sep)
+        feature_metadata, format_type = _load_feature_metadata(feature_file, format_type, sep = sep)
+        assert format_type == "HCA DCP"
+
+    if input_csv.endswith(".gz"):
+        csv_fifo = os.path.join(tempfile.gettempdir(), fname + ".fifo")
+        os.mkfifo(csv_fifo)
+        subprocess.Popen("gunzip -c {0} > {1}".format(input_csv, csv_fifo), shell = True)
+        row_ind, col_ind, data, shape, rowkey, rownames, colnames = read_csv(csv_fifo, sep)
+        os.unlink(csv_fifo)
+    else:
+        row_ind, col_ind, data, shape, rowkey, rownames, colnames = read_csv(input_csv, sep)
+
+    if rowkey == "cellkey":
+        # HCA format
+        assert (barcode_metadata is not None) and (feature_metadata is not None) and (barcode_metadata.shape[0] == shape[0]) and (feature_metadata.shape[0] == shape[1]) and \
+               ((barcode_metadata["barcodekey"].values != np.array(rownames)).sum() == 0) and ((feature_metadata["featureid"].values != np.array(colnames)).sum() == 0)
+        mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
+    else:
+        mat = csr_matrix((data, (col_ind, row_ind)), shape = (shape[1], shape[0]))
+        if barcode_metadata is None:
+            barcode_metadata = {"barcodekey": colnames}
+        else:
+            assert (barcode_metadata.shape[0] == shape[1]) and ((barcode_metadata["barcodekey"].values != np.array(colnames)).sum() == 0)
+        if feature_metadata is None:
+            feature_metadata = {"featurekey": rownames}
+        else:
+            assert (feature_metadata.shape[0] == shape[0]) and ((feature_metadata["featurekey"].values != np.array(rownames)).sum() == 0)
+
+    genome = genome if genome is not None else "unknown"
+    exptype = exptype if exptype is not None else "rna"
+
+    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "experiment_type": exptype})
+    unidata.filter(ngene = ngene)
+
+    data = MultimodalData()
+    data.add_data(genome, unidata)
+
+    return data

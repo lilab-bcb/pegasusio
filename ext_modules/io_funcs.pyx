@@ -4,7 +4,7 @@ import numpy as np
 
 from libc.stdlib cimport malloc, free
 from libc.stdio cimport fopen, fclose, getline, FILE, fscanf, sscanf, fprintf
-from libc.string cimport strncmp, strlen
+from libc.string cimport strncmp, strlen, strtok
 
 cimport cython
 
@@ -38,7 +38,7 @@ cpdef tuple read_mtx(char* mtx_file):
 	cdef size_t M, N, L, i
 
 	assert line[0] != b'%'
-	assert sscanf(line, "%zd %zd %zd", &M, &N, &L) >= 0
+	assert sscanf(line, "%zu %zu %zu", &M, &N, &L) >= 0
 	free(line)
 
 	row_ind = np.zeros(L, dtype = np.intc)
@@ -112,3 +112,73 @@ cpdef void write_mtx(char* mtx_file, object data, int[:] indices, int[:] indptr,
 				fprintf(fo, fmt, indices[j] + 1, i + 1, data_int[j])
 
 	fclose(fo)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef int is_zero(char* pch):
+	cdef int i = 0
+	while pch[i] != 0:
+		if pch[i] >= b'1' and pch[i] <= b'9':
+			return 0
+		i += 1
+	return 1
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef tuple read_csv(char* csv_file, char* delimiters):
+	cdef FILE* fi = fopen(csv_file, "r")
+	cdef char* line = NULL
+	cdef char* pch = NULL
+	cdef size_t size
+
+	cdef str row_key
+	cdef list colnames = [], rownames = [], row_ind = [], col_ind = [], data_list = []
+	cdef int M = 0, N = 0
+	cdef size_t L = 0
+	cdef Py_ssize_t i
+
+	assert getline(&line, &size, fi) >= 0
+	pch = strtok(line, delimiters)
+	assert pch != NULL
+	row_key = pch
+
+	pch = strtok(NULL, delimiters)
+	while pch != NULL:
+		colnames.append(pch)
+		N += 1
+		pch = strtok(NULL, delimiters)
+
+	if N == 0:
+		raise ValueError("File {} contains no columns!".format(csv_file))
+
+	colnames[N - 1] = colnames[N - 1].rstrip("\n\r")
+
+	while getline(&line, &size, fi) >=0:
+		if line[0] < 32 or line[0] == 127:
+			continue
+		pch = strtok(line, delimiters)
+		assert pch != NULL
+		rownames.append(pch)
+		for i in range(N):
+			pch = strtok(NULL, delimiters)
+			assert pch != NULL
+			if is_zero(pch) == 0:
+				row_ind.append(M)
+				col_ind.append(i)
+				data_list.append(pch)
+				if i == N - 1:
+					data_list[L] = data_list[L].rstrip("\r\n")
+				L += 1
+		M += 1
+
+	free(line)
+	fclose(fi)
+
+	try:
+		data = np.array(data_list, dtype = np.intc)
+	except ValueError:
+		data = np.array(data_list, dtype = np.float32)
+
+	return row_ind, col_ind, data, (M, N), row_key, rownames, colnames
+
