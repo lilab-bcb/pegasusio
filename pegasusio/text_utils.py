@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pegasusio import UnimodalData, MultimodalData
-from pegasusio.cylib.io import read_mtx, write_mtx, read_csv
+from pegasusio.cylib.io import read_mtx, write_mtx, read_csv, write_dense
 
 
 
@@ -134,6 +134,8 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, exptype: str, ngen
     mtx_file = os.path.join(path, file_name)
     if file_name.endswith(".gz"):
         mtx_fifo = os.path.join(tempfile.gettempdir(), file_name + ".fifo")
+        if os.path.exists(mtx_fifo):
+            os.unlink(mtx_fifo)
         os.mkfifo(mtx_fifo)
         subprocess.Popen("gunzip -c {0} > {1}".format(mtx_file, mtx_fifo), shell = True)
         row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
@@ -233,13 +235,15 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = "rna", ngene: in
 def _write_mtx(unidata: UnimodalData, output_dir: str):
     """ Write Unimodal data to mtx
     """
-    if not os.path.exists(output_dir):
+    if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     
     for key in unidata.list_keys():
         matrix = unidata.matrices[key]
         mtx_file = os.path.join(output_dir, ("matrix" if key == "X" else key) + ".mtx.gz")
         fifo_file = mtx_file + ".fifo"
+        if os.path.exists(fifo_file):
+            os.unlink(fifo_file)
         os.mkfifo(fifo_file)
         pobj = subprocess.Popen("cat {0} | gzip -c - > {1}".format(fifo_file, mtx_file), shell = True)
         write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = 2) # matrix is cell x gene csr_matrix, will write as gene x cell
@@ -260,16 +264,12 @@ def write_mtx_file(data: MultimodalData, output_directory: str):
     """ Write output to mtx files in output_directory
     """
     output_dir = os.path.abspath(output_directory)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok = True)
 
     for key in data.list_data():
         _write_mtx(data.get_data(key), os.path.join(output_dir, key))
     
     logger.info("Mtx files are written.")
-
-
-
 
 
 
@@ -326,6 +326,8 @@ def load_csv_file(
 
     if input_csv.endswith(".gz"):
         csv_fifo = os.path.join(tempfile.gettempdir(), fname + ".fifo")
+        if os.path.exists(csv_fifo):
+            os.unlink(csv_fifo)
         os.mkfifo(csv_fifo)
         subprocess.Popen("gunzip -c {0} > {1}".format(input_csv, csv_fifo), shell = True)
         row_ind, col_ind, data, shape, rowkey, rownames, colnames = read_csv(csv_fifo, sep)
@@ -359,3 +361,146 @@ def load_csv_file(
     data.add_data(genome, unidata)
 
     return data
+
+
+def _write_scp_metadata(unidata: Unimodaldata, output_name: str, precision: int = 2) -> None:
+    """ Write metadata for SCP
+    """
+    metadata_list = []
+    datatype_list = []
+    for col_name in unidata.obs.columns:
+        metadata_list.append(col_names)
+        if unidata.obs[col_name].dtype.kind in ['i', 'u', 'f', 'c']:
+            datatype_list.append("\tnumeric")
+        else:
+            datatype_list.append("\tgroup")
+
+    metadata_file = "{}.scp.metadata.txt".format(output_name)
+    with open(metadata_file, "w") as fout:
+        fout.write("NAME{metadata}\n".format(metadata = "".join(metadata_list)))
+        fout.write("TYPE{datatype}\n".format(datatype = "".join(datatype_list)))
+
+    data.obs.to_csv(metadata_file, sep="\t", na_rep = "", float_format = "%.{}f".format(precision), header=False, mode="a")
+    logger.info("Metadata file {} is written.".format(metadata_file))
+
+
+def _write_scp_coords(unidata: UnimodalData, output_name: str, precision: int = 2) -> None:
+    """ Write coordinates for each visualization
+    """
+    float_fmt = "%.{}f".format(precision)
+    for basis in unidata.obsm.keys():
+        basis_X = unidata.obsm[basis]
+        if basis_X.ndim != 2 or basis_X.shape[1] < 2:
+            continue
+        coords = ["X", "Y"] if basis_X.shape[1] == 2 else ["X", "Y", "Z"]
+        coord_file = "{}.scp.{}.coords.txt".format(output_name, basis)
+        with open(coord_file, "w") as fout:
+            fout.write("NAME\t{coo}\n".format(coo = "\t".join(coords)))
+            fout.write("TYPE\t{dtype}\n".format(dtype = "\t".join(["numeric"] * len(coords))))
+        df_out = pd.DataFrame(
+            basis_X[:, 0: len(coords)],
+            columns=coords,
+            index=unidata.obs_names,
+        )
+        df_out.to_csv(coord_file, sep="\t", na_rep = "", float_format = float_fmt, header=False, mode="a")
+        logger.info("Coordinate file {} is written.".format(coord_file))
+
+
+def _write_scp_expression(unidata: UnimodalData, output_name: str, is_sparse: bool, precision: int = 2) -> None:
+    """ Only write the main matrix X
+    """
+    matrix = unidata.get_matrix("X")
+    if is_sparse:
+        barcode_file = "{}.scp.barcodes.tsv".format(output_name)
+        with open(barcode_file, "w") as fout:
+            fout.write("\n".join(unidata.obs_names) + "\n")
+        logger.info("Barcode file {} is written.".format(barcode_file))
+
+        feature_file = "{}.scp.features.tsv".format(output_name)
+        
+        gene_names = unidata.var_names.values
+        gene_ids = unidata.var["featureid"].values if "featureid" in unidata.var else (unidata.var["gene_ids"] if "gene_ids" in unidata.var else gene_names)
+        
+        df = pd.DataFrame({"gene_names": gene_names, "gene_ids": gene_ids})[["gene_ids", "gene_names"]]
+        df.to_csv(feature_file, sep="\t", header=False, index=False)
+        logger.info("Feature file {} is written.".format(feature_file))
+
+        mtx_file = "{}.scp.matrix.mtx".format(output_name)
+        write_mtx(mtx_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision) # matrix is cell x gene csr_matrix, will write as gene x cell
+        logger.info("Matrix file {} is written.".format(mtx_file))
+    else:
+        expr_file = "{}.scp.expr.txt".format(output_name)
+        matrix = matrix.T.tocsr() # convert to gene x cell
+        write_dense(expr_file, unidata.obs_names.values, unidata.var_names.values, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision)
+        logger.info("Dense expression file {} is written.".format(expr_file))
+
+
+def write_scp_file(data: MultimodalData, output_name: str, is_sparse: bool = True, precision: int = 2) -> None:
+    """Generate outputs for single cell portal from a MultimodalData object
+
+    Parameters
+    ----------
+    data: MultimodalData
+        A MultimodalData object.
+
+    output_name: ``str``
+        Name prefix for output files.
+
+    is_sparse: ``bool``, optional, default: ``True``
+        If ``True``, enforce the count matrix to be sparse after written into files.
+
+    precision: ``int``, optional, default: ``2``
+        Round numbers to ``precision`` decimal places.
+
+    Returns
+    -------
+    ``None``
+
+    If data contains only one modality, files are generated as follows:
+        * ``output_name.scp.basis.coords.txt``, where ``basis`` is for each key in ``adata.obsm`` field.
+        * ``output_name.scp.metadata.txt``.
+        * Gene expression files:
+            * If in sparse format:
+                * ``output_name.scp.features.tsv``, information on genes;
+                * ``output_name.scp.barcodes.tsv``, information on cell barcodes;
+                * ``output_name.scp.matrix.mtx``, count matrix.
+            * If not in sparse:
+                * ``output_name.scp.expr.txt``.
+
+    Otherwise, under the directory os.path.dirname(output_name), we will create separate folders per key and each separate folder has its own files in the format above.
+
+    Examples
+    --------
+    >>> io.write_scp_file(data, output_name = "scp_result")
+    """
+    output_name = os.path.abspath(output_name)
+
+    valid_keys = []
+    for key in data.list_data():
+        try:
+            mat = data.get_data(key).get_matrix("X")
+            if mat.data.size > 0:
+                valid_keys.append(key)
+        except ValueError:
+            pass
+
+    if len(valid_keys) == 1:
+        unidata = data.get_data(valid_keys[0])
+        _write_scp_metadata(unidata, output_name, precision = precision)
+        _write_scp_coords(unidata, output_name, precision = precision)
+        _write_scp_expression(unidata, output_name, is_sparse, precision = precision)
+    else:
+        path = os.path.dirname(output_name)
+        fname = os.path.basename(output_name)
+        for key in valid_keys:
+            subpath = os.path.join(path, key)
+            if not os.path.isdir(subpath):
+                os.path.mkdir(subpath)
+            out_new_name = os.path.join(subpath, fname)
+
+            unidata = data.get_data(key)
+            _write_scp_metadata(unidata, out_new_name, precision = precision)
+            _write_scp_coords(unidata, out_new_name, precision = precision)
+            _write_scp_expression(unidata, out_new_name, is_sparse, precision = precision)
+    
+    logger.info("write_scp_file is done.")
