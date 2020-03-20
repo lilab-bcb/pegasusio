@@ -363,13 +363,13 @@ def load_csv_file(
     return data
 
 
-def _write_scp_metadata(unidata: Unimodaldata, output_name: str, precision: int = 2) -> None:
+def _write_scp_metadata(unidata: UnimodalData, output_name: str, precision: int = 2) -> None:
     """ Write metadata for SCP
     """
     metadata_list = []
     datatype_list = []
     for col_name in unidata.obs.columns:
-        metadata_list.append(col_names)
+        metadata_list.append("\t" + col_name)
         if unidata.obs[col_name].dtype.kind in ['i', 'u', 'f', 'c']:
             datatype_list.append("\tnumeric")
         else:
@@ -380,7 +380,7 @@ def _write_scp_metadata(unidata: Unimodaldata, output_name: str, precision: int 
         fout.write("NAME{metadata}\n".format(metadata = "".join(metadata_list)))
         fout.write("TYPE{datatype}\n".format(datatype = "".join(datatype_list)))
 
-    data.obs.to_csv(metadata_file, sep="\t", na_rep = "", float_format = "%.{}f".format(precision), header=False, mode="a")
+    unidata.obs.to_csv(metadata_file, sep="\t", na_rep = "", float_format = "%.{}f".format(precision), header=False, mode="a")
     logger.info("Metadata file {} is written.".format(metadata_file))
 
 

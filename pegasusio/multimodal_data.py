@@ -10,7 +10,11 @@ from pegasusio import UnimodalData
 
 
 class MultimodalData:
-    def __init__(self, data_dict: Dict[str, UnimodalData] = None):
+    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None):
+        if isinstance(data_dict, anndata.AnnData):
+            self.from_anndata(data_dict)
+            return None
+
         self.data = data_dict if data_dict is not None else dict()
         self._selected = self._unidata = None
 
@@ -164,3 +168,13 @@ class MultimodalData:
         remove_set = available - keywords
         for keyword in remove_set:
             self.data.pop(keyword)
+
+
+    def from_anndata(self, data: anndata.AnnData) -> None:
+        """ Initialize from an anndata object
+        """
+        unidata = UnimodalData(data)
+        key = unidata.uns.get("genome", "unknown")
+        self.data = {key: unidata}
+        self._selected = key
+        self._unidata = unidata

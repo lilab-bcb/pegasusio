@@ -13,13 +13,16 @@ from pegasusio.cylib.funcs import split_barcode_channel
 class UnimodalData:
     def __init__(
         self,
-        barcode_metadata: Union[dict, pd.DataFrame] = None,
+        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
         feature_metadata: Union[dict, pd.DataFrame] = None,
         matrices: Dict[str, csr_matrix] = None,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
         metadata: dict = None,
     ) -> None:
+        if isinstance(barcode_metadata, anndata.AnnData):
+            self.from_anndata(barcode_metadata)
+            return None
 
         def replace_none_df(value):
             return value if value is not None else pd.DataFrame()
@@ -336,6 +339,15 @@ class UnimodalData:
         self.feature_multiarrays = dict(data.varm)
 
         self.metadata = dict(data.uns)
+
+        genome = self.metadata.get("genome", None)
+        if genome is None:
+            self.metadata["genome"] = "unknown"
+        elif isinstance(genome, np.ndarray): # for compatibility reasons
+            self.metadata["genome"] = ",".join(genome)
+
+        if "experiment_type" not in self.metadata:
+            self.metadata["experiment_type"] = "rna"
 
         self.cur_matrix = "X"
 
