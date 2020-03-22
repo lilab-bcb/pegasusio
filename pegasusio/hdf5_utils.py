@@ -236,7 +236,7 @@ def load_loom_file(input_loom: str, genome: str = None, exptype: str = None, nge
     exptype: `str`, optional (default None)
         Experiment type. If None, use "rna" instead. If not None and input loom contains experiment_type attribute, the attribute will be overwritten.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with exptype == "rna".
 
     Returns
     -------
@@ -292,7 +292,8 @@ def load_loom_file(input_loom: str, genome: str = None, exptype: str = None, nge
             metadata["experiment_type"] = "rna"
             
         unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata)
-        unidata.filter(ngene = ngene)
+        if metadata["experiment_type"] == "rna":
+            unidata.filter(ngene = ngene)
 
     data.add_data(genome, unidata)
 

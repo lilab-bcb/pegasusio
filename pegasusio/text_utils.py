@@ -151,7 +151,8 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, exptype: str, ngen
     mat.eliminate_zeros()
 
     unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"experiment_type": exptype, "genome": genome})
-    unidata.filter(ngene=ngene)
+    if exptype == "rna":
+        unidata.filter(ngene=ngene)
     if format_type == "10x v3" or format_type == "10x v2":
         unidata.separate_channels()
 
@@ -171,7 +172,7 @@ def _locate_mtx_file(path: str) -> str:
     return file_names[0] if len(file_names) > 0 else None
 
 
-def load_mtx_file(path: str, genome: str = None, exptype: str = "rna", ngene: int = None) -> MultimodalData:
+def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int = None) -> MultimodalData:
     """Load gene-count matrix from Market Matrix files (10x v2, v3 and HCA DCP formats)
 
     Parameters
@@ -181,15 +182,15 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = "rna", ngene: in
         Path to mtx files. The directory implied by path should either contain matrix, feature and barcode information, or folders containing these information.
     genome : `str`, optional (default: None)
         Genome name of the matrix. If None, genome will be inferred from path.
-    exptype: `str`, optional (default: 'rna')
-        Experiment type, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'
+    exptype: `str`, optional (default: None)
+        Experiment type, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to 'rna' exptype
 
     Returns
     -------
 
-    An MemData object containing a genome-Array2D pair.
+    A MultimodalData object containing (genome, UnimodalData) pairs.
 
     Examples
     --------
@@ -206,6 +207,9 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = "rna", ngene: in
         path, file_name = os.path.split(orig_file)
 
     data = MultimodalData()
+
+    if exptype is None:
+        exptype = "rna"
 
     if file_name is not None:
         if genome is None:
@@ -232,7 +236,7 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = "rna", ngene: in
 
 
 
-def _write_mtx(unidata: UnimodalData, output_dir: str):
+def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
     """ Write Unimodal data to mtx
     """
     if not os.path.isdir(output_dir):
@@ -246,7 +250,7 @@ def _write_mtx(unidata: UnimodalData, output_dir: str):
             os.unlink(fifo_file)
         os.mkfifo(fifo_file)
         pobj = subprocess.Popen("cat {0} | gzip -c - > {1}".format(fifo_file, mtx_file), shell = True)
-        write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = 2) # matrix is cell x gene csr_matrix, will write as gene x cell
+        write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision) # matrix is cell x gene csr_matrix, will write as gene x cell
         assert pobj.wait() == 0
         os.unlink(fifo_file)
         logger.info("{} is written.".format(mtx_file))
@@ -260,14 +264,14 @@ def _write_mtx(unidata: UnimodalData, output_dir: str):
     logger.info("Mtx for {} is written.".format(unidata.get_genome()))
 
 
-def write_mtx_file(data: MultimodalData, output_directory: str):
+def write_mtx_file(data: MultimodalData, output_directory: str, precision: int = 2):
     """ Write output to mtx files in output_directory
     """
     output_dir = os.path.abspath(output_directory)
     os.makedirs(output_dir, exist_ok = True)
 
     for key in data.list_data():
-        _write_mtx(data.get_data(key), os.path.join(output_dir, key))
+        _write_mtx(data.get_data(key), os.path.join(output_dir, key), precision)
     
     logger.info("Mtx files are written.")
 
@@ -294,7 +298,7 @@ def load_csv_file(
     exptype: `str`, optional (default None)
         Experiment type. If None, use "rna" instead.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with exptype == "rna"
 
     Returns
     -------
@@ -355,7 +359,8 @@ def load_csv_file(
     exptype = exptype if exptype is not None else "rna"
 
     unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "experiment_type": exptype})
-    unidata.filter(ngene = ngene)
+    if exptype == "rna":
+        unidata.filter(ngene = ngene)
 
     data = MultimodalData()
     data.add_data(genome, unidata)

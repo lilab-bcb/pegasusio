@@ -1,5 +1,7 @@
 # This code is inspired by HCA zarr python codes and AnnData zarr codes
 
+import os
+import shutil
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, is_dict_like
@@ -9,7 +11,7 @@ from zarr import Blosc
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
-from pegasusio import UnimodalData
+from pegasusio import UnimodalData, MultimodalData
 
 
 
@@ -39,16 +41,26 @@ def calc_chunk(shape: tuple) -> tuple:
 
 
 class ZarrFile:
-    def __init__(self, path: str, mode: str = 'r', storage_type: str = 'NestedDirectoryStore') -> None:
+    def __init__(self, path: str, mode: str = 'r', storage_type: str = None) -> None:
         """ Initialize a Zarr file, if mode == 'w', create an empty one, otherwise, load from path
         path : `str`, path for the zarr object.
-        storage_type : `str`, currently only support 'ZipStore' and 'NestedDirectoryStore'.
-        """        
+        storage_type : `str`, currently only support 'ZipStore' and 'NestedDirectoryStore'. If None, use 'NestedDirectoryStore' by default.
+        """
         self.store = self.root = None
+
+        if storage_type is None:
+            storage_type = 'NestedDirectoryStore'
 
         if mode == 'w':
             # Create a new zarr file
-            self.store = zarr.ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else zarr.NestedDirectoryStore(path)
+            if storage_type == 'ZipStore':
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                self.store = zarr.ZipStore(path, mode = 'w')
+            else:
+                if os.path.isfile(path):
+                    os.unlink(path)
+                zarr.NestedDirectoryStore(path)
             self.root = zarr.group(self.store, overwrite = True)
             self.root.attrs['store'] = storage_type
         else:
@@ -80,12 +92,12 @@ class ZarrFile:
 
     def read_dataframe(self, group: zarr.Group) -> Union[pd.DataFrame, np.ndarray]:
         if group.attrs['data_type'] == 'data_frame':
-            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in group.attrs['columns']}, 
+            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in group.array_keys() if col != '_index'}, 
                 index = pd.Index(self.read_series(group, '_index'), name = group.attrs['index_name']),
                 columns = group.attrs['columns'])
             return df
         else:
-            array = np.rec.fromarrays([self.read_series(group, col) for col in group.attrs['columns']],
+            array = np.rec.fromarrays([self.read_series(group, col) for col in group.array_keys()],
                 names = group.attrs['columns'])
             return array
 
@@ -122,15 +134,52 @@ class ZarrFile:
         return res_dict
 
 
-    def read_unimodal_data(self, group: zarr.Group) -> UnimodalData:
+    def read_unimodal_data(self, group: zarr.Group, ngene: int = None, select_singlets: bool = False) -> UnimodalData:
         """ Read UnimodalData
+            ngene: filter barcodes with < ngene
+            select_singlets: only select singlets
+            The above two option only works if experiment_type == "rna"
         """
-        return UnimodalData(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
+        unidata = UnimodalData(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
                             feature_metadata = self.read_dataframe(group['feature_metadata']),
                             matrices = self.read_mapping(group['matrices']),
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
                             feature_multiarrays = self.read_mapping(group['feature_multiarrays']),
                             metadata = self.read_mapping(group['metadata']))
+
+        assert "genome" in unidata.metadata
+        assert "experiment_type" in unidata.metadata
+        
+        if unidata.metadata["experiment_type"] == "rna":
+            unidata.filter(ngene, select_singlets)
+
+        return unidata
+
+
+    def read_multimodal_data(self, ngene: int = None, select_singlets: bool = False) -> MultimodalData:
+        """ Read MultimodalData
+            ngene: filter barcodes with < ngene
+            select_singlets: only select singlets
+            The above two option only works for dataset with experiment_type == "rna"
+        """
+        data = MultimodalData()
+        need_trim = (ngene is not None) or select_singlets
+        selected_barcodes = None
+
+        for key, group in self.root.groups():
+            unidata = self.read_unimodal_data(group, ngene, select_singlets)
+            if need_trim and unidata.uns.get("experiment_type", "rna") == "rna":
+                selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
+            data.add_data(key, unidata)
+
+        if need_trim:
+            for key in data.list_data():
+                unidata = data.get_data(key)
+                if unidata.uns.get("experiment_type", "rna") != "rna":
+                    selected = unidata.obs_names.isin(selected_barcodes)
+                    unidata.trim(selected)
+
+        return data
 
 
 
@@ -170,13 +219,13 @@ class ZarrFile:
 
         sub_group = group.create_group(name, overwrite = True) 
         attrs_dict = {'data_type' : data_type}
-        attrs_dict['columns'] = list(df.columns if data_type == 'data_frame' else df.dtype.names)
+        cols = list(df.columns if data_type == 'data_frame' else df.dtype.names)
         if data_type == 'data_frame':
             attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
             sub_group.create_group('_categories', overwrite = True) # create a group to store category keys for catigorical columns
             self.write_series(sub_group, '_index', df.index.values, data_type)
 
-        for col in attrs_dict['columns']:
+        for col in cols:
             self.write_series(sub_group, col, (df[col].values if data_type == 'data_frame' else df[col]), data_type)
 
         sub_group.attrs.update(**attrs_dict)
@@ -231,3 +280,9 @@ class ZarrFile:
         self.write_mapping(sub_group, 'metadata', data.metadata)
 
 
+    def write_multimodal_data(self, data: MultimodalData) -> None:
+        """ Write MultimodalData
+        """
+        for key in data.list_data():
+            unidata = data.get_data(key)
+            self.write_unimodal_data(self.root, key, unidata)

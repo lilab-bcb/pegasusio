@@ -3,9 +3,12 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from collections.abc import MutableMapping
-from typing import List, Dict, Union
-import anndata
+from typing import List, Dict, Union, Set
 
+import logging
+logger = logging.getLogger(__name__)
+
+import anndata
 from pegasusio.cylib.funcs import split_barcode_channel
 
 
@@ -266,8 +269,7 @@ class UnimodalData:
         selected = np.ones(self.X.shape[0], dtype=bool)
         if ngene is not None:
             selected = selected & (self.X.getnnz(axis=1) >= ngene)
-        if select_singlets:
-            assert "demux_type" in self.barcode_metadata
+        if select_singlets and ("demux_type" in self.barcode_metadata):
             selected = (
                 selected & (self.barcode_metadata["demux_type"] == "singlet").values
             )
@@ -314,8 +316,34 @@ class UnimodalData:
                 self.barcode_metadata[attr] = np.repeat(row[attr], nsample)
 
 
-    def from_anndata(self, data: anndata.AnnData) -> None:
+    def scan_black_list(self, black_list: Set[str]):
+        """ Remove (key, value) pairs where key is in black_list
+        """
+        def _scan_dataframe(df: pd.DataFrame, black_list: Set[str]):
+            cols = []
+            for key in df.columns:
+                if key in black_list:
+                    cols.append(key)
+            if len(cols) > 0:
+                df.drop(columns = cols, inplace = True)
+
+        def _scan_dict(mapping: dict, black_list: Set[str]):
+            for key in mapping:
+                if key in black_list:
+                    mapping.pop(key)
+
+        _scan_dataframe(self.barcode_metadata, black_list)
+        _scan_dataframe(self.feature_metadata, black_list)
+
+        _scan_dict(self.matrices, black_list)
+        _scan_dict(self.barcode_multiarrays, black_list)
+        _scan_dict(self.feature_multiarrays, black_list)
+        _scan_dict(self.metadata, black_list)
+
+
+    def from_anndata(self, data: anndata.AnnData, genome: str = None, exptype: str = None) -> None:
         """ Initialize from an anndata object
+            If genome/exptype is not None, set 'genome'/'experiment_type' as genome/exptype
         """
         self.barcode_metadata = data.obs
         self.barcode_metadata.index.name = "barcodekey"
@@ -340,13 +368,17 @@ class UnimodalData:
 
         self.metadata = dict(data.uns)
 
-        genome = self.metadata.get("genome", None)
-        if genome is None:
+        if genome is not None:
+            self.metadata["genome"] = genome
+        elif "genome" not in self.metadata:
             self.metadata["genome"] = "unknown"
-        elif isinstance(genome, np.ndarray): # for compatibility reasons
-            self.metadata["genome"] = ",".join(genome)
+        elif isinstance(self.metadata["genome"], np.ndarray):
+            assert self.metadata["genome"].ndim == 1
+            self.metadata["genome"] = self.metadata["genome"][0]
 
-        if "experiment_type" not in self.metadata:
+        if exptype is not None:
+            self.metadata["experiment_type"] = exptype
+        elif "experiment_type" not in self.metadata:
             self.metadata["experiment_type"] = "rna"
 
         self.cur_matrix = "X"

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack, vstack
 
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Set
 import anndata
 
 from pegasusio import UnimodalData
@@ -10,9 +10,9 @@ from pegasusio import UnimodalData
 
 
 class MultimodalData:
-    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None):
+    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None, genome: str = None, exptype: str = None):
         if isinstance(data_dict, anndata.AnnData):
-            self.from_anndata(data_dict)
+            self.from_anndata(data_dict, genome = genome, exptype = exptype)
             return None
 
         self.data = data_dict if data_dict is not None else dict()
@@ -150,31 +150,58 @@ class MultimodalData:
         return self.data[key]
 
 
-    def restrain_keywords(self, keywords: str) -> None:
-        """May load more data, this will restrain keys to the ones listed in keywords, which is a comma-separated list
+    def drop_data(self, key: str) -> UnimodalData:
+        if key not in self.data:
+            raise ValueError("Key {} does not exist!".format(key))
+        return self.data.pop(key)
+
+
+    def subset_data(self, data_subset: Set[str] = None, exptype_subset: Set[str] = None) -> None:
+        """ Only keep data that are in data_subset and exptype_subset
         """
-        if keywords is None:
+        if data_subset is not None:
+            for key in self.list_data():
+                if key not in data_subset:
+                    self.data.pop(key)
+
+        if exptype_subset is not None:
+            for key in self.list_data():
+                if self.data[key].uns["experiment_type"] not in exptype_subset:
+                    self.data.pop(key)
+
+
+    def scan_black_list(self, black_list: Set[str] = None):
+        """ Remove unwanted keys in the black list
+            Note: black_list might be changed.
+        """
+        if black_list is None:
             return None
 
-        keywords = set(keywords.split(","))
-        available = set(self.data)
+        def _check_reserved_keyword(black_list: Set[str], keyword: str):
+            if keyword in black_list:
+                logger.warning("Removed reserved keyword '{}' from black list.".format(keyword))
+                black_list.remove(keyword)
 
-        invalid_set = keywords - available
-        if len(invalid_set) > 0:
-            raise ValueError(
-                "Keywords {} do not exist.".format(",".join(list(invalid_set)))
-            )
+        _check_reserved_keyword(black_list, "genome")
+        _check_reserved_keyword(black_list, "experiment_type")
 
-        remove_set = available - keywords
-        for keyword in remove_set:
-            self.data.pop(keyword)
+        for key in self.data:
+            self.data[key].scan_black_list(black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData) -> None:
+    def from_anndata(self, data: anndata.AnnData, genome: str = None, exptype: str = None) -> None:
         """ Initialize from an anndata object
         """
         unidata = UnimodalData(data)
-        key = unidata.uns.get("genome", "unknown")
+        key = unidata.uns["genome"]
         self.data = {key: unidata}
         self._selected = key
         self._unidata = unidata
+
+
+    def to_anndata(self) -> anndata.AnnData:
+        """ Convert current data to an anndata object
+        """
+        if self._unidata is None:
+            raise ValueError("Please first select a unimodal data to convert!")
+        return self._unidata.to_anndata()

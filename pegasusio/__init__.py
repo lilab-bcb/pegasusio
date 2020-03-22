@@ -16,9 +16,7 @@ warnings.filterwarnings("ignore", category=FutureWarning, module='anndata')
 
 from .unimodal_data import UnimodalData
 from .multimodal_data import MultimodalData
-from .zarr_utils import ZarrFile
-from .hdf5_utils import load_10x_h5_file, load_pegasus_h5_file, load_loom_file, write_loom_file
-from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
+from .readwrite import infer_file_type, read_input, write_output
 
 from ._version import get_versions
 
