@@ -18,7 +18,8 @@ requires = [
     "numpy",
     "pandas",
     "scipy",
-    "setuptools"
+    "setuptools",
+    "zarr"
 ]
 
 extensions = [
