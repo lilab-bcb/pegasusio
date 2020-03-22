@@ -92,9 +92,10 @@ class ZarrFile:
 
     def read_dataframe(self, group: zarr.Group) -> Union[pd.DataFrame, np.ndarray]:
         if group.attrs['data_type'] == 'data_frame':
-            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in group.array_keys() if col != '_index'}, 
+            columns = [col for col in group.array_keys() if col != '_index']
+            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in columns},
                 index = pd.Index(self.read_series(group, '_index'), name = group.attrs['index_name']),
-                columns = group.attrs['columns'])
+                columns = columns)
             return df
         else:
             array = np.rec.fromarrays([self.read_series(group, col) for col in group.array_keys()],
