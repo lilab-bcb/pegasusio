@@ -148,7 +148,7 @@ def read_input(
     data.scan_black_list(black_list)    
 
     end = time.perf_counter()
-    logger.info("{} file '{}'' is loaded, time spent = {:.2f}s.".format(file_type, input_file, end - start))
+    logger.info("{} file '{}' is loaded, time spent = {:.2f}s.".format(file_type, input_file, end - start))
 
     return data
 
