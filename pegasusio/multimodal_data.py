@@ -19,6 +19,16 @@ class MultimodalData:
         self._selected = self._unidata = None
 
 
+    def __repr__(self) -> str:
+        repr_str = "MultimodalData object with {} UnimodalData: {}".format(len(self.data), str(list(self.data))[1:-1])
+        if self._selected is not None:
+            repr_str += "\n    It currently binds to UnimodalData object {}\n\n".format(self._selected)
+            repr_str += self._unidata.__repr__()
+        else:
+            repr_str += "\n    It currently binds to no UnimodalData object"
+
+        return repr_str
+
 
     @property
     def obs(self) -> Union[pd.DataFrame, None]:

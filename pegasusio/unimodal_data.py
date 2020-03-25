@@ -82,6 +82,16 @@ class UnimodalData:
             )
 
 
+    def __repr__(self) -> str:
+        repr_str = "UnimodalData object with n_obs x n_vars = {} x {}".format(self.barcode_metadata.shape[0], self.feature_metadata.shape[0])
+        repr_str += "\n    It contains {} matrices: {}".format(len(self.matrices), str(list(self.matrices))[1:-1])
+        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self.cur_matrix) if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
+        for key in ["obs", "var", "obsm", "varm", "uns"]:
+            repr_str += "\n    {}: {}".format(key, str(list(getattr(self, key).keys()))[1:-1])
+
+        return repr_str
+
+
     @property
     def obs(self) -> pd.DataFrame:
         return self.barcode_metadata
