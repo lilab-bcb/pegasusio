@@ -126,6 +126,15 @@ class MultimodalData:
         assert self._unidata is not None
         return self._unidata.get_exptype()
 
+    def _inplace_subset_obs(self, index: List[bool]) -> None:
+        """ Surrogate function for UnimodalData, subset barcode_metadata inplace """
+        assert self._unidata is not None
+        self._unidata._inplace_subset_obs(index)
+
+    def _inplace_subset_var(self, index: List[bool]) -> None:
+        """ Surrogate function for UnimodalData, subset feature_metadata inplace """
+        assert self._unidata is not None
+        self._unidata._inplace_subset_var(index)
 
 
     def list_data(self) -> List[str]:
@@ -215,3 +224,18 @@ class MultimodalData:
         if self._unidata is None:
             raise ValueError("Please first select a unimodal data to convert!")
         return self._unidata.to_anndata()
+
+
+    def copy(self) -> "MultimodalData":
+        from copy import deepcopy
+        new_data = MultimodalData(deepcopy(self.data))
+        new_data._selected = self._selected
+        if new_data._selected is not None:
+            new_data._unidata = new_data.data[new_data._selected]
+        return new_data
+
+
+    def __deepcopy__(self, memo):
+        return self.copy()
+
+

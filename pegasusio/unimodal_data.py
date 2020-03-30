@@ -414,3 +414,38 @@ class UnimodalData:
             varm = self.feature_multiarrays,
             layers = layers,
             raw = raw)
+
+
+    def copy(self) -> "UnimodalData":
+        from copy import deepcopy
+        new_data = UnimodalData(self.barcode_metadata.copy(), 
+                                self.feature_metadata.copy(), 
+                                deepcopy(self.matrices), 
+                                deepcopy(self.barcode_multiarrays), 
+                                deepcopy(self.feature_multiarrays), 
+                                deepcopy(self.metadata))
+        new_data.cur_matrix = self.cur_matrix
+        return new_data
+
+
+    def __deepcopy__(self, memo: Dict):
+        return self.copy()
+
+
+    def _inplace_subset_obs(self, index: List[bool]) -> None:
+        """ Subset barcode_metadata inplace """
+        self.barcode_metadata = self.barcode_metadata.loc[index]
+        for key in list(self.matrices):
+            self.matrices[key] = self.matrices[key][index, :]
+        for key in list(self.barcode_multiarrays):
+            self.barcode_multiarrays[key] = self.barcode_multiarrays[key][index]
+
+
+    def _inplace_subset_var(self, index: List[bool]) -> None:
+        """ Subset feature_metadata inplace """
+        self.feature_metadata = self.feature_metadata.loc[index]
+        for key in list(self.matrices):
+            self.matrices[key] = self.matrices[key][:, index]
+        for key in list(self.feature_multiarrays):
+            self.feature_multiarrays[key] = self.feature_multiarrays[key][index]
+            
