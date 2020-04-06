@@ -71,7 +71,7 @@ class UnimodalData:
             elif self.feature_metadata.index.name != "featurekey":
                 raise ValueError("Cannot locate feature index featurekey!")
 
-        self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
+        self._update_shape()
 
         for key, mat in self.matrices.items():
             if mat.shape[0] != self._shape[0]:
@@ -90,6 +90,10 @@ class UnimodalData:
         return repr_str
 
 
+    def _update_shape(self) -> None:
+        self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
+
+
     @property
     def obs(self) -> pd.DataFrame:
         return self.barcode_metadata
@@ -98,6 +102,7 @@ class UnimodalData:
     def obs(self, obs: pd.DataFrame):
         assert obs.shape[0] == 0 or obs.index.name == "barcodekey"
         self.barcode_metadata = obs
+        self._update_shape()
 
     @property
     def obs_names(self) -> pd.Index:
@@ -116,6 +121,7 @@ class UnimodalData:
     def var(self, var: pd.DataFrame):
         assert var.shape[0] == 0 or var.index.name == "featurekey"
         self.feature_metadata = var
+        self._update_shape()
 
     @property
     def var_names(self) -> pd.Index:
@@ -475,6 +481,7 @@ class UnimodalData:
             self.matrices[key] = self.matrices[key][index, :]
         for key in list(self.barcode_multiarrays):
             self.barcode_multiarrays[key] = self.barcode_multiarrays[key][index]
+        self._update_shape()
 
 
     def _inplace_subset_var(self, index: List[bool]) -> None:
@@ -484,6 +491,7 @@ class UnimodalData:
             self.matrices[key] = self.matrices[key][:, index]
         for key in list(self.feature_multiarrays):
             self.feature_multiarrays[key] = self.feature_multiarrays[key][index]
+        self._update_shape()
 
 
     def __getitem__(self, index: INDEX) -> UnimodalDataView:
