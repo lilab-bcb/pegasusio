@@ -1,9 +1,10 @@
 import os
 import time
 import anndata
-from typing import Tuple, Set
+from typing import Tuple, Set, Union
+
 import logging
-logger = logging.getLogger("pegasusio")
+logger = logging.getLogger(__name__)
 
 from pegasusio import UnimodalData, MultimodalData
 
@@ -155,7 +156,7 @@ def read_input(
 
 
 def write_output(
-    data: MultimodalData,
+    data: Union[MultimodalData, UnimodalData],
     output_file: str,
     file_type: str = None,
     zarr_zipstore: bool = False,
@@ -191,6 +192,9 @@ def write_output(
     >>> io.write_output(data, 'test.zarr')
     """
     start = time.perf_counter()
+
+    if isinstance(data, UnimodalData):
+        data = MutimodalData({data.uns["genome"]: data})
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 
