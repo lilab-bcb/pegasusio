@@ -1,11 +1,16 @@
+import gc
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack, vstack
+from typing import List, Dict, Union, Set, Tuple
 
-from typing import List, Dict, Union, Set
+import logging
+logger = logging.getLogger(__name__)
+
 import anndata
 
 from pegasusio import UnimodalData
+from .views import INDEX, UnimodalDataView
 
 
 
@@ -28,6 +33,11 @@ class MultimodalData:
             repr_str += "\n    It currently binds to no UnimodalData object"
 
         return repr_str
+
+
+    def update(self, data: "MultimodalData") -> None:
+        for key in data.data:
+            self.data[key] = data.data[key]
 
 
     @property
@@ -102,6 +112,21 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.uns = uns
 
+    @property
+    def shape(self) -> Tuple[int, int]:
+        return self._unidata.shape if self._unidata is not None else None
+    
+    @shape.setter
+    def shape(self, _shape: Tuple[int, int]):
+        assert self._unidata is not None
+        self._unidata.shape = _shape
+
+    def as_float(self, matkey: str = None) -> None:
+        """ Surrogate function to convert matrix to float """
+        assert self._unidata is not None
+        self._unidata.as_float(matkey)
+
+
     def list_keys(self, key_type: str = "matrix") -> List[str]:
         """ Surrogate function for UnimodalData, return available keys in metadata, key_type = barcode, feature, matrix, other
         """
@@ -135,6 +160,11 @@ class MultimodalData:
         """ Surrogate function for UnimodalData, subset feature_metadata inplace """
         assert self._unidata is not None
         self._unidata._inplace_subset_var(index)
+
+    def __getitem__(self, index: INDEX) -> UnimodalDataView:
+        """ Surrogate function for UnimodalData, [] operation """
+        assert self._unidata is not None
+        return self._unidata[index]
 
 
     def list_data(self) -> List[str]:
@@ -173,6 +203,32 @@ class MultimodalData:
         if key not in self.data:
             raise ValueError("Key {} does not exist!".format(key))
         return self.data.pop(key)
+
+
+    def concat_data(self, exptype: str = "rna"):
+        """ Used for raw data, Ignore multiarrays and only consider one matrix per unidata """
+        genomes = []
+        unidata_arr = []
+
+        for key in list(self.data):
+            genomes.append(key)
+            unidata_arr.append(self.data.pop(key))
+
+        if len(genomes) == 1:
+            unikey = genomes[0]
+            self.data[unikey] = unidata_arr[0]
+        else:
+            unikey = ",".join(genomes)
+            feature_metadata = pd.concat([unidata.feature_metadata for unidata in unidata_arr], axis = 0)
+            feature_metadata.reset_index(inplace = True)
+            feature_metadata.fillna(value = "N/A", inplace = True)
+            X = hstack([unidata.matrices["X"] for unidata in unidata_arr], format = "csr")
+            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, metadata = {"genome": unikey, "experiment_type": "rna"})
+            del unidata_arr
+            gc.collect()
+
+        self._selected = unikey
+        self._unidata = self.data[unikey]
 
 
     def subset_data(self, data_subset: Set[str] = None, exptype_subset: Set[str] = None) -> None:

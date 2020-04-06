@@ -3,14 +3,16 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from collections.abc import MutableMapping
-from typing import List, Dict, Union, Set
+from copy import deepcopy
+from typing import List, Dict, Union, Set, Tuple
 
 import logging
 logger = logging.getLogger(__name__)
 
 import anndata
-from pegasusio.cylib.funcs import split_barcode_channel
 
+from pegasusio.cylib.funcs import split_barcode_channel
+from .views import INDEX, _parse_index, UnimodalDataView
 
 
 class UnimodalData:
@@ -22,6 +24,7 @@ class UnimodalData:
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
         metadata: dict = None,
+        cur_matrix: str = "X",
     ) -> None:
         if isinstance(barcode_metadata, anndata.AnnData):
             self.from_anndata(barcode_metadata)
@@ -41,7 +44,7 @@ class UnimodalData:
         self.barcode_multiarrays = replace_none(barcode_multiarrays)
         self.feature_multiarrays = replace_none(feature_multiarrays)
         self.metadata = replace_none(metadata)  # other metadata, a dictionary
-        self.cur_matrix = "X" # default matrix is X
+        self._cur_matrix = cur_matrix # cur_matrix
 
         if len(self.barcode_metadata) > 0:
             if isinstance(self.barcode_metadata, MutableMapping):
@@ -68,24 +71,19 @@ class UnimodalData:
             elif self.feature_metadata.index.name != "featurekey":
                 raise ValueError("Cannot locate feature index featurekey!")
 
-        if (self.X is not None) and (self.barcode_metadata.shape[0] != self.X.shape[0]):
-            raise ValueError(
-                "Wrong number of cells : matrix has {} cells, barcodes file has {}".format(
-                    self.X.shape[0], self.barcode_metadata.shape[0]
-                )
-            )
-        if (self.X is not None) and (self.feature_metadata.shape[0] != self.X.shape[1]):
-            raise ValueError(
-                "Wrong number of features : matrix has {} features, features file has {}".format(
-                    self.X.shape[1], self.feature_metadata.shape[0]
-                )
-            )
+        self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
+
+        for key, mat in self.matrices.items():
+            if mat.shape[0] != self._shape[0]:
+                raise ValueError("Wrong number of barcodes : matrix {} has {} barcodes, barcodes file has {} barcodes.".format(key, mat.shape[0], self._shape[0]))
+            if mat.shape[1] != self._shape[1]:
+                raise ValueError("Wrong number of features : matrix {} has {} features, features file has {} features.".format(key, mat.shape[1], self._shape[1]))
 
 
     def __repr__(self) -> str:
         repr_str = "UnimodalData object with n_obs x n_vars = {} x {}".format(self.barcode_metadata.shape[0], self.feature_metadata.shape[0])
         repr_str += "\n    It contains {} matrices: {}".format(len(self.matrices), str(list(self.matrices))[1:-1])
-        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self.cur_matrix) if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
+        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
             repr_str += "\n    {}: {}".format(key, str(list(getattr(self, key).keys()))[1:-1])
 
@@ -130,11 +128,11 @@ class UnimodalData:
 
     @property
     def X(self) -> Union[csr_matrix, None]:
-        return self.matrices.get(self.cur_matrix, None)
+        return self.matrices.get(self._cur_matrix, None)
 
     @X.setter
     def X(self, X: csr_matrix):
-        self.matrices[self.cur_matrix] = X
+        self.matrices[self._cur_matrix] = X
 
     @property
     def obsm(self) -> Dict[str, np.ndarray]:
@@ -159,6 +157,14 @@ class UnimodalData:
     @uns.setter
     def uns(self, uns: dict):
         self.metadata = uns
+
+    @property
+    def shape(self) -> Tuple[int, int]:
+        return self._shape
+    
+    @shape.setter
+    def shape(self, _shape: Tuple[int, int]):
+        raise ValueError("Cannot set shape attribute!")
 
 
     def polish_featurekey(self, feature_metadata: pd.DataFrame, genome: str) -> None:
@@ -228,7 +234,7 @@ class UnimodalData:
     def current_matrix(self) -> str:
         """ Return current matrix as self.X
         """
-        return self.cur_matrix
+        return self._cur_matrix
 
 
     def add_matrix(self, key: str, mat: csr_matrix) -> None:
@@ -236,10 +242,10 @@ class UnimodalData:
         """
         if key in self.matrices:
             raise ValueError("Matrix key {} already exists!".format(key))
-        if self.barcode_metadata.shape[0] != mat.shape[0]:
-            raise ValueError("Wrong number of cells: matrix has {} cells, which is not match with barcode file ({})!".format(mat.shape[0], self.barcode_metadata.shape[0]))
-        if self.feature_metadata.shape[0] != mat.shape[1]:
-            raise ValueError("Wrong number of features: matrix has {} features, which is not match with feature file ({})!".format(mat.shape[1], self.feature_metadata.shape[0]))
+        if mat.shape[0] != self._shape[0]:
+            raise ValueError("Wrong number of barcodes: matrix {} has {} barcodes, which does not match with the barcode file ({})!".format(key, mat.shape[0], self._shape[0]))
+        if mat.shape[1] != self._shape[1]:
+            raise ValueError("Wrong number of features: matrix {} has {} features, which does not match with the feature file ({})!".format(key, mat.shape[1], self._shape[1]))
 
         self.matrices[key] = mat
 
@@ -249,7 +255,7 @@ class UnimodalData:
         """
         if key not in self.matrices:
             raise ValueError("Matrix key {} does not exist!".format(key))
-        self.cur_matrix = key
+        self._cur_matrix = key
 
 
     def get_matrix(self, key: str) -> csr_matrix:
@@ -258,6 +264,17 @@ class UnimodalData:
         if key not in self.matrices:
             raise ValueError("Matrix key {} does not exist!".format(key))
         return self.matrices[key]
+
+
+    def as_float(self, key: str = None) -> None:
+        """ Convert self.matrices[key] as float
+        """
+        key = self._cur_matrix if key is None else key
+        X = self.matrices[key]
+        if X.dtype == np.int32:
+            X.dtype = np.float32
+            orig_data = X.data.view(np.int32)
+            X.data[...] = orig_data
 
 
     def trim(self, selected: List[bool]) -> None:
@@ -391,7 +408,8 @@ class UnimodalData:
         elif "experiment_type" not in self.metadata:
             self.metadata["experiment_type"] = "rna"
 
-        self.cur_matrix = "X"
+        self._cur_matrix = "X"
+        self._shape = data.shape
 
     
     def to_anndata(self) -> anndata.AnnData:
@@ -417,19 +435,37 @@ class UnimodalData:
 
 
     def copy(self) -> "UnimodalData":
-        from copy import deepcopy
-        new_data = UnimodalData(self.barcode_metadata.copy(), 
-                                self.feature_metadata.copy(), 
-                                deepcopy(self.matrices), 
-                                deepcopy(self.barcode_multiarrays), 
-                                deepcopy(self.feature_multiarrays), 
-                                deepcopy(self.metadata))
-        new_data.cur_matrix = self.cur_matrix
-        return new_data
+        return UnimodalData(self.barcode_metadata.copy(), 
+                            self.feature_metadata.copy(), 
+                            deepcopy(self.matrices), 
+                            deepcopy(self.barcode_multiarrays), 
+                            deepcopy(self.feature_multiarrays), 
+                            deepcopy(self.metadata), 
+                            self._cur_matrix)
 
 
     def __deepcopy__(self, memo: Dict):
         return self.copy()
+
+
+    def _copy_view(self, viewobj: UnimodalDataView, deep: bool = True):
+        """ deep: if deepcopy """
+        mats = viewobj._copy_matrices()
+        bmarrs = viewobj.obsm[...]
+        fmarrs = viewobj.varm[...]
+        
+        if deep:
+            mats = deepcopy(mats)
+            bmarrs = deepcopy(bmarrs)
+            fmarrs = deepcopy(fmarrs)
+
+        return UnimodalData(viewobj.obs.copy(), 
+                            viewobj.var.copy(),
+                            mats,
+                            bmarrs,
+                            fmarrs,
+                            deepcopy(viewobj.uns),
+                            viewobj._cur_matrix)
 
 
     def _inplace_subset_obs(self, index: List[bool]) -> None:
@@ -448,4 +484,8 @@ class UnimodalData:
             self.matrices[key] = self.matrices[key][:, index]
         for key in list(self.feature_multiarrays):
             self.feature_multiarrays[key] = self.feature_multiarrays[key][index]
-            
+
+
+    def __getitem__(self, index: INDEX) -> UnimodalDataView:
+        barcode_index, feature_index = _parse_index(self, index)
+        return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix)
