@@ -91,15 +91,18 @@ class ZarrFile:
 
 
     def read_dataframe(self, group: zarr.Group) -> Union[pd.DataFrame, np.ndarray]:
-        if group.attrs['data_type'] == 'data_frame':
+        columns = group.attrs.get('columns', None)
+        if columns is None:
             columns = [col for col in group.array_keys() if col != '_index']
+
+        if group.attrs['data_type'] == 'data_frame':
             df = pd.DataFrame(data = {col: self.read_series(group, col) for col in columns},
                 index = pd.Index(self.read_series(group, '_index'), name = group.attrs['index_name']),
                 columns = columns)
             return df
         else:
-            array = np.rec.fromarrays([self.read_series(group, col) for col in group.array_keys()],
-                names = group.attrs['columns'])
+            array = np.rec.fromarrays([self.read_series(group, col) for col in columns],
+                names = columns)
             return array
 
 
@@ -221,6 +224,7 @@ class ZarrFile:
         sub_group = group.create_group(name, overwrite = True) 
         attrs_dict = {'data_type' : data_type}
         cols = list(df.columns if data_type == 'data_frame' else df.dtype.names)
+        attrs_dict['columns'] = cols
         if data_type == 'data_frame':
             attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
             sub_group.create_group('_categories', overwrite = True) # create a group to store category keys for catigorical columns
