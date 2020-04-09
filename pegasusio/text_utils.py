@@ -121,8 +121,8 @@ def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t")
     return feature_metadata, format_type
 
 
-def load_one_mtx_file(path: str, file_name: str, genome: str, exptype: str, ngene: int = None) -> UnimodalData:
-    """Load one gene-count matrix in mtx format into an Array2D object
+def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, ngene: int = None) -> UnimodalData:
+    """Load one gene-count matrix in mtx format into a UnimodalData object
     """
     fname = re.sub('(.mtx|.mtx.gz)$', '', file_name)
     barcode_file, feature_file = _locate_barcode_and_feature_files(path, fname)
@@ -150,8 +150,8 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, exptype: str, ngen
     mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
     mat.eliminate_zeros()
 
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"experiment_type": exptype, "genome": genome})
-    if exptype == "rna":
+    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": modality, "genome": genome})
+    if modality == "rna":
         unidata.filter(ngene=ngene)
     if format_type == "10x v3" or format_type == "10x v2":
         unidata.separate_channels()
@@ -172,7 +172,7 @@ def _locate_mtx_file(path: str) -> str:
     return file_names[0] if len(file_names) > 0 else None
 
 
-def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int = None) -> MultimodalData:
+def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: int = None) -> MultimodalData:
     """Load gene-count matrix from Market Matrix files (10x v2, v3 and HCA DCP formats)
 
     Parameters
@@ -182,10 +182,10 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int
         Path to mtx files. The directory implied by path should either contain matrix, feature and barcode information, or folders containing these information.
     genome : `str`, optional (default: None)
         Genome name of the matrix. If None, genome will be inferred from path.
-    exptype: `str`, optional (default: None)
-        Experiment type, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
+    modality: `str`, optional (default: None)
+        Modality, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to 'rna' exptype
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to 'rna' modality
 
     Returns
     -------
@@ -208,8 +208,8 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int
 
     data = MultimodalData()
 
-    if exptype is None:
-        exptype = "rna"
+    if modality is None:
+        modality = "rna"
 
     if file_name is not None:
         if genome is None:
@@ -220,7 +220,7 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int
                 path,
                 file_name,
                 genome,
-                exptype,
+                modality,
                 ngene=ngene,
             ),
         )
@@ -230,7 +230,7 @@ def load_mtx_file(path: str, genome: str = None, exptype: str = None, ngene: int
                 file_name = _locate_mtx_file(dir_entry.path)
                 if file_name is None:
                     raise ValueError("Folder {} does not contain a mtx file!".format(dir_entry.path))
-                data.add_data(dir_entry.name, load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, exptype, ngene=ngene))
+                data.add_data(dir_entry.name, load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, modality, ngene=ngene))
 
     return data
 
@@ -281,7 +281,7 @@ def load_csv_file(
     input_csv: str,
     sep: str = ",",
     genome: str = None,
-    exptype: str = None,
+    modality: str = None,
     ngene: int = None
 ) -> MultimodalData:
     """Load count matrix from a CSV-style file, such as CSV file or DGE style tsv file.
@@ -295,10 +295,10 @@ def load_csv_file(
         Separator between fields, either ',' or '\t'.
     genome : `str`, optional (default None)
         The genome reference. If None, use "unknown" instead.
-    exptype: `str`, optional (default None)
-        Experiment type. If None, use "rna" instead.
+    modality: `str`, optional (default None)
+        Modality. If None, use "rna" instead.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with exptype == "rna"
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with modality == "rna"
 
     Returns
     -------
@@ -356,10 +356,10 @@ def load_csv_file(
             assert (feature_metadata.shape[0] == shape[0]) and ((feature_metadata["featurekey"].values != np.array(rownames)).sum() == 0)
 
     genome = genome if genome is not None else "unknown"
-    exptype = exptype if exptype is not None else "rna"
+    modality = modality if modality is not None else "rna"
 
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "experiment_type": exptype})
-    if exptype == "rna":
+    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "modality": modality})
+    if modality == "rna":
         unidata.filter(ngene = ngene)
 
     data = MultimodalData()

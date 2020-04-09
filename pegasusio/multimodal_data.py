@@ -15,9 +15,9 @@ from .views import INDEX, UnimodalDataView
 
 
 class MultimodalData:
-    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None, genome: str = None, exptype: str = None):
+    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None, genome: str = None, modality: str = None):
         if isinstance(data_dict, anndata.AnnData):
-            self.from_anndata(data_dict, genome = genome, exptype = exptype)
+            self.from_anndata(data_dict, genome = genome, modality = modality)
             return None
 
         self.data = data_dict if data_dict is not None else dict()
@@ -145,11 +145,11 @@ class MultimodalData:
         assert self._unidata is not None
         return self._unidata.get_matrix(key)
 
-    def get_exptype(self) -> str:
-        """ Surrogate function for UnimodalData, return experiment tpye, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
+    def get_modality(self) -> str:
+        """ Surrogate function for UnimodalData, return modality, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
         """
         assert self._unidata is not None
-        return self._unidata.get_exptype()
+        return self._unidata.get_modality()
 
     def _inplace_subset_obs(self, index: List[bool]) -> None:
         """ Surrogate function for UnimodalData, subset barcode_metadata inplace """
@@ -193,10 +193,23 @@ class MultimodalData:
         return self._selected
 
 
-    def get_data(self, key: str) -> UnimodalData:
-        if key not in self.data:
-            raise ValueError("Key {} does not exist!".format(key))
-        return self.data[key]
+    def get_data(self, key: str = None, modality: str = None) -> Union[UnimodalData, List[UnimodalData]]:
+        if key is not None:
+            if key not in self.data:
+                raise ValueError("Key {} does not exist!".format(key))
+            return self.data[key]
+
+        if modality is None:
+            raise ValueError("Either key or modality needs to be set!")
+
+        data_arr = []
+        for key in self.data:
+            if self.data[key].uns["modality"] == modality:
+                data_arr.append(self.data[key])
+        if len(data_arr) == 0:
+            raise ValueError("No UnimodalData with modality {}!".format(modality))
+
+        return data_arr[0] if len(data_arr) == 1 else data_arr
 
 
     def drop_data(self, key: str) -> UnimodalData:
@@ -205,7 +218,7 @@ class MultimodalData:
         return self.data.pop(key)
 
 
-    def concat_data(self, exptype: str = "rna"):
+    def concat_data(self, modality: str = "rna"):
         """ Used for raw data, Ignore multiarrays and only consider one matrix per unidata """
         genomes = []
         unidata_arr = []
@@ -223,7 +236,7 @@ class MultimodalData:
             feature_metadata.reset_index(inplace = True)
             feature_metadata.fillna(value = "N/A", inplace = True)
             X = hstack([unidata.matrices["X"] for unidata in unidata_arr], format = "csr")
-            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, metadata = {"genome": unikey, "experiment_type": "rna"})
+            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, metadata = {"genome": unikey, "modality": "rna"})
             del unidata_arr
             gc.collect()
 
@@ -231,17 +244,17 @@ class MultimodalData:
         self._unidata = self.data[unikey]
 
 
-    def subset_data(self, data_subset: Set[str] = None, exptype_subset: Set[str] = None) -> None:
-        """ Only keep data that are in data_subset and exptype_subset
+    def subset_data(self, data_subset: Set[str] = None, modality_subset: Set[str] = None) -> None:
+        """ Only keep data that are in data_subset and modality_subset
         """
         if data_subset is not None:
             for key in self.list_data():
                 if key not in data_subset:
                     self.data.pop(key)
 
-        if exptype_subset is not None:
+        if modality_subset is not None:
             for key in self.list_data():
-                if self.data[key].uns["experiment_type"] not in exptype_subset:
+                if self.data[key].uns["modality"] not in modality_subset:
                     self.data.pop(key)
 
 
@@ -258,13 +271,13 @@ class MultimodalData:
                 black_list.remove(keyword)
 
         _check_reserved_keyword(black_list, "genome")
-        _check_reserved_keyword(black_list, "experiment_type")
+        _check_reserved_keyword(black_list, "modality")
 
         for key in self.data:
             self.data[key].scan_black_list(black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, exptype: str = None) -> None:
+    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         """ Initialize from an anndata object
         """
         unidata = UnimodalData(data)

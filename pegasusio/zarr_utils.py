@@ -11,8 +11,7 @@ from zarr import Blosc
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
-from pegasusio import UnimodalData, MultimodalData
-
+from pegasusio import modalities, UnimodalData, MultimodalData
 
 
 CHUNKSIZE = 1000000
@@ -142,7 +141,7 @@ class ZarrFile:
         """ Read UnimodalData
             ngene: filter barcodes with < ngene
             select_singlets: only select singlets
-            The above two option only works if experiment_type == "rna"
+            The above two option only works if modality == "rna"
         """
         unidata = UnimodalData(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
                             feature_metadata = self.read_dataframe(group['feature_metadata']),
@@ -152,9 +151,11 @@ class ZarrFile:
                             metadata = self.read_mapping(group['metadata']))
 
         assert "genome" in unidata.metadata
-        assert "experiment_type" in unidata.metadata
-        
-        if unidata.metadata["experiment_type"] == "rna":
+        if "modality" not in unidata.metadata:
+            assert unidata.metadata.get("experiment_type", "none") in modalities
+            unidata.metadata["modality"] = unidata.metadata.pop("experiment_type")
+
+        if unidata.metadata["modality"] == "rna":
             unidata.filter(ngene, select_singlets)
 
         return unidata
@@ -164,7 +165,7 @@ class ZarrFile:
         """ Read MultimodalData
             ngene: filter barcodes with < ngene
             select_singlets: only select singlets
-            The above two option only works for dataset with experiment_type == "rna"
+            The above two option only works for dataset with modality == "rna"
         """
         data = MultimodalData()
         need_trim = (ngene is not None) or select_singlets
@@ -172,14 +173,14 @@ class ZarrFile:
 
         for key, group in self.root.groups():
             unidata = self.read_unimodal_data(group, ngene, select_singlets)
-            if need_trim and unidata.uns.get("experiment_type", "rna") == "rna":
+            if need_trim and unidata.uns.get("modality", "rna") == "rna":
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
             data.add_data(key, unidata)
 
         if need_trim:
             for key in data.list_data():
                 unidata = data.get_data(key)
-                if unidata.uns.get("experiment_type", "rna") != "rna":
+                if unidata.uns.get("modality", "rna") != "rna":
                     selected = unidata.obs_names.isin(selected_barcodes)
                     unidata.trim(selected)
 

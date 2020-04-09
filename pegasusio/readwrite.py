@@ -13,7 +13,6 @@ from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_
 from .zarr_utils import ZarrFile
 
 
-
 def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     """ Infer file format from input_file name
 
@@ -77,12 +76,12 @@ def read_input(
     input_file: str,
     file_type: str = None,
     genome: str = None,
-    exptype: str = None,
+    modality: str = None,
     ngene: int = None,
     select_singlets: bool = False,
     black_list: Set[str] = None,
     select_data: Set[str] = None,
-    select_exptype: Set[str] = None 
+    select_modality: Set[str] = None 
 ) -> MultimodalData:
     """Load data into memory.
 
@@ -97,8 +96,8 @@ def read_input(
         File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', or 'tsv'. If None, inferred from input_file
     genome : `str`, optional (default: None)
         For formats like loom, mtx, dge, csv and tsv, genome is used to provide genome name. In this case if genome is None, except mtx format, "unknown" is used as the genome name instead.
-    exptype : `str`, optional (default: None)
-        Default experiment type, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
+    modality : `str`, optional (default: None)
+        Default modality, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
     ngene : `int`, optional (default: None)
         Minimum number of genes to keep a barcode. Default is to keep all barcodes.
     select_singlets : `bool`, optional (default: False)
@@ -107,8 +106,8 @@ def read_input(
         Attributes in black list will be poped out.
     select_data: `Set[str]`, optional (default: None)
         Only select data with keys in select_data.
-    select_exptype: `Set[str]`, optional (default: None)
-        Only select data with experiment type in select_exptype.
+    select_modality: `Set[str]`, optional (default: None)
+        Only select data with modalities in select_modality.
 
     Returns
     -------
@@ -119,7 +118,7 @@ def read_input(
     --------
     >>> data = io.read_input('example_10x.h5')
     >>> data = io.read_input('example.h5ad')
-    >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', exptype = 'hashing')
+    >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
     start = time.perf_counter()
 
@@ -134,18 +133,18 @@ def read_input(
     elif file_type == "h5sc":
         data = load_pegasus_h5_file(input_file, ngene=ngene, select_singlets=select_singlets)
     elif file_type == "h5ad":
-        data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, exptype = exptype)
+        data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, modality = modality)
     elif file_type == "loom":
-        data = load_loom_file(input_file, genome = genome, exptype = exptype, ngene = ngene)
+        data = load_loom_file(input_file, genome = genome, modality = modality, ngene = ngene)
     elif file_type == "10x":
         data = load_10x_h5_file(input_file, ngene=ngene)
     elif file_type == "mtx":
-        data = load_mtx_file(input_file, genome = genome, exptype = exptype, ngene = ngene)
+        data = load_mtx_file(input_file, genome = genome, modality = modality, ngene = ngene)
     else:
         assert file_type == "csv" or file_type == "tsv"
-        data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, exptype = exptype, ngene = ngene)
+        data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)
 
-    data.subset_data(select_data, select_exptype)
+    data.subset_data(select_data, select_modality)
     data.scan_black_list(black_list)    
 
     end = time.perf_counter()
