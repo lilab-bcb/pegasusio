@@ -193,10 +193,23 @@ class MultimodalData:
         return self._selected
 
 
-    def get_data(self, key: str) -> UnimodalData:
-        if key not in self.data:
-            raise ValueError("Key {} does not exist!".format(key))
-        return self.data[key]
+    def get_data(self, key: str = None, modality: str = None) -> Union[UnimodalData, List[UnimodalData]]:
+        if key is not None:
+            if key not in self.data:
+                raise ValueError("Key {} does not exist!".format(key))
+            return self.data[key]
+
+        if modality is None:
+            raise ValueError("Either key or modality needs to be set!")
+
+        data_arr = []
+        for key in self.data:
+            if self.data[key].uns["modality"] == modality:
+                data_arr.append(self.data[key])
+        if len(data_arr) == 0:
+            raise ValueError("No UnimodalData with modality {}!".format(modality))
+
+        return data_arr[0] if len(data_arr) == 1 else data_arr
 
 
     def drop_data(self, key: str) -> UnimodalData:
