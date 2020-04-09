@@ -14,6 +14,8 @@ logger.addHandler(ch)
 warnings.filterwarnings("ignore", category=FutureWarning, module='anndata')
 
 
+modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac']
+
 from .unimodal_data import UnimodalData
 from .multimodal_data import MultimodalData
 from .readwrite import infer_file_type, read_input, write_output

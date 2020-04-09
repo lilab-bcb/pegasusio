@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
+from pegasusio import modalities
 from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
 
@@ -206,10 +207,10 @@ class UnimodalData:
                     keys[i] = keys[i] + ".#~{}".format(idn) # duplicate ID starts from 2. .#~ makes it unique.
 
 
-    def get_exptype(self) -> str:
-        """ return experiment tpye, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
+    def get_modality(self) -> str:
+        """ return modality, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
         """
-        return self.metadata.get("experiment_type", None)
+        return self.metadata.get("modality", None)
 
 
     def get_genome(self) -> str:
@@ -374,9 +375,9 @@ class UnimodalData:
         _scan_dict(self.metadata, black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, exptype: str = None) -> None:
+    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         """ Initialize from an anndata object
-            If genome/exptype is not None, set 'genome'/'experiment_type' as genome/exptype
+            If genome/modality is not None, set 'genome'/'modality' as genome/modality
         """
         self.barcode_metadata = data.obs
         self.barcode_metadata.index.name = "barcodekey"
@@ -409,10 +410,13 @@ class UnimodalData:
             assert self.metadata["genome"].ndim == 1
             self.metadata["genome"] = self.metadata["genome"][0]
 
-        if exptype is not None:
-            self.metadata["experiment_type"] = exptype
-        elif "experiment_type" not in self.metadata:
-            self.metadata["experiment_type"] = "rna"
+        if modality is not None:
+            self.metadata["modality"] = modality
+        elif "modality" not in self.metadata:
+            if self.metadata.get("experiment_type", "none") in modalities:
+                self.metadata["modality"] = self.metadata.pop("experiment_type")
+            else:        
+                self.metadata["modality"] = "rna"
 
         self._cur_matrix = "X"
         self._shape = data.shape
@@ -476,6 +480,8 @@ class UnimodalData:
 
     def _inplace_subset_obs(self, index: List[bool]) -> None:
         """ Subset barcode_metadata inplace """
+        if isinstance(index, pd.Series):
+            index = index.values
         self.barcode_metadata = self.barcode_metadata.loc[index]
         for key in list(self.matrices):
             self.matrices[key] = self.matrices[key][index, :]
@@ -486,6 +492,8 @@ class UnimodalData:
 
     def _inplace_subset_var(self, index: List[bool]) -> None:
         """ Subset feature_metadata inplace """
+        if isinstance(index, pd.Series):
+            index = index.values
         self.feature_metadata = self.feature_metadata.loc[index]
         for key in list(self.matrices):
             self.matrices[key] = self.matrices[key][:, index]

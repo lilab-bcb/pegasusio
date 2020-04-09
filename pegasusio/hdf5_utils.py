@@ -7,8 +7,7 @@ from typing import Dict
 import logging
 logger = logging.getLogger(__name__)
 
-from pegasusio import UnimodalData, MultimodalData
-
+from pegasusio import modalities, UnimodalData, MultimodalData
 
 
 def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
@@ -52,7 +51,7 @@ def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         unidata = UnimodalData({"barcodekey": barcodes}, 
         	{"featurekey": names, "featureid": ids}, 
         	{"X": mat}, 
-        	metadata = {"experiment_type": "rna", "genome": genome}
+        	metadata = {"modality": "rna", "genome": genome}
         )
         unidata.filter(ngene=ngene)
         unidata.separate_channels()
@@ -103,7 +102,7 @@ def load_10x_h5_file_v3(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         barcode_metadata = {"barcodekey": barcodes}
         feature_metadata = {"featurekey": names[idx], "featureid": ids[idx]}
         mat = bigmat[:, idx].copy()
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"experiment_type": "rna", "genome": genome})
+        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": "rna", "genome": genome})
         unidata.filter(ngene=ngene)
         unidata.separate_channels()
 
@@ -205,7 +204,7 @@ def load_pegasus_h5_file(
                 feature_metadata[key] = values
 
             is_citeseq = genome.startswith("CITE_Seq")
-            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"experiment_type": "citeseq" if is_citeseq else "rna", "genome": genome})
+            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": "citeseq" if is_citeseq else "rna", "genome": genome})
 
             if is_citeseq:
                 cite_seq_name = genome
@@ -223,7 +222,7 @@ def load_pegasus_h5_file(
     return data
 
 
-def load_loom_file(input_loom: str, genome: str = None, exptype: str = None, ngene: int = None) -> MultimodalData:
+def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ngene: int = None) -> MultimodalData:
     """Load count matrix from a LOOM file.
 
     Parameters
@@ -233,10 +232,10 @@ def load_loom_file(input_loom: str, genome: str = None, exptype: str = None, nge
         The LOOM file, containing the count matrix.
     genome : `str`, optional (default None)
         The genome reference. If None, use "unknown" instead. If not None and input loom contains genome attribute, the attribute will be overwritten.
-    exptype: `str`, optional (default None)
-        Experiment type. If None, use "rna" instead. If not None and input loom contains experiment_type attribute, the attribute will be overwritten.
+    modality: `str`, optional (default None)
+        Modality. If None, use "rna" instead. If not None and input loom contains modality attribute, the attribute will be overwritten.
     ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with exptype == "rna".
+        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with modality == "rna".
 
     Returns
     -------
@@ -286,13 +285,17 @@ def load_loom_file(input_loom: str, genome: str = None, exptype: str = None, nge
             metadata["genome"] = genome
         elif "genome" not in metadata:
             metadata["genome"] = "unknown"
-        if exptype is not None:
-            metadata["experiment_type"] = exptype
-        elif "experiment_type" not in metadata:
-            metadata["experiment_type"] = "rna"
+
+        if modality is not None:
+            metadata["modality"] = modality
+        elif "modality" not in metadata:
+            if metadata.get("experiment_type", "none") in modalities:
+                metadata["modality"] = metadata.pop("experiment_type")
+            else:
+                metadata["modality"] = "rna"
             
         unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata)
-        if metadata["experiment_type"] == "rna":
+        if metadata["modality"] == "rna":
             unidata.filter(ngene = ngene)
 
     data.add_data(genome, unidata)
