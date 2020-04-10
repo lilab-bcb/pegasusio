@@ -47,7 +47,6 @@ class MultiArrayView(MutableMapping):
 
 
 
-
 def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX) -> Tuple[List[int], List[int]]:
 
     def _extract_indices_from_parent(parent: Union["UnimodalData", "UnimodalDataView"]) -> Tuple[pd.Index, pd.Index, List[int], List[int]]:
@@ -61,7 +60,13 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
             if index_1d == slice(None):
                 return None
             else:
-                raise ValueError("Do not accept slice other than slice(None) as {} index!".format(index_name))
+                if not (isinstance(index_1d.start, int) or isinstance(index_1d.start, np.integer) or isinstance(index_1d.start, str) or (index_1d.start is None)):
+                    raise ValueError("Invalid slice.start '{}'. slice.start must be either None, integer or string!".format(index_1d.start))
+                if not (isinstance(index_1d.stop, int) or isinstance(index_1d.stop, np.integer) or isinstance(index_1d.stop, str) or (index_1d.stop is None)):
+                    raise ValueError("Invalid slice.stop '{}'. slice.stop must be either None, integer or string!".format(index_1d.stop))
+                if not (isinstance(index_1d.step, int) or isinstance(index_1d.step, np.integer) or (index_1d.step is None)):
+                    raise ValueError("Invalid slice.step '{}'. slice.step must be either None, integer or string!".format(index_1d.step))
+                return index_1d
         elif isinstance(index_1d, pd.Index):
             return index_1d
         else:
@@ -83,29 +88,60 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
 
     def _parse_one_index(base_idx: pd.Index, index_1d: Union[INDEX1D, None], index_name: str, view_index: List[int] = None) -> List[int]:
         """ index_name: 'row' or 'column' """
-        if index_1d is None:
-            indexer = np.array(range(base_idx.size)) if view_index is None else view_index.copy()
-        elif isinstance(index_1d, pd.Index):
-            indexer = _process_pd_index(base_idx, index_1d)
-        else:
-            assert isinstance(index_1d, np.ndarray) and index_1d.ndim == 1
-            if index_1d.dtype.kind in {'b', 'i', 'u'}:
-                upper_size = base_idx.size if view_index is None else view_index.size
-                if index_1d.dtype.kind == 'b':
-                    if index_1d.size != upper_size:
-                        raise ValueError("{} index size does not match: actual size {}, input size {}!".format(index_name, upper_size, index_1d.size))
-                    indexer = np.where(index_1d)[0] if view_index is None else view_index[index_1d]
-                elif index_1d.dtype.kind == 'i' or index_1d.dtype.kind == 'u':
-                    if np.any(index_1d < 0):
-                        raise ValueError("Detect negative values in {} index!".format(index_name))
-                    if np.any(index_1d >= upper_size):
-                        raise ValueError("Detect values exceeding the largest valid position {} in {} index!".format(upper_size - 1, index_name))
-                    if np.unique(index_1d).size < index_1d.size:
-                        raise ValueError("{} index values are not unique!".format(index_name))
-                    indexer = index_1d if view_index is None else view_index[index_1d]
-            else:
-                indexer = _process_pd_index(base_idx, pd.Index(index_1d))
+        if view_index is not None:
+            base_idx = base_idx[view_index]
 
+        indexer = None
+
+        if index_1d is None:
+            indexer = range(base_idx.size)
+        elif isinstance(index_1d, slice):
+            step = 1 if index_1d.step is None else index_1d.step
+            
+            start = index_1d.start
+            if isinstance(start, str):
+                if start not in base_idx:
+                    raise ValueError("Cannot locate slice.start '{}' in {} index!".format(start, index_name))
+                start = base_idx.get_loc(start)
+            elif start is None:
+                start = 0
+            else:
+                if start < 0 or start >= base_idx.size:
+                    raise ValueError("slice.start '{}' is out of the boundary [{}, {}) for {} index!".format(start, 0, base_idx.size, index_name))
+
+            stop = index_1d.stop
+            if isinstance(stop, str):
+                if stop not in base_idx:
+                    raise ValueError("Cannot locate slice.stop '{}' in {} index!".format(stop, index_name))
+                stop = base_idx.get_loc(stop) + np.sign(step) # if str , use [] instead of [)
+            elif stop is None:
+                stop = base_idx.size
+            else:
+                if stop < 0 or stop > base_idx.size:
+                    raise ValueError("slice.stop '{}' is out of the boundary [{}, {}] for {} index!".format(stop, 0, base_idx.size, index_name))
+
+            indexer = range(start, stop, step)
+        elif isinstance(index_1d, np.ndarray) and (index_1d.dtype.kind in {'b', 'i', 'u'}):
+            assert index_1d.ndim == 1
+
+            if index_1d.dtype.kind == 'b':
+                if index_1d.size != base_idx.size:
+                    raise ValueError("{} index size does not match: actual size {}, input size {}!".format(index_name, base_idx.size, index_1d.size))
+                indexer = np.where(index_1d)[0]
+            elif index_1d.dtype.kind == 'i' or index_1d.dtype.kind == 'u':
+                if np.any(index_1d < 0):
+                    raise ValueError("Detect negative values in {} index!".format(index_name))
+                if np.any(index_1d >= base_idx.size):
+                    raise ValueError("Detect values exceeding the largest valid position {} in {} index!".format(base_idx.size - 1, index_name))
+                if np.unique(index_1d).size < index_1d.size:
+                    raise ValueError("{} index values are not unique!".format(index_name))
+        else:
+            if not isinstance(index_1d, pd.Index):
+                assert isinstance(index_1d, np.ndarray) and index_1d.ndim == 1
+                index_1d = pd.Index(index_1d)
+            indexer = _process_pd_index(base_idx, index_1d)
+
+        indexer = np.array(indexer, copy = False) if view_index is None else view_index[indexer]
         return indexer
 
 
@@ -161,7 +197,7 @@ class UnimodalDataView:
     @property
     def obs(self) -> pd.DataFrame:
         if self.barcode_metadata is None:
-            self.barcode_metadata = self.parent.barcode_metadata.iloc[self.barcode_index]
+            self.barcode_metadata = self.parent.barcode_metadata.iloc[self.barcode_index].copy(deep = False)
         return self.barcode_metadata
 
     @obs.setter
@@ -179,7 +215,7 @@ class UnimodalDataView:
     @property
     def var(self) -> pd.DataFrame:
         if self.feature_metadata is None:
-            self.feature_metadata = self.parent.feature_metadata.iloc[self.feature_index]
+            self.feature_metadata = self.parent.feature_metadata.iloc[self.feature_index].copy(deep = False)
         return self.feature_metadata
 
     @var.setter

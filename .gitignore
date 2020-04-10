@@ -1,4 +1,6 @@
 ext_modules/*.c
+ext_modules/*.html
+ext_modules/*.so
 __pycache__
 build/
 dist/
