@@ -4,6 +4,7 @@ from setuptools.extension import Extension
 from Cython.Build import cythonize
 from codecs import open
 import os
+import numpy
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -23,7 +24,7 @@ requires = [
 ]
 
 extensions = [
-    Extension("pegasusio.cylib.funcs", ["ext_modules/fast_funcs.pyx"]),
+    Extension("pegasusio.cylib.funcs", ["ext_modules/fast_funcs.pyx"], include_dirs=[numpy.get_include()]),
     Extension("pegasusio.cylib.io", ["ext_modules/io_funcs.pyx"])
 ]
 

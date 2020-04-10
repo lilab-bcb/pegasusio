@@ -1,5 +1,6 @@
 import os
 import time
+import gzip
 import anndata
 from typing import Tuple, Set, Union
 
@@ -11,6 +12,7 @@ from pegasusio import UnimodalData, MultimodalData
 from .hdf5_utils import load_10x_h5_file, load_pegasus_h5_file, load_loom_file, write_loom_file
 from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
 from .zarr_utils import ZarrFile
+from .vdj_utils import load_10x_vdj_file
 
 
 def infer_file_type(input_file: str) -> Tuple[str, str, str]:
@@ -70,6 +72,14 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
         raise ValueError("Unrecognized file type for file {}!".format(input_file))
 
     return file_type, copy_path, copy_type
+
+
+def parse_csv_type(input_csv: str) -> str:
+    with (gzip.open(input_csv, "rt") if input_csv.endswith(".gz") else open(input_csv)) as fin:
+        line = next(fin)
+        if line.find(",chain,v_gene,d_gene,j_gene,c_gene,") >= 0:
+            return "vdj"
+    return "other"
 
 
 def read_input(
@@ -142,7 +152,10 @@ def read_input(
         data = load_mtx_file(input_file, genome = genome, modality = modality, ngene = ngene)
     else:
         assert file_type == "csv" or file_type == "tsv"
-        data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)
+        if file_type == "csv" and parse_csv_type(input_file) == "vdj":
+            data = load_10x_vdj_file(input_file, genome = genome, modality = modality)
+        else:
+            data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)
 
     data.subset_data(select_data, select_modality)
     data.scan_black_list(black_list)    

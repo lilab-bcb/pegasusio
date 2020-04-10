@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
-from pegasusio import UnimodalData
+from pegasusio import UnimodalData, VDJData
 from .views import INDEX, UnimodalDataView
-
+from .vdj_data import VDJDataView
 
 
 class MultimodalData:
@@ -22,12 +22,21 @@ class MultimodalData:
 
         self.data = data_dict if data_dict is not None else dict()
         self._selected = self._unidata = None
+        if len(self.data) > 0:
+            self._selected = list(self.data)[0]
+            self._unidata = self.data[self._selected]
+
+
+    def _find_data_type(self, obj: object) -> str:
+        if isinstance(obj, VDJData):
+            return "VDJData"
+        return "UnimodalData"
 
 
     def __repr__(self) -> str:
         repr_str = "MultimodalData object with {} UnimodalData: {}".format(len(self.data), str(list(self.data))[1:-1])
         if self._selected is not None:
-            repr_str += "\n    It currently binds to UnimodalData object {}\n\n".format(self._selected)
+            repr_str += "\n    It currently binds to {} object {}\n\n".format(self._find_data_type(self._unidata), self._selected)
             repr_str += self._unidata.__repr__()
         else:
             repr_str += "\n    It currently binds to no UnimodalData object"
@@ -37,6 +46,8 @@ class MultimodalData:
 
     def update(self, data: "MultimodalData") -> None:
         for key in data.data:
+            if key in self.data:
+                raise ValueError("Detected duplicated key {}!".format(key))
             self.data[key] = data.data[key]
 
 
@@ -126,7 +137,6 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.as_float(matkey)
 
-
     def list_keys(self, key_type: str = "matrix") -> List[str]:
         """ Surrogate function for UnimodalData, return available keys in metadata, key_type = barcode, feature, matrix, other
         """
@@ -161,10 +171,15 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata._inplace_subset_var(index)
 
-    def __getitem__(self, index: INDEX) -> UnimodalDataView:
+    def __getitem__(self, index: INDEX) -> Union[UnimodalDataView, VDJDataView]:
         """ Surrogate function for UnimodalData, [] operation """
         assert self._unidata is not None
         return self._unidata[index]
+
+    def get_chain(self, chain: str) -> pd.DataFrame:
+        """ Surrogate function for VDJData """
+        assert self._unidata is not None and isinstance(self._unidata, VDJData)
+        return self._unidata.get_chain(chain)
 
 
     def list_data(self) -> List[str]:

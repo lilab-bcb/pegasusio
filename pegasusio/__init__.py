@@ -17,6 +17,7 @@ warnings.filterwarnings("ignore", category=FutureWarning, module='anndata')
 modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac']
 
 from .unimodal_data import UnimodalData
+from .vdj_data import VDJData
 from .multimodal_data import MultimodalData
 from .readwrite import infer_file_type, read_input, write_output
 
