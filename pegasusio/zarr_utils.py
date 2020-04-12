@@ -182,7 +182,7 @@ class ZarrFile:
                 unidata = data.get_data(key)
                 if unidata.uns.get("modality", "rna") != "rna":
                     selected = unidata.obs_names.isin(selected_barcodes)
-                    unidata.trim(selected)
+                    unidata._inplace_subset_obs(selected)
 
         return data
 

@@ -217,7 +217,7 @@ def load_pegasus_h5_file(
     if (cite_seq_name is not None) and (selected_barcodes is not None):
         unidata = data.get_data(cite_seq_name)
         selected = unidata.obs_names.isin(selected_barcodes)
-        unidata.trim(selected)
+        unidata._inplace_subset_obs(selected)
 
     return data
 

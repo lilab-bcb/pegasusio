@@ -74,12 +74,12 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     return file_type, copy_path, copy_type
 
 
-def parse_csv_type(input_csv: str) -> str:
+def is_vdj_file(input_csv: str, file_type: str) -> bool:
+    if file_type != "csv":
+        return False
     with (gzip.open(input_csv, "rt") if input_csv.endswith(".gz") else open(input_csv)) as fin:
         line = next(fin)
-        if line.find(",chain,v_gene,d_gene,j_gene,c_gene,") >= 0:
-            return "vdj"
-    return "other"
+        return line.find(",chain,v_gene,d_gene,j_gene,c_gene,") >= 0
 
 
 def read_input(
@@ -152,7 +152,7 @@ def read_input(
         data = load_mtx_file(input_file, genome = genome, modality = modality, ngene = ngene)
     else:
         assert file_type == "csv" or file_type == "tsv"
-        if file_type == "csv" and parse_csv_type(input_file) == "vdj":
+        if is_vdj_file(input_file, file_type):
             data = load_10x_vdj_file(input_file, genome = genome, modality = modality)
         else:
             data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)

@@ -11,7 +11,7 @@ from typing import List, Dict, Tuple, Union
 import logging
 logger = logging.getLogger(__name__)
 
-from pegasusio import UnimodalData, MultimodalData
+from pegasusio import UnimodalData, CITESeqData, MultimodalData
 from pegasusio.cylib.io import read_mtx, write_mtx, read_csv, write_dense
 
 
@@ -358,12 +358,14 @@ def load_csv_file(
     genome = genome if genome is not None else "unknown"
     modality = modality if modality is not None else "rna"
 
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "modality": modality})
-    if modality == "rna":
-        unidata.filter(ngene = ngene)
+    if modality == "citeseq":
+        unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, metadata = {"genome": genome, "modality": modality})
+    else:
+        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "modality": modality})
+        if modality == "rna":
+            unidata.filter(ngene = ngene)
 
-    data = MultimodalData()
-    data.add_data(genome, unidata)
+    data = MultimodalData({genome: unidata})
 
     return data
 

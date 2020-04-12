@@ -11,7 +11,7 @@ from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
-class VDJDataView(UnimodalDataView):
+class CITESeqView(UnimodalDataView):
     def __init__(self, vdjdata: "VDJData", barcode_index: List[int], feature_index: List[int], cur_matrix: str):
         super().__init__(vdjdata, barcode_index, feature_index, cur_matrix)
         for keyword in self.parent._uns_keywords:
@@ -64,8 +64,10 @@ class VDJDataView(UnimodalDataView):
 
 
 
-class VDJData(UnimodalData):
-    _matrix_keywords = ["high_confidence", "length", "reads", "umis", "v_gene", "d_gene", "j_gene", "c_gene", "cdr3", "cdr3_nt"]
+class CITESeqData(UnimodalData):
+    _matrix_keywords = ["capped", "log.transformed", "raw.count"]
+
+
     _uns_keywords = ["_v_gene", "_d_gene", "_j_gene", "_c_gene", "_cdr3", "_cdr3_nt"]
     _features = {"tcr": ["TRA", "TRB", "TRD", "TRG", "Multi"], "bcr": ["IGK", "IGL", "IGH", "Multi"]}
     _n_contigs = 10
@@ -76,50 +78,34 @@ class VDJData(UnimodalData):
         barcode_metadata: Union[dict, pd.DataFrame],
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, csr_matrix],
-        metadata: dict,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
-        cur_matrix: str = "umis",
+        metadata: dict,
+        cur_matrix: str = None,
     ) -> None:
-        assert metadata["modality"] in {"tcr", "bcr"}
+        assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata, cur_matrix)
-        for chain in VDJData._features[self.uns["modality"]]:
-            pos = self.var_names.get_loc(chain)
-            self.obs["n" + chain] = self.X[:, pos:pos+VDJData._n_contigs].getnnz(axis = 1)
+        for keyword in CITESeqData._matrix_keywords:
+            if keyword in self.matrices:
+                self._cur_matrix = keyword
+                break
+        assert self._cur_matrix is not None
 
 
     def __repr__(self) -> str:
-        return super().__repr__().replace("UnimodalData", "VDJData", 1)
-
-
-    def get_chain(self, chain: str) -> pd.DataFrame:
-        if chain not in self.var_names:
-            raise ValueError("Chain {} is unknown!".format(chain))
-
-        data = {}
-        fpos = self.var_names.get_loc(chain)
-        for keyword in VDJData._matrix_keywords:
-            uns_key = "_" + keyword
-            if uns_key in self.uns:
-                idx = self.matrices[keyword][:, fpos].toarray().ravel()
-                data[keyword] = self.uns[uns_key][idx]
-            else:
-                data[keyword] = self.matrices[keyword][:, fpos].toarray().ravel()
-        df = pd.DataFrame(data = data, index = self.obs_names, columns = VDJData._matrix_keywords)
-
-        return df
+        return super().__repr__().replace("UnimodalData", "CITESeqData", 1)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
-        raise ValueError("Cannot convert an AnnData object to a VDJData object!")
+        raise ValueError("Cannot convert an AnnData object to a CITESeqData object!")
 
     
     def to_anndata(self) -> anndata.AnnData:
-        raise ValueError("Cannot convert a VDJData object ot an AnnData object!")
+        raise ValueError("Cannot convert a CITESeqData object ot an AnnData object!")
 
 
-    def __getitem__(self, index: INDEX) -> VDJDataView:
+    def __getitem__(self, index: INDEX) -> CITESeqDataView:
         barcode_index, feature_index = _parse_index(self, index)
-        return VDJDataView(self, barcode_index, feature_index, self._cur_matrix)
+        return CITESeqDataView(self, barcode_index, feature_index, self._cur_matrix)
 
 
