@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
-from pegasusio import UnimodalData, VDJData
+from pegasusio import UnimodalData, VDJData, CITESeqData
 from .views import INDEX, UnimodalDataView
 from .vdj_data import VDJDataView
 
@@ -170,10 +170,27 @@ class MultimodalData:
         assert self._unidata is not None
         return self._unidata[index]
 
+
     def get_chain(self, chain: str) -> pd.DataFrame:
         """ Surrogate function for VDJData """
         assert self._unidata is not None and isinstance(self._unidata, VDJData)
         return self._unidata.get_chain(chain)
+
+    def load_control_list(self, antibody_control_csv: str) -> None:
+        """ Surrogate function for CITESeqData """
+        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
+        self._unidata.load_control_list(antibody_control_csv)
+
+    def log_transform(self) -> None:
+        """ Surrogate function for CITESeqData """
+        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
+        self._unidata.log_transform()
+
+    def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
+        """ Surrogate function for CITESeqData """
+        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
+        self._unidata.arcsinh_transform(cofactor = cofactor, jitter = jitter, random_state = random_state, select = select)
+
 
 
     def list_data(self) -> List[str]:

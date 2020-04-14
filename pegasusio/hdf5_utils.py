@@ -205,7 +205,7 @@ def load_pegasus_h5_file(
 
             if genome.startswith("CITE_Seq"):
                 cite_seq_name = genome
-                unidata = CITESeqData(barcode_metadata, feature_metadata, {"log.transformed": mat}, {"modality": "citeseq", "genome": genome})
+                unidata = CITESeqData(barcode_metadata, feature_metadata, {"log.transformed": mat.astype(np.float32)}, {"modality": "citeseq", "genome": genome})
             else:
                 unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
                 unidata.filter(ngene, select_singlets)

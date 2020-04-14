@@ -27,7 +27,7 @@ class CITESeqData(UnimodalData):
         cur_matrix: str = None,
     ) -> None:
         assert metadata["modality"] == "citeseq"
-        super().__init__(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata, cur_matrix)
+        super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
         assert len(self.matrices) == 1
         self._cur_matrix = list(self.matrices)[0]
 
@@ -52,7 +52,7 @@ class CITESeqData(UnimodalData):
         return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CITESeqData")
 
 
-    def load_control_list(antibody_control_csv: str):
+    def load_control_list(self, antibody_control_csv: str) -> None:
         assert "raw.count" in self.matrices
 
         ctrls = {"None": 0}
@@ -76,16 +76,17 @@ class CITESeqData(UnimodalData):
 
         self.metadata["_control_names"] = ctrl_names
         self.metadata["_control_counts"] = hstack([csr_matrix((self._shape[0], 1), dtype = np.int32), 
-                                                   self.matrices["raw.count"][:, self.feature_metadata.get_indexer(ctrl_idx)]], 
+                                                   self.matrices["raw.count"][:, self.feature_metadata.index.get_indexer(ctrl_idx)]], 
                                                    format = "csr")
-        self._inplace_subset_var(~self.feature_metadata.isin(ctrl_idx))
+        self._inplace_subset_var(~self.feature_metadata.index.isin(ctrl_idx))
 
         for keyword in list(self.matrices):
             if keyword != "raw.count":
                 del self.matrices[keyword]
+        self._cur_matrix = "raw.count"
 
 
-    def log_transform(self) -> None:
+    def log_transform(self, select: bool = True) -> None:
         """ ln(x+1)"""
         if "raw.count" not in self.matrices:
             raise ValueError("raw.count matrix must exist in order to calculate the log transformed matrix!")
@@ -94,9 +95,11 @@ class CITESeqData(UnimodalData):
                              - np.log1p(self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values], dtype = np.float32),
                              0.0)
         self.matrices["log.transformed"] = csr_matrix(log_mat)
+        if select:
+            self._cur_matrix = "log.transformed"
 
 
-    def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0) -> None:
+    def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """Conduct arcsinh transform on the raw.count matrix.
         
         Add arcsinh transformed matrix 'arcsinh.transformed'. If jitter == True, instead add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)). Mimic Cytobank.
@@ -111,6 +114,9 @@ class CITESeqData(UnimodalData):
 
         random_state: ``int``, optional, default: ``0``
             Random seed for generating jitters.
+
+        select: ``bool``, optional, default: ``True``
+            If True, select the transformed matrix as the major matrix (X).
 
         Returns
         -------
@@ -135,11 +141,14 @@ class CITESeqData(UnimodalData):
             jitters = np.random.uniform(low = -0.5, high = 0.5, size = signal.shape)
             signal = np.add(signal, jitters, dtype = np.float32)
 
-        signal = np.arcsinh(signal, dtype = np.float32)
-        control = np.arcsinh(control, dtype = np.float32)
+        signal = np.arcsinh(signal / cofactor, dtype = np.float32)
+        control = np.arcsinh(control / cofactor, dtype = np.float32)
         arcsinh_mat = np.maximum(signal - control, 0.0)
 
         if jitter:
             self.matrices["arcsinh.jitter"] = arcsinh_mat
         else:
             self.matrices["arcsinh.transformed"] = csr_matrix(arcsinh_mat)
+
+        if select:
+            self._cur_matrix = "arcsinh.jitter" if jitter else "arcsinh.transformed"

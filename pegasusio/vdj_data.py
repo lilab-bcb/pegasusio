@@ -74,7 +74,7 @@ class VDJData(UnimodalData):
         cur_matrix: str = "umis",
     ) -> None:
         assert metadata["modality"] in {"tcr", "bcr"}
-        super().__init__(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata, cur_matrix)
+        super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
         for chain in VDJData._features[self.uns["modality"]]:
             pos = self.var_names.get_loc(chain)
             self.obs["n" + chain] = self.X[:, pos:pos+VDJData._n_contigs].getnnz(axis = 1)
