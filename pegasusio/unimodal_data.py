@@ -16,15 +16,15 @@ from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
-class UnimodalData:
+class UnimodalData:        
     def __init__(
         self,
         barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
         feature_metadata: Union[dict, pd.DataFrame] = None,
         matrices: Dict[str, csr_matrix] = None,
+        metadata: dict = None,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
-        metadata: dict = None,
         cur_matrix: str = "X",
     ) -> None:
         if isinstance(barcode_metadata, anndata.AnnData):
@@ -82,7 +82,7 @@ class UnimodalData:
 
 
     def __repr__(self) -> str:
-        repr_str = "UnimodalData object with n_obs x n_vars = {} x {}".format(self.barcode_metadata.shape[0], self.feature_metadata.shape[0])
+        repr_str = "{} object with n_obs x n_vars = {} x {}".format(self.__class__.__name__, self.barcode_metadata.shape[0], self.feature_metadata.shape[0])
         repr_str += "\n    It contains {} matrices: {}".format(len(self.matrices), str(list(self.matrices))[1:-1])
         repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
@@ -284,12 +284,35 @@ class UnimodalData:
             X.data[...] = orig_data
 
 
-    def trim(self, selected: List[bool]) -> None:
-        """ Only keep barcodes in selected
-        """
-        self.barcode_metadata = self.barcode_metadata[selected]
-        for key, mat in self.matrices.items():
-            self.matrices[key] = mat[selected, :]
+    def _inplace_subset_obs(self, index: List[bool]) -> None:
+        """ Subset barcode_metadata inplace """
+        if isinstance(index, pd.Series):
+            index = index.values
+        self.barcode_metadata = self.barcode_metadata.loc[index].copy(deep = False)
+        for key in list(self.matrices):
+            self.matrices[key] = self.matrices[key][index, :]
+        for key in list(self.barcode_multiarrays):
+            self.barcode_multiarrays[key] = self.barcode_multiarrays[key][index]
+        if "_obs_keys" in self.metadata:
+            for key in self.metadata["_obs_keys"]:
+                self.metadata[key] = self.metadata[key][index]
+        self._update_shape()
+        gc.collect()
+
+
+    def _inplace_subset_var(self, index: List[bool]) -> None:
+        """ Subset feature_metadata inplace """
+        if isinstance(index, pd.Series):
+            index = index.values
+        self.feature_metadata = self.feature_metadata.loc[index].copy(deep = False)
+        for key in list(self.matrices):
+            self.matrices[key] = self.matrices[key][:, index]
+        for key in list(self.feature_multiarrays):
+            self.feature_multiarrays[key] = self.feature_multiarrays[key][index]
+        if "_var_keys" in self.metadata:
+            for key in self.metadata["_var_keys"]:
+                self.metadata[key] = self.metadata[key][index]
+        self._update_shape()
         gc.collect()
 
 
@@ -309,7 +332,7 @@ class UnimodalData:
             )
             self.barcode_metadata.drop(columns="demux_type", inplace=True)
 
-        self.trim(selected)
+        self._inplace_subset_obs(selected)
 
 
     def separate_channels(self) -> None:
@@ -362,9 +385,9 @@ class UnimodalData:
                 df.drop(columns = cols, inplace = True)
 
         def _scan_dict(mapping: dict, black_list: Set[str]):
-            for key in mapping:
+            for key in list(mapping):
                 if key in black_list:
-                    mapping.pop(key)
+                    del mapping[key]
 
         _scan_dataframe(self.barcode_metadata, black_list)
         _scan_dataframe(self.feature_metadata, black_list)
@@ -448,9 +471,9 @@ class UnimodalData:
         return UnimodalData(self.barcode_metadata.copy(), 
                             self.feature_metadata.copy(), 
                             deepcopy(self.matrices), 
+                            deepcopy(self.metadata), 
                             deepcopy(self.barcode_multiarrays), 
                             deepcopy(self.feature_multiarrays), 
-                            deepcopy(self.metadata), 
                             self._cur_matrix)
 
 
@@ -472,34 +495,10 @@ class UnimodalData:
         return UnimodalData(viewobj.obs.copy(), 
                             viewobj.var.copy(),
                             mats,
+                            deepcopy(viewobj.uns),
                             bmarrs,
                             fmarrs,
-                            deepcopy(viewobj.uns),
                             viewobj._cur_matrix)
-
-
-    def _inplace_subset_obs(self, index: List[bool]) -> None:
-        """ Subset barcode_metadata inplace """
-        if isinstance(index, pd.Series):
-            index = index.values
-        self.barcode_metadata = self.barcode_metadata.loc[index]
-        for key in list(self.matrices):
-            self.matrices[key] = self.matrices[key][index, :]
-        for key in list(self.barcode_multiarrays):
-            self.barcode_multiarrays[key] = self.barcode_multiarrays[key][index]
-        self._update_shape()
-
-
-    def _inplace_subset_var(self, index: List[bool]) -> None:
-        """ Subset feature_metadata inplace """
-        if isinstance(index, pd.Series):
-            index = index.values
-        self.feature_metadata = self.feature_metadata.loc[index]
-        for key in list(self.matrices):
-            self.matrices[key] = self.matrices[key][:, index]
-        for key in list(self.feature_multiarrays):
-            self.feature_multiarrays[key] = self.feature_multiarrays[key][index]
-        self._update_shape()
 
 
     def __getitem__(self, index: INDEX) -> UnimodalDataView:

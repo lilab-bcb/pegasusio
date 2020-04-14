@@ -7,7 +7,7 @@ from typing import Dict
 import logging
 logger = logging.getLogger(__name__)
 
-from pegasusio import modalities, UnimodalData, MultimodalData
+from pegasusio import modalities, UnimodalData, CITESeqData, MultimodalData
 
 
 def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
@@ -51,7 +51,7 @@ def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         unidata = UnimodalData({"barcodekey": barcodes}, 
         	{"featurekey": names, "featureid": ids}, 
         	{"X": mat}, 
-        	metadata = {"modality": "rna", "genome": genome}
+        	{"modality": "rna", "genome": genome}
         )
         unidata.filter(ngene=ngene)
         unidata.separate_channels()
@@ -102,7 +102,7 @@ def load_10x_h5_file_v3(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         barcode_metadata = {"barcodekey": barcodes}
         feature_metadata = {"featurekey": names[idx], "featureid": ids[idx]}
         mat = bigmat[:, idx].copy()
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": "rna", "genome": genome})
+        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
         unidata.filter(ngene=ngene)
         unidata.separate_channels()
 
@@ -203,12 +203,11 @@ def load_pegasus_h5_file(
                     key = "featureid"                    
                 feature_metadata[key] = values
 
-            is_citeseq = genome.startswith("CITE_Seq")
-            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": "citeseq" if is_citeseq else "rna", "genome": genome})
-
-            if is_citeseq:
+            if genome.startswith("CITE_Seq"):
                 cite_seq_name = genome
+                unidata = CITESeqData(barcode_metadata, feature_metadata, {"log.transformed": mat.astype(np.float32)}, {"modality": "citeseq", "genome": genome})
             else:
+                unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
                 unidata.filter(ngene, select_singlets)
                 selected_barcodes = unidata.obs_names
 
@@ -217,7 +216,7 @@ def load_pegasus_h5_file(
     if (cite_seq_name is not None) and (selected_barcodes is not None):
         unidata = data.get_data(cite_seq_name)
         selected = unidata.obs_names.isin(selected_barcodes)
-        unidata.trim(selected)
+        unidata._inplace_subset_obs(selected)
 
     return data
 
@@ -294,7 +293,7 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ng
             else:
                 metadata["modality"] = "rna"
             
-        unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata)
+        unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays)
         if metadata["modality"] == "rna":
             unidata.filter(ngene = ngene)
 

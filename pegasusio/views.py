@@ -164,7 +164,7 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
 
 
 class UnimodalDataView:
-    def __init__(self, unidata: "UnimodalData", barcode_index: List[int], feature_index: List[int], cur_matrix: str):
+    def __init__(self, unidata: "UnimodalData", barcode_index: List[int], feature_index: List[int], cur_matrix: str, obj_name: str = "UnimodalData"):
         self.parent = unidata
         self.barcode_index = barcode_index
         self.feature_index = feature_index
@@ -183,15 +183,16 @@ class UnimodalDataView:
 
         self._cur_matrix = cur_matrix
         self._shape = (self.barcode_index.size, self.feature_index.size)
+        self._obj_name = obj_name
 
-    def __repr__(self) -> str:
-        repr_str = "View of UnimodalData object with n_obs x n_vars = {} x {}".format(self._shape[0], self._shape[1])
+    def __repr__(self, repr_dict: Dict[str, str] = None) -> str:
+        repr_str = "View of {} object with n_obs x n_vars = {} x {}".format(self._obj_name, self._shape[0], self._shape[1])
         repr_str += "\n    It contains {} matrices: {}".format(len(self.parent.matrices), str(list(self.parent.matrices))[1:-1])
         repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm"]:
-            repr_str += "\n    {}: {}".format(key, str(list(getattr(self.parent, key).keys()))[1:-1])
+            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else str(list(getattr(self.parent, key).keys()))[1:-1]
+            repr_str += "\n    {}: {}".format(key, str_out)
         repr_str += "\n    uns: {}".format(str(list(self.metadata))[1:-1])
-
         return repr_str
 
     @property
@@ -281,7 +282,7 @@ class UnimodalDataView:
 
     def __getitem__(self, index: INDEX) -> "UnimodalDataView":
         barcode_index, feature_index = _parse_index(self, index)
-        return UnimodalDataView(self.parent, barcode_index, feature_index, self._cur_matrix)
+        return UnimodalDataView(self.parent, barcode_index, feature_index, self._cur_matrix, obj_name = self._obj_name)
 
     def _copy_matrices(self) -> Dict[str, csr_matrix]:
         for key in self.parent.matrices:
