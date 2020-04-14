@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
-from typing import List, Dict, Union
+from scipy.sparse import csr_matrix, hstack
+from typing import Dict, Union
 
 import logging
 logger = logging.getLogger(__name__)
@@ -11,89 +11,32 @@ from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
-class CITESeqView(UnimodalDataView):
-    def __init__(self, vdjdata: "VDJData", barcode_index: List[int], feature_index: List[int], cur_matrix: str):
-        super().__init__(vdjdata, barcode_index, feature_index, cur_matrix)
-        for keyword in self.parent._uns_keywords:
-            self.metadata[keyword] = self.parent.metadata[keyword]
-        self.obs # must call .obs in order to initialize self.barcode_metadata
-        for chain in self.parent._features[self.metadata["modality"]]:
-            keyword = "n" + chain
-            if keyword in self.barcode_metadata:
-                self.barcode_metadata.drop(columns = keyword, inplace = True)
-
-            pos_arr = []
-            for pos, vname in enumerate(self.var_names):
-                if vname.startswith(chain):
-                    pos_arr.append(pos)
-            if len(pos_arr) > 0:
-                self.barcode_metadata["n" + chain] = self.X[:, pos_arr].getnnz(axis = 1)
-
-    def __repr__(self) -> str:
-        repr_str = "View of VDJData object with n_obs x n_vars = {} x {}".format(self._shape[0], self._shape[1])
-        repr_str += "\n    It contains {} matrices: {}".format(len(self.parent.matrices), str(list(self.parent.matrices))[1:-1])
-        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
-        repr_str += "\n    obs: {}".format(str(list(self.barcode_metadata))[1:-1])
-        for key in ["var", "obsm", "varm"]:
-            repr_str += "\n    {}: {}".format(key, str(list(getattr(self.parent, key).keys()))[1:-1])
-        repr_str += "\n    uns: {}".format(str(list(self.metadata))[1:-1])
-
-        return repr_str
-
-    def __getitem__(self, index: INDEX) -> "VDJDataView":
-        barcode_index, feature_index = _parse_index(self, index)
-        return VDJDataView(self.parent, barcode_index, feature_index, self._cur_matrix)
-
-    def get_chain(self, chain: str) -> pd.DataFrame:
-        if chain not in self.var_names:
-            raise ValueError("Chain {} is unknown!".format(chain))
-
-        data = {}
-        fpos = self.var_names.get_loc(chain)
-        for keyword in self.parent._matrix_keywords:
-            uns_key = "_" + keyword
-            self.select_matrix(keyword)
-            if uns_key in self.uns:
-                idx = self.X[:, fpos].toarray().ravel()
-                data[keyword] = self.uns[uns_key][idx]
-            else:
-                data[keyword] = self.X[:, fpos].toarray().ravel()
-        df = pd.DataFrame(data = data, index = self.obs_names, columns = self.parent._matrix_keywords)
-
-        return df
-
-
-
 class CITESeqData(UnimodalData):
-    _matrix_keywords = ["capped", "log.transformed", "raw.count"]
-
-
-    _uns_keywords = ["_v_gene", "_d_gene", "_j_gene", "_c_gene", "_cdr3", "_cdr3_nt"]
-    _features = {"tcr": ["TRA", "TRB", "TRD", "TRG", "Multi"], "bcr": ["IGK", "IGL", "IGH", "Multi"]}
-    _n_contigs = 10
-
+    _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
+    _uns_keywords = ["_control_names", "_control_counts"]
+    _var_keywords = ["_control_id"]
 
     def __init__(
         self,
         barcode_metadata: Union[dict, pd.DataFrame],
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, csr_matrix],
+        metadata: dict,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
-        metadata: dict,
         cur_matrix: str = None,
     ) -> None:
         assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, barcode_multiarrays, feature_multiarrays, metadata, cur_matrix)
-        for keyword in CITESeqData._matrix_keywords:
-            if keyword in self.matrices:
-                self._cur_matrix = keyword
-                break
-        assert self._cur_matrix is not None
+        assert len(self.matrices) == 1
+        self._cur_matrix = list(self.matrices)[0]
 
-
-    def __repr__(self) -> str:
-        return super().__repr__().replace("UnimodalData", "CITESeqData", 1)
+        if self._cur_matrix == "raw.count":
+            # Prepare for the control antibody list.
+            self.metadata["_control_names"] = np.array(["None"], dtype = object)
+            self.metadata["_control_counts"] = csr_matrix((self._shape[0], 1), dtype = np.int32)
+            self.metadata["_obs_keys"] = ["_control_counts"]
+            self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
@@ -104,8 +47,99 @@ class CITESeqData(UnimodalData):
         raise ValueError("Cannot convert a CITESeqData object ot an AnnData object!")
 
 
-    def __getitem__(self, index: INDEX) -> CITESeqDataView:
+    def __getitem__(self, index: INDEX) -> UnimodalDataView:
         barcode_index, feature_index = _parse_index(self, index)
-        return CITESeqDataView(self, barcode_index, feature_index, self._cur_matrix)
+        return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CITESeqData")
 
 
+    def load_control_list(antibody_control_csv: str):
+        assert "raw.count" in self.matrices
+
+        ctrls = {"None": 0}
+        series = pd.read_csv(antibody_control_csv, header=0, index_col=0, squeeze=True)
+        for antibody, control in series.iteritems():
+            pos = ctrls.get(control, None)
+            if pos is None:
+                if control not in self.feature_metadata.index:
+                    raise ValueError("Detected unknown control antibody '{}'!".format(control))
+                pos = len(ctrls)
+                ctrls[control] = pos
+
+            if antibody not in self.feature_metadata.index:
+                raise ValueError("Detected unknown CITE-Seq antibody '{}'!".format(antibody))
+            self.feature_metadata.loc[antibody, "_control_id"] = pos
+
+        ctrl_names = np.empty(len(ctrls), dtype = object)
+        for ctrl_name, pos in ctrls.items():
+            ctrl_names[pos] = ctrl_name
+        ctrl_idx = pd.Index(ctrl_names[1:], copy = False)
+
+        self.metadata["_control_names"] = ctrl_names
+        self.metadata["_control_counts"] = hstack([csr_matrix((self._shape[0], 1), dtype = np.int32), 
+                                                   self.matrices["raw.count"][:, self.feature_metadata.get_indexer(ctrl_idx)]], 
+                                                   format = "csr")
+        self._inplace_subset_var(~self.feature_metadata.isin(ctrl_idx))
+
+        for keyword in list(self.matrices):
+            if keyword != "raw.count":
+                del self.matrices[keyword]
+
+
+    def log_transform(self) -> None:
+        """ ln(x+1)"""
+        if "raw.count" not in self.matrices:
+            raise ValueError("raw.count matrix must exist in order to calculate the log transformed matrix!")
+
+        log_mat = np.maximum(np.log1p(self.matrices["raw.count"].toarray(), dtype = np.float32) \
+                             - np.log1p(self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values], dtype = np.float32),
+                             0.0)
+        self.matrices["log.transformed"] = csr_matrix(log_mat)
+
+
+    def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0) -> None:
+        """Conduct arcsinh transform on the raw.count matrix.
+        
+        Add arcsinh transformed matrix 'arcsinh.transformed'. If jitter == True, instead add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)). Mimic Cytobank.
+        
+        Parameters
+        ----------
+        cofactor: ``float``, optional, default: ``5.0``
+            Cofactor used in cytobank, arcsinh(x / cofactor).
+
+        jitter: ``bool``, optional, default: ``False``
+            Add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)).
+
+        random_state: ``int``, optional, default: ``0``
+            Random seed for generating jitters.
+
+        Returns
+        -------
+        ``None``
+
+        Update ``self.matrices``:
+            * ``self.matrices['arcsinh.transformed']``: if jitter == False, csr_matrix.
+            * ``self.matrices['arcsinh.jitter']``: if jitter == True, np.ndarray.
+
+        Examples
+        --------
+        >>> citeseq_data.arcsinh_transform(jitter = True)
+        """
+        if "raw.count" not in self.matrices:
+            raise ValueError("raw.count matrix must exist in order to calculate the arcsinh transformed matrix!")
+
+        signal = self.matrices["raw.count"].toarray()
+        control = self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values]
+
+        if jitter:
+            np.random.seed(random_state)
+            jitters = np.random.uniform(low = -0.5, high = 0.5, size = signal.shape)
+            signal = np.add(signal, jitters, dtype = np.float32)
+
+        signal = np.arcsinh(signal, dtype = np.float32)
+        control = np.arcsinh(control, dtype = np.float32)
+        arcsinh_mat = np.maximum(signal - control, 0.0)
+
+        if jitter:
+            self.matrices["arcsinh.jitter"] = arcsinh_mat
+        else:
+            self.matrices["arcsinh.transformed"] = csr_matrix(arcsinh_mat)

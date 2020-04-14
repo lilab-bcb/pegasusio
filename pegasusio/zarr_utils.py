@@ -11,7 +11,7 @@ from zarr import Blosc
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
-from pegasusio import modalities, UnimodalData, MultimodalData
+from pegasusio import modalities, UnimodalData, VDJData, CITESeqData, MultimodalData
 
 
 CHUNKSIZE = 1000000
@@ -143,19 +143,26 @@ class ZarrFile:
             select_singlets: only select singlets
             The above two option only works if modality == "rna"
         """
-        unidata = UnimodalData(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
+        metadata = self.read_mapping(group['metadata'])
+        assert "genome" in metadata
+        if "modality" not in metadata:
+            assert metadata.get("experiment_type", "none") in modalities
+            metadata["modality"] = metadata.pop("experiment_type")
+
+        DataClass = UnimodalData
+        if metadata["modality"] in {"tcr", "bcr"}:
+            DataClass = VDJData
+        elif metadata["modality"] == "citeseq":
+            DataClass = CITESeqData
+
+        unidata = DataClass(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
                             feature_metadata = self.read_dataframe(group['feature_metadata']),
                             matrices = self.read_mapping(group['matrices']),
+                            metadata = metadata,
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
-                            feature_multiarrays = self.read_mapping(group['feature_multiarrays']),
-                            metadata = self.read_mapping(group['metadata']))
+                            feature_multiarrays = self.read_mapping(group['feature_multiarrays']))
 
-        assert "genome" in unidata.metadata
-        if "modality" not in unidata.metadata:
-            assert unidata.metadata.get("experiment_type", "none") in modalities
-            unidata.metadata["modality"] = unidata.metadata.pop("experiment_type")
-
-        if unidata.metadata["modality"] == "rna":
+        if metadata["modality"] == "rna":
             unidata.filter(ngene, select_singlets)
 
         return unidata
@@ -281,9 +288,9 @@ class ZarrFile:
         self.write_dataframe(sub_group, 'barcode_metadata', data.barcode_metadata)
         self.write_dataframe(sub_group, 'feature_metadata', data.feature_metadata)
         self.write_mapping(sub_group, 'matrices', data.matrices)
+        self.write_mapping(sub_group, 'metadata', data.metadata)
         self.write_mapping(sub_group, 'barcode_multiarrays', data.barcode_multiarrays)
         self.write_mapping(sub_group, 'feature_multiarrays', data.feature_multiarrays)
-        self.write_mapping(sub_group, 'metadata', data.metadata)
 
 
     def write_multimodal_data(self, data: MultimodalData) -> None:

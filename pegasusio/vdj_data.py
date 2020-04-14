@@ -13,7 +13,7 @@ from .views import INDEX, _parse_index, UnimodalDataView
 
 class VDJDataView(UnimodalDataView):
     def __init__(self, vdjdata: "VDJData", barcode_index: List[int], feature_index: List[int], cur_matrix: str):
-        super().__init__(vdjdata, barcode_index, feature_index, cur_matrix)
+        super().__init__(vdjdata, barcode_index, feature_index, cur_matrix, obj_name = "VDJData")
         for keyword in self.parent._uns_keywords:
             self.metadata[keyword] = self.parent.metadata[keyword]
         self.obs # must call .obs in order to initialize self.barcode_metadata
@@ -30,15 +30,7 @@ class VDJDataView(UnimodalDataView):
                 self.barcode_metadata["n" + chain] = self.X[:, pos_arr].getnnz(axis = 1)
 
     def __repr__(self) -> str:
-        repr_str = "View of VDJData object with n_obs x n_vars = {} x {}".format(self._shape[0], self._shape[1])
-        repr_str += "\n    It contains {} matrices: {}".format(len(self.parent.matrices), str(list(self.parent.matrices))[1:-1])
-        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
-        repr_str += "\n    obs: {}".format(str(list(self.barcode_metadata))[1:-1])
-        for key in ["var", "obsm", "varm"]:
-            repr_str += "\n    {}: {}".format(key, str(list(getattr(self.parent, key).keys()))[1:-1])
-        repr_str += "\n    uns: {}".format(str(list(self.metadata))[1:-1])
-
-        return repr_str
+        return super().__repr__({"obs": str(list(self.barcode_metadata))[1:-1]})
 
     def __getitem__(self, index: INDEX) -> "VDJDataView":
         barcode_index, feature_index = _parse_index(self, index)
@@ -88,10 +80,6 @@ class VDJData(UnimodalData):
             self.obs["n" + chain] = self.X[:, pos:pos+VDJData._n_contigs].getnnz(axis = 1)
 
 
-    def __repr__(self) -> str:
-        return super().__repr__().replace("UnimodalData", "VDJData", 1)
-
-
     def get_chain(self, chain: str) -> pd.DataFrame:
         if chain not in self.var_names:
             raise ValueError("Chain {} is unknown!".format(chain))
@@ -121,5 +109,3 @@ class VDJData(UnimodalData):
     def __getitem__(self, index: INDEX) -> VDJDataView:
         barcode_index, feature_index = _parse_index(self, index)
         return VDJDataView(self, barcode_index, feature_index, self._cur_matrix)
-
-

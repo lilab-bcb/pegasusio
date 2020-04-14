@@ -27,16 +27,10 @@ class MultimodalData:
             self._unidata = self.data[self._selected]
 
 
-    def _find_data_type(self, obj: object) -> str:
-        if isinstance(obj, VDJData):
-            return "VDJData"
-        return "UnimodalData"
-
-
     def __repr__(self) -> str:
         repr_str = "MultimodalData object with {} UnimodalData: {}".format(len(self.data), str(list(self.data))[1:-1])
         if self._selected is not None:
-            repr_str += "\n    It currently binds to {} object {}\n\n".format(self._find_data_type(self._unidata), self._selected)
+            repr_str += "\n    It currently binds to {} object {}\n\n".format(self._unidata.__class__.__name__, self._selected)
             repr_str += self._unidata.__repr__()
         else:
             repr_str += "\n    It currently binds to no UnimodalData object"
@@ -88,11 +82,11 @@ class MultimodalData:
         self._unidata.var_names = var_names
 
     @property
-    def X(self) -> Union[csr_matrix, None]:
+    def X(self) -> Union[csr_matrix, np.ndarray, None]:
         return self._unidata.X if self._unidata is not None else None
 
     @X.setter
-    def X(self, X: csr_matrix):
+    def X(self, X: Union[csr_matrix, np.ndarray]):
         assert self._unidata is not None
         self._unidata.X = X
 
@@ -149,7 +143,7 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.select_matrix(key)
 
-    def get_matrix(self, key: str) -> csr_matrix:
+    def get_matrix(self, key: str) -> Union[csr_matrix, np.ndarray]:
         """ Surrogate function for UnimodalData, return a matrix indexed by key
         """
         assert self._unidata is not None
@@ -251,7 +245,7 @@ class MultimodalData:
             feature_metadata.reset_index(inplace = True)
             feature_metadata.fillna(value = "N/A", inplace = True)
             X = hstack([unidata.matrices["X"] for unidata in unidata_arr], format = "csr")
-            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, metadata = {"genome": unikey, "modality": "rna"})
+            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, {"genome": unikey, "modality": "rna"})
             del unidata_arr
             gc.collect()
 
@@ -265,12 +259,12 @@ class MultimodalData:
         if data_subset is not None:
             for key in self.list_data():
                 if key not in data_subset:
-                    self.data.pop(key)
+                    del self.data[key]
 
         if modality_subset is not None:
             for key in self.list_data():
                 if self.data[key].uns["modality"] not in modality_subset:
-                    self.data.pop(key)
+                    self.data[key]
 
 
     def scan_black_list(self, black_list: Set[str] = None):
@@ -321,5 +315,3 @@ class MultimodalData:
 
     def __deepcopy__(self, memo):
         return self.copy()
-
-

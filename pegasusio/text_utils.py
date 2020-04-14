@@ -15,7 +15,6 @@ from pegasusio import UnimodalData, CITESeqData, MultimodalData
 from pegasusio.cylib.io import read_mtx, write_mtx, read_csv, write_dense
 
 
-
 def _enumerate_files(path: str, parts: List[str], repl_list1: List[str], repl_list2: List[str] = None) -> str:
     """ Enumerate all possible file names """
     if len(parts) <= 2:
@@ -150,7 +149,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, nge
     mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
     mat.eliminate_zeros()
 
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"modality": modality, "genome": genome})
+    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": modality, "genome": genome})
     if modality == "rna":
         unidata.filter(ngene=ngene)
     if format_type == "10x v3" or format_type == "10x v2":
@@ -359,9 +358,9 @@ def load_csv_file(
     modality = modality if modality is not None else "rna"
 
     if modality == "citeseq":
-        unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, metadata = {"genome": genome, "modality": modality})
+        unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
     else:
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, metadata = {"genome": genome, "modality": modality})
+        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
         if modality == "rna":
             unidata.filter(ngene = ngene)
 
