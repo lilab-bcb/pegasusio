@@ -1,10 +1,9 @@
 # cython: language_level=3
 
 import numpy as np
-cimport numpy as np
 cimport cython
 
-ctypedef np.uint8_t uint8
+ctypedef unsigned char uint8
 
 
 @cython.boundscheck(False)
@@ -61,7 +60,7 @@ cpdef tuple convert_10x_vdj_to_vdjdata(str[:] tokens, int[:, :] mats_int, str[:,
         chain = mats_str[i, nstr - 1]
         num = fmap.get(chain, 0)
         if num >= n_contigs:
-            raise ValueError("There are more than {} productive contigs with chain type {}!".format(n_contigs, chain))
+            raise ValueError(f"There are more than {n_contigs} productive contigs with chain type {chain}!")
         fpos = fid2pos[chain + (str(num + 1) if num > 0 else "")]
         for j in range(nint - 1):
             matview[j, bpos, fpos] = mats_int[i, j]
