@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack
-from typing import Dict, Union
+from typing import List, Dict, Union
 
 import anndata
 from pegasusio import UnimodalData
@@ -10,7 +10,7 @@ from .views import INDEX, _parse_index, UnimodalDataView
 
 class CITESeqData(UnimodalData):
     _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
-    _uns_keywords = ["_control_names", "_control_counts"]
+    _uns_keywords = ["_control_names", "_control_counts", "_other_names", "_other_counts"] # '_other' are antibodies that set aside
     _var_keywords = ["_control_id"]
 
     def __init__(
@@ -47,6 +47,27 @@ class CITESeqData(UnimodalData):
     def __getitem__(self, index: INDEX) -> UnimodalDataView:
         barcode_index, feature_index = _parse_index(self, index)
         return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CITESeqData")
+
+
+    def set_aside(self, params: List[str]) -> None:
+        """ Move antibodies in params from the raw.count matrix
+        """
+        assert len(self.matrices) == 1 and "raw.count" in self.matrices
+        assert "_other_names" not in self.metadata
+
+        locs = self.feature_metadata.index.get_indexer(params) 
+        if (locs < 0).sum() > 0:
+            raise ValueError(f"Detected unknown antibodies {params[locs < 0]}!")
+        self.metadata["_other_names"] = self.feature_metadata.index.values[locs] # with loc: List[int], this should be a copy not a reference
+        self.metadata["_other_counts"] = self.matrices["raw.count"][:, locs]
+
+        obs_keys = self.metadata.get("_obs_keys", [])
+        obs_keys.append("_other_counts")
+        self.metadata["_obs_keys"] = obs_keys
+        
+        idx = np.ones(self._shape[1], dtype = bool)
+        idx[locs] = False
+        self._inplace_subset_var(idx)
 
 
     def load_control_list(self, control_csv: str) -> None:
@@ -134,8 +155,11 @@ class CITESeqData(UnimodalData):
         if "raw.count" not in self.matrices:
             raise ValueError("raw.count matrix must exist in order to calculate the arcsinh transformed matrix!")
 
+        ctrl_ids = self.feature_metadata["_control_id"].values
+        idx = ctrl_ids > 0
+
         signal = self.matrices["raw.count"].toarray()
-        control = self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values]
+        control = self.metadata["_control_counts"].toarray()[:, ctrl_ids]
 
         if jitter:
             np.random.seed(random_state)
@@ -144,7 +168,8 @@ class CITESeqData(UnimodalData):
 
         signal = np.arcsinh(signal / cofactor, dtype = np.float32)
         control = np.arcsinh(control / cofactor, dtype = np.float32)
-        arcsinh_mat = np.maximum(signal - control, 0.0)
+        arcsinh_mat = signal - control
+        arcsinh_mat[:, idx] = np.maximum(arcsinh_mat[:, idx], 0.0)
 
         if jitter:
             self.matrices["arcsinh.jitter"] = arcsinh_mat

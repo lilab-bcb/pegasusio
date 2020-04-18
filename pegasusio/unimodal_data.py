@@ -16,6 +16,32 @@ from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
+class DataDict(MutableMapping):
+    def __init__(self, initial_data = None):
+        self.mapping = initial_data if initial_data is not None else dict()
+        self.dirty = set() # record keywords in mapping and dirty
+
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __setitem__(self, key, value):
+        self.mapping[key] = value
+        self.dirty.add(key)
+
+    def __delitem__(self, key):
+        del self.mapping[key]
+        self.dirty.remove(key)
+
+    def __iter__(self):
+        return iter(self.mapping)
+
+    def __len__(self):
+        return len(self.mapping)
+
+    def __repr__(self):
+        return f"DataDict object with keys: {str(list(self.mapping))[1:-1]}"
+
+
 class UnimodalData:        
     def __init__(
         self,
@@ -34,17 +60,13 @@ class UnimodalData:
         def replace_none_df(value):
             return value if value is not None else pd.DataFrame()
 
-        def replace_none(value):
-            """ Set empty dictionary as default is dangerous since others might fill in values to the dict
-            """
-            return value if value is not None else dict()
 
         self.barcode_metadata = replace_none_df(barcode_metadata) # barcode metadata
         self.feature_metadata = replace_none_df(feature_metadata) # feature metadata
-        self.matrices = replace_none(matrices) # a dictionary of scipy csr matrix
-        self.barcode_multiarrays = replace_none(barcode_multiarrays)
-        self.feature_multiarrays = replace_none(feature_multiarrays)
-        self.metadata = replace_none(metadata)  # other metadata, a dictionary
+        self.matrices = DataDict(matrices) # a dictionary of scipy csr matrix
+        self.barcode_multiarrays = DataDict(barcode_multiarrays)
+        self.feature_multiarrays = DataDict(feature_multiarrays)
+        self.metadata = DataDict(metadata)  # other metadata, a dictionary
         self._cur_matrix = cur_matrix # cur_matrix
 
         if len(self.barcode_metadata) > 0:
@@ -147,6 +169,7 @@ class UnimodalData:
 
     @obsm.setter
     def obsm(self, obsm: Dict[str, np.ndarray]):
+        assert isinstance(obsm, DataDict)
         self.barcode_multiarrays = obsm
 
     @property
@@ -155,14 +178,16 @@ class UnimodalData:
 
     @varm.setter
     def varm(self, varm: Dict[str, np.ndarray]):
+        assert isinstance(varm, DataDict)
         self.feature_multiarrays = varm
 
     @property
-    def uns(self) -> dict:
+    def uns(self) -> DataDict:
         return self.metadata
 
     @uns.setter
-    def uns(self, uns: dict):
+    def uns(self, uns: DataDict):
+        assert isinstance(uns, DataDict)
         self.metadata = uns
 
     @property
@@ -423,17 +448,17 @@ class UnimodalData:
         def _to_csr(X):
             return X if isinstance(X, csr_matrix) else csr_matrix(X)
 
-        self.matrices = {"X": _to_csr(data.X)}
+        self.matrices = DataDict({"X": _to_csr(data.X)})
         if data.raw is not None:
             self.matrices["raw.X"] = _to_csr(data.raw.X)
         for key, value in data.layers.items():
             self.matrices[key] = _to_csr(value)
 
-        self.barcode_multiarrays = dict(data.obsm)
+        self.barcode_multiarrays = DataDict(dict(data.obsm))
 
-        self.feature_multiarrays = dict(data.varm)
+        self.feature_multiarrays = DataDict(dict(data.varm))
 
-        self.metadata = dict(data.uns)
+        self.metadata = DataDict(dict(data.uns))
 
         if genome is not None:
             self.metadata["genome"] = genome

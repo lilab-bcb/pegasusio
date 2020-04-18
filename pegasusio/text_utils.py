@@ -364,7 +364,7 @@ def load_csv_file(
         if modality == "rna":
             unidata.filter(ngene = ngene)
 
-    data = MultimodalData({genome: unidata})
+    data = MultimodalData(unidata)
 
     return data
 

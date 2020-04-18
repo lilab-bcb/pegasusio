@@ -43,7 +43,30 @@ class MultiArrayView(MutableMapping):
         return len(self.parent)
 
     def __repr__(self) -> str:
-        return f"View of multiarrays with keys: {str(list(self.parent))[1:-1]}."
+        return f"View of multiarrays with keys: {str(list(self.parent))[1:-1]}"
+
+
+class MetadataView(MutableMapping):
+    def __init__(self, metadata: dict = None):
+        self.metadata = metadata if metadata is not None else dict()
+
+    def __getitem__(self, key: str) -> Union[str, np.ndarray]:
+        return self.metadata[key]
+
+    def __setitem__(self, key: str, value: object):
+        self.metadata[key] = value
+
+    def __delitem__(self, key: str):
+        del self.metadata[key]
+
+    def __iter__(self):
+        return iter(self.metadata)
+
+    def __len__(self):
+        return len(self.metadata)
+
+    def __repr__(self) -> str:
+        return f"View of metadata with keys: {str(list(self.metadata))[1:-1]}"
 
 
 
@@ -175,7 +198,7 @@ class UnimodalDataView:
         self.barcode_multiarrays = MultiArrayView(unidata.barcode_multiarrays, barcode_index)
         self.feature_multiarrays = MultiArrayView(unidata.feature_multiarrays, feature_index)
 
-        self.metadata = {}
+        self.metadata = MetadataView()
         for key, value in unidata.metadata.items():
             # For views, only copy string objects
             if isinstance(value, str):
@@ -261,11 +284,11 @@ class UnimodalDataView:
         raise ValueError("Cannot set varm for UnimodalDataView object!")
 
     @property
-    def uns(self) -> dict:
+    def uns(self) -> MetadataView:
         return self.metadata
 
     @uns.setter
-    def uns(self, uns: dict):
+    def uns(self, uns: MetadataView):
         raise ValueError("Cannot set uns for UnimodalDataView object!")
 
     @property

@@ -46,7 +46,7 @@ class CytoData(UnimodalData):
         return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CytoData")
 
 
-    def set_aside_parameters(self, params: List[str] = ["Time"]) -> None:
+    def set_aside(self, params: List[str] = ["Time"]) -> None:
         """ Move parameters in params from the raw.data matrix
         """
         assert len(self.matrices) == 1 and "raw.data" in self.matrices
@@ -135,8 +135,11 @@ class CytoData(UnimodalData):
         if "raw.data" not in self.matrices:
             raise ValueError("raw.data matrix must exist in order to calculate the arcsinh transformed matrix!")
 
+        ctrl_ids = self.feature_metadata["_control_id"].values
+        idx = ctrl_ids > 0
+
         signal = self.matrices["raw.data"]
-        control = self.barcode_metadata["_controls"][:, self.feature_metadata["_control_id"].values]
+        control = self.barcode_multiarrays["_controls"][:, ctrl_ids]
 
         if jitter:
             np.random.seed(random_state)
@@ -145,7 +148,8 @@ class CytoData(UnimodalData):
 
         signal = np.arcsinh(signal / cofactor, dtype = np.float32)
         control = np.arcsinh(control / cofactor, dtype = np.float32)
-        arcsinh_mat = np.maximum(signal - control, 0.0)
+        arcsinh_mat = signal - control
+        arcsinh_mat[:, idx] = np.maximum(arcsinh_mat[:, idx], 0.0)
 
         if jitter:
             self.matrices["arcsinh.jitter"] = arcsinh_mat

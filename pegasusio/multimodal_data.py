@@ -187,11 +187,14 @@ class MultimodalData:
         assert self._unidata is not None and isinstance(self._unidata, VDJData)
         return self._unidata.get_chain(chain)
 
-    def set_aside_parameters(self, params: List[str] = ["Time"]) -> None:
-        """ Surrogate function for CytoData """
-        assert self._unidata is not None and isinstance(self._unidata, CytoData)
-        self._unidata.set_aside_parameters(params)
-
+    def set_aside(self, params: List[str] = None) -> None:
+        """ Surrogate function for CITESeqData and CytoData """
+        assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
+        if params is None:
+            self._unidata.set_aside()
+        else:
+            self._unidata.set_aside(params)
+        
     def load_control_list(self, control_csv: str) -> None:
         """ Surrogate function for CITESeqData and CytoData """
         assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
