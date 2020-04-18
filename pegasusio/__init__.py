@@ -19,6 +19,7 @@ modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac']
 from .unimodal_data import UnimodalData
 from .vdj_data import VDJData
 from .citeseq_data import CITESeqData
+from .cyto_data import CytoData
 from .multimodal_data import MultimodalData
 from .readwrite import infer_file_type, read_input, write_output
 

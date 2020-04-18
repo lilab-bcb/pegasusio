@@ -3,9 +3,6 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from typing import List, Dict, Union
 
-import logging
-logger = logging.getLogger(__name__)
-
 import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
@@ -38,7 +35,7 @@ class VDJDataView(UnimodalDataView):
 
     def get_chain(self, chain: str) -> pd.DataFrame:
         if chain not in self.var_names:
-            raise ValueError("Chain {} is unknown!".format(chain))
+            raise ValueError(f"Chain '{chain}' is unknown!")
 
         data = {}
         fpos = self.var_names.get_loc(chain)
@@ -82,7 +79,7 @@ class VDJData(UnimodalData):
 
     def get_chain(self, chain: str) -> pd.DataFrame:
         if chain not in self.var_names:
-            raise ValueError("Chain {} is unknown!".format(chain))
+            raise ValueError("Chain '{chain}' is unknown!")
 
         data = {}
         fpos = self.var_names.get_loc(chain)

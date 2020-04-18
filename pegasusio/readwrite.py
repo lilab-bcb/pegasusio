@@ -13,6 +13,7 @@ from .hdf5_utils import load_10x_h5_file, load_pegasus_h5_file, load_loom_file, 
 from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
 from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
+from .cyto_utils import load_fcs_file
 
 
 def infer_file_type(input_file: str) -> Tuple[str, str, str]:
@@ -29,7 +30,7 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     Returns
     -------
     `str`
-        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv' and 'tsv'.
+        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs'.
     `str`
         The path covering all input files. Most time this is the same as input_file. But for HCA mtx and csv, this should be parent directory.
     `str`
@@ -51,6 +52,8 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
         file_type = "loom"
     elif input_file.endswith(".h5"):
         file_type = "10x"
+    elif input_file.endswith(".fcs"):
+        file_type = "fcs"
     elif (
         input_file.endswith(".mtx")
         or input_file.endswith(".mtx.gz")
@@ -69,7 +72,7 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
         ".txt.gz") or input_file.endswith(".tsv.gz"):
         file_type = "tsv"
     else:
-        raise ValueError("Unrecognized file type for file {}!".format(input_file))
+        raise ValueError(f"Unrecognized file type for file {input_file}!")
 
     return file_type, copy_path, copy_type
 
@@ -91,6 +94,7 @@ def read_input(
     select_singlets: bool = False,
     black_list: Set[str] = None,
     select_data: Set[str] = None,
+    select_genome: Set[str] = None,
     select_modality: Set[str] = None 
 ) -> MultimodalData:
     """Load data into memory.
@@ -103,11 +107,11 @@ def read_input(
     input_file : `str`
         Input file name.
     file_type : `str`, optional (default: None)
-        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', or 'tsv'. If None, inferred from input_file
+        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data). If None, inferred from input_file
     genome : `str`, optional (default: None)
         For formats like loom, mtx, dge, csv and tsv, genome is used to provide genome name. In this case if genome is None, except mtx format, "unknown" is used as the genome name instead.
     modality : `str`, optional (default: None)
-        Default modality, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
+        Default modality, choosing from 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto' (flow cytometry / mass cytometry). If None, use 'rna' as default.
     ngene : `int`, optional (default: None)
         Minimum number of genes to keep a barcode. Default is to keep all barcodes.
     select_singlets : `bool`, optional (default: False)
@@ -115,9 +119,11 @@ def read_input(
     black_list : `Set[str]`, optional (default: None)
         Attributes in black list will be poped out.
     select_data: `Set[str]`, optional (default: None)
-        Only select data with keys in select_data.
+        Only select data with keys in select_data. Select_data, select_genome and select_modality are mutually exclusive.
+    select_genome: `Set[str]`, optional (default: None)
+        Only select data with genomes in select_genome. Select_data, select_genome and select_modality are mutually exclusive.
     select_modality: `Set[str]`, optional (default: None)
-        Only select data with modalities in select_modality.
+        Only select data with modalities in select_modality. Select_data, select_genome and select_modality are mutually exclusive.
 
     Returns
     -------
@@ -148,6 +154,8 @@ def read_input(
         data = load_loom_file(input_file, genome = genome, modality = modality, ngene = ngene)
     elif file_type == "10x":
         data = load_10x_h5_file(input_file, ngene=ngene)
+    elif file_type == "fcs":
+        data = load_fcs_file(input_file, genome = genome)
     elif file_type == "mtx":
         data = load_mtx_file(input_file, genome = genome, modality = modality, ngene = ngene)
     else:
@@ -157,11 +165,11 @@ def read_input(
         else:
             data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)
 
-    data.subset_data(select_data, select_modality)
+    data.subset_data(select_data, select_genome, select_modality)
     data.scan_black_list(black_list)    
 
     end = time.perf_counter()
-    logger.info("{} file '{}' is loaded, time spent = {:.2f}s.".format(file_type, input_file, end - start))
+    logger.info(f"{file_type} file '{input_file}' is loaded, time spent = {(end - start):.2f}s.")
 
     return data
 
@@ -206,7 +214,7 @@ def write_output(
     start = time.perf_counter()
 
     if isinstance(data, UnimodalData):
-        data = MutimodalData({data.uns["genome"]: data})
+        data = MutimodalData(data)
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 
@@ -235,7 +243,7 @@ def write_output(
     elif file_type == "scp":
         write_scp_file(data, output_file, is_sparse = is_sparse, precision = precision)
     else:
-        raise ValueError("Unknown file type {}!".format(file_type))
+        raise ValueError(f"Unknown file type '{file_type}'!")
 
     end = time.perf_counter()
-    logger.info("{} file '{}' is written. Time spent = {:.2f}s.".format(file_type, output_file, end - start))
+    logger.info(f"{file_type} file '{output_file}' is written. Time spent = {(end - start):.2f}s.")

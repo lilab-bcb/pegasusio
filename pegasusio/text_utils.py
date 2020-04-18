@@ -128,7 +128,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, nge
 
     barcode_metadata, format_type = _load_barcode_metadata(barcode_file)
     feature_metadata, format_type = _load_feature_metadata(feature_file, format_type)
-    logger.info("Detected mtx file in {} format.".format(format_type))
+    logger.info(f"Detected mtx file in {format_type} format.")
 
     mtx_file = os.path.join(path, file_name)
     if file_name.endswith(".gz"):
@@ -136,7 +136,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, nge
         if os.path.exists(mtx_fifo):
             os.unlink(mtx_fifo)
         os.mkfifo(mtx_fifo)
-        subprocess.Popen("gunzip -c {0} > {1}".format(mtx_file, mtx_fifo), shell = True)
+        subprocess.Popen(f"gunzip -c {mtx_file} > {mtx_fifo}", shell = True)
         row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
         os.unlink(mtx_fifo)
     else:
@@ -202,7 +202,7 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
         file_name = _locate_mtx_file(path)
     else:
         if (not orig_file.endswith(".mtx")) and (not orig_file.endswith(".mtx.gz")):
-            raise ValueError("File {} does not end with suffix .mtx or .mtx.gz!".format(orig_file))
+            raise ValueError(f"File {orig_file} does not end with suffix .mtx or .mtx.gz!")
         path, file_name = os.path.split(orig_file)
 
     data = MultimodalData()
@@ -228,7 +228,7 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
             if dir_entry.is_dir():
                 file_name = _locate_mtx_file(dir_entry.path)
                 if file_name is None:
-                    raise ValueError("Folder {} does not contain a mtx file!".format(dir_entry.path))
+                    raise ValueError(f"Folder {dir_entry.path} does not contain a mtx file!")
                 data.add_data(dir_entry.name, load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, modality, ngene=ngene))
 
     return data
@@ -248,11 +248,11 @@ def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
         if os.path.exists(fifo_file):
             os.unlink(fifo_file)
         os.mkfifo(fifo_file)
-        pobj = subprocess.Popen("cat {0} | gzip -c - > {1}".format(fifo_file, mtx_file), shell = True)
+        pobj = subprocess.Popen(f"cat {fifo_file} | gzip -c - > {mtx_file}", shell = True)
         write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision) # matrix is cell x gene csr_matrix, will write as gene x cell
         assert pobj.wait() == 0
         os.unlink(fifo_file)
-        logger.info("{} is written.".format(mtx_file))
+        logger.info(f"{mtx_file} is written.")
 
     unidata.barcode_metadata.to_csv(os.path.join(output_dir, "barcodes.tsv.gz"), sep = '\t')
     logger.info("barcodes.tsv.gz is written.")
@@ -260,7 +260,7 @@ def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
     unidata.feature_metadata.to_csv(os.path.join(output_dir, "features.tsv.gz"), sep = '\t')
     logger.info("features.tsv.gz is written.")
 
-    logger.info("Mtx for {} is written.".format(unidata.get_genome()))
+    logger.info(f"Mtx for {unidata.get_uid()} is written.")
 
 
 def write_mtx_file(data: MultimodalData, output_directory: str, precision: int = 2):
@@ -332,7 +332,7 @@ def load_csv_file(
         if os.path.exists(csv_fifo):
             os.unlink(csv_fifo)
         os.mkfifo(csv_fifo)
-        subprocess.Popen("gunzip -c {0} > {1}".format(input_csv, csv_fifo), shell = True)
+        subprocess.Popen(f"gunzip -c {input_csv} > {csv_fifo}", shell = True)
         row_ind, col_ind, data, shape, rowkey, rownames, colnames = read_csv(csv_fifo, sep)
         os.unlink(csv_fifo)
     else:
@@ -364,7 +364,7 @@ def load_csv_file(
         if modality == "rna":
             unidata.filter(ngene = ngene)
 
-    data = MultimodalData({genome: unidata})
+    data = MultimodalData(unidata)
 
     return data
 
@@ -381,35 +381,35 @@ def _write_scp_metadata(unidata: UnimodalData, output_name: str, precision: int 
         else:
             datatype_list.append("\tgroup")
 
-    metadata_file = "{}.scp.metadata.txt".format(output_name)
+    metadata_file = f"{output_name}.scp.metadata.txt"
     with open(metadata_file, "w") as fout:
-        fout.write("NAME{metadata}\n".format(metadata = "".join(metadata_list)))
-        fout.write("TYPE{datatype}\n".format(datatype = "".join(datatype_list)))
+        fout.write(f"NAME{''.join(metadata_list)}\n")
+        fout.write(f"TYPE{''.join(datatype_list)}\n")
 
-    unidata.obs.to_csv(metadata_file, sep="\t", na_rep = "", float_format = "%.{}f".format(precision), header=False, mode="a")
-    logger.info("Metadata file {} is written.".format(metadata_file))
+    unidata.obs.to_csv(metadata_file, sep="\t", na_rep = "", float_format = f"%.{precision}f", header=False, mode="a")
+    logger.info(f"Metadata file {metadata_file} is written.")
 
 
 def _write_scp_coords(unidata: UnimodalData, output_name: str, precision: int = 2) -> None:
     """ Write coordinates for each visualization
     """
-    float_fmt = "%.{}f".format(precision)
+    float_fmt = f"%.{precision}f"
     for basis in unidata.obsm.keys():
         basis_X = unidata.obsm[basis]
-        if basis_X.ndim != 2 or basis_X.shape[1] < 2:
+        if not basis.startswith("X_") or basis_X.ndim != 2 or basis_X.shape[1] < 2:
             continue
         coords = ["X", "Y"] if basis_X.shape[1] == 2 else ["X", "Y", "Z"]
-        coord_file = "{}.scp.{}.coords.txt".format(output_name, basis)
+        coord_file = f"{output_name}.scp.{basis}.coords.txt"
         with open(coord_file, "w") as fout:
-            fout.write("NAME\t{coo}\n".format(coo = "\t".join(coords)))
-            fout.write("TYPE\t{dtype}\n".format(dtype = "\t".join(["numeric"] * len(coords))))
+            fout.write(f"NAME\t{chr(9).join(coords)}\n")
+            fout.write(f"TYPE\t{chr(9).join(['numeric'] * len(coords))}\n")
         df_out = pd.DataFrame(
             basis_X[:, 0: len(coords)],
             columns=coords,
             index=unidata.obs_names,
         )
         df_out.to_csv(coord_file, sep="\t", na_rep = "", float_format = float_fmt, header=False, mode="a")
-        logger.info("Coordinate file {} is written.".format(coord_file))
+        logger.info(f"Coordinate file {coord_file} is written.")
 
 
 def _write_scp_expression(unidata: UnimodalData, output_name: str, is_sparse: bool, precision: int = 2) -> None:
@@ -417,28 +417,28 @@ def _write_scp_expression(unidata: UnimodalData, output_name: str, is_sparse: bo
     """
     matrix = unidata.get_matrix("X")
     if is_sparse:
-        barcode_file = "{}.scp.barcodes.tsv".format(output_name)
+        barcode_file = f"{output_name}.scp.barcodes.tsv"
         with open(barcode_file, "w") as fout:
             fout.write("\n".join(unidata.obs_names) + "\n")
-        logger.info("Barcode file {} is written.".format(barcode_file))
+        logger.info(f"Barcode file {barcode_file} is written.")
 
-        feature_file = "{}.scp.features.tsv".format(output_name)
+        feature_file = f"{output_name}.scp.features.tsv"
         
         gene_names = unidata.var_names.values
         gene_ids = unidata.var["featureid"].values if "featureid" in unidata.var else (unidata.var["gene_ids"] if "gene_ids" in unidata.var else gene_names)
         
         df = pd.DataFrame({"gene_names": gene_names, "gene_ids": gene_ids})[["gene_ids", "gene_names"]]
         df.to_csv(feature_file, sep="\t", header=False, index=False)
-        logger.info("Feature file {} is written.".format(feature_file))
+        logger.info(f"Feature file {feature_file} is written.")
 
-        mtx_file = "{}.scp.matrix.mtx".format(output_name)
+        mtx_file = f"{output_name}.scp.matrix.mtx"
         write_mtx(mtx_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision) # matrix is cell x gene csr_matrix, will write as gene x cell
-        logger.info("Matrix file {} is written.".format(mtx_file))
+        logger.info(f"Matrix file {mtx_file} is written.")
     else:
-        expr_file = "{}.scp.expr.txt".format(output_name)
+        expr_file = f"{output_name}.scp.expr.txt"
         matrix = matrix.T.tocsr() # convert to gene x cell
         write_dense(expr_file, unidata.obs_names.values, unidata.var_names.values, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision)
-        logger.info("Dense expression file {} is written.".format(expr_file))
+        logger.info(f"Dense expression file {expr_file} is written.")
 
 
 def write_scp_file(data: MultimodalData, output_name: str, is_sparse: bool = True, precision: int = 2) -> None:

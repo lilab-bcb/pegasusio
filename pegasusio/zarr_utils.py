@@ -11,7 +11,7 @@ from zarr import Blosc
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
-from pegasusio import modalities, UnimodalData, VDJData, CITESeqData, MultimodalData
+from pegasusio import modalities, UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
 
 
 CHUNKSIZE = 1000000
@@ -84,7 +84,7 @@ class ZarrFile:
     def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.recarray]:
         if 'ordered' in group[name].attrs:
             # categorical column
-            return pd.Categorical.from_codes(group[name][...], categories = group['_categories/{0}'.format(name)][...], ordered = group[name].attrs['ordered'])
+            return pd.Categorical.from_codes(group[name][...], categories = group[f'_categories/{name}'][...], ordered = group[name].attrs['ordered'])
         else:
             return group[name][...]
 
@@ -150,10 +150,13 @@ class ZarrFile:
             metadata["modality"] = metadata.pop("experiment_type")
 
         DataClass = UnimodalData
-        if metadata["modality"] in {"tcr", "bcr"}:
+        modality = metadata["modality"]
+        if modality == "tcr" or modality == "bcr":
             DataClass = VDJData
-        elif metadata["modality"] == "citeseq":
+        elif modality == "citeseq":
             DataClass = CITESeqData
+        elif modality == "cyto":
+            DataClass = CytoData
 
         unidata = DataClass(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
                             feature_metadata = self.read_dataframe(group['feature_metadata']),
@@ -162,7 +165,7 @@ class ZarrFile:
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
                             feature_multiarrays = self.read_mapping(group['feature_multiarrays']))
 
-        if metadata["modality"] == "rna":
+        if modality == "rna":
             unidata.filter(ngene, select_singlets)
 
         return unidata
@@ -180,14 +183,16 @@ class ZarrFile:
 
         for key, group in self.root.groups():
             unidata = self.read_unimodal_data(group, ngene, select_singlets)
-            if need_trim and unidata.uns.get("modality", "rna") == "rna":
+            modality = unidata.get_modality()
+            assert modality is not None
+            if need_trim and modality == "rna":
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
-            data.add_data(key, unidata)
+            data.add_data(unidata)
 
         if need_trim:
             for key in data.list_data():
                 unidata = data.get_data(key)
-                if unidata.uns.get("modality", "rna") != "rna":
+                if unidata.get_modality() != "rna":
                     selected = unidata.obs_names.isin(selected_barcodes)
                     unidata._inplace_subset_obs(selected)
 

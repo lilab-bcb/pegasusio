@@ -3,9 +3,6 @@ import pandas as pd
 import itertools
 from scipy.sparse import csr_matrix
 
-import logging
-logger = logging.getLogger(__name__)
-
 from pegasusio import VDJData, MultimodalData
 from pegasusio.cylib.funcs import convert_10x_vdj_to_vdjdata
 
@@ -44,10 +41,10 @@ def load_10x_vdj_file(input_csv: str, genome: str = None, modality: str = None) 
     elif feature_name in VDJData._features["bcr"]:
         modal = "bcr"
     else:
-        raise ValueError("Unknown feature {} detected!".format(feature_name))
+        raise ValueError(f"Unknown feature '{feature_name}' detected!")
 
     if (modality is not None) and (modality != modal):
-        raise ValueError("Detected modality {} does not match user-provided modality {}!".format(modal, modality))
+        raise ValueError(f"Detected modality '{modal}' does not match user-provided modality '{modality}'!")
     modality = modal
     
     # Set up feature keys
@@ -79,6 +76,6 @@ def load_10x_vdj_file(input_csv: str, genome: str = None, modality: str = None) 
 
     vdjdata = VDJData(barcode_metadata, feature_metadata, matrices, metadata)
     vdjdata.separate_channels()
-    data = MultimodalData({genome: vdjdata})
+    data = MultimodalData(vdjdata)
 
     return data
