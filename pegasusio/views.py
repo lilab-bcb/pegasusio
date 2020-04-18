@@ -27,7 +27,7 @@ class MultiArrayView(MutableMapping):
             if key in self.parent:
                 self.multiarrays[key] = self.parent[key][self.index]
             else:
-                raise ValueError("Key {} does not exist!".format(key))
+                raise ValueError(f"Key '{key}' does not exist!")
         return self.multiarrays[key]    
 
     def __setitem__(self, key: str, value: object):
@@ -43,7 +43,7 @@ class MultiArrayView(MutableMapping):
         return len(self.parent)
 
     def __repr__(self) -> str:
-        return "View of multiarrays with keys: {}.".format(str(list(self.parent))[1:-1])
+        return f"View of multiarrays with keys: {str(list(self.parent))[1:-1]}."
 
 
 
@@ -61,11 +61,11 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
                 return None
             else:
                 if not (isinstance(index_1d.start, int) or isinstance(index_1d.start, np.integer) or isinstance(index_1d.start, str) or (index_1d.start is None)):
-                    raise ValueError("Invalid slice.start '{}'. slice.start must be either None, integer or string!".format(index_1d.start))
+                    raise ValueError(f"Invalid slice.start '{index_1d.start}'. slice.start must be either None, integer or string!")
                 if not (isinstance(index_1d.stop, int) or isinstance(index_1d.stop, np.integer) or isinstance(index_1d.stop, str) or (index_1d.stop is None)):
-                    raise ValueError("Invalid slice.stop '{}'. slice.stop must be either None, integer or string!".format(index_1d.stop))
+                    raise ValueError(f"Invalid slice.stop '{index_1d.stop}'. slice.stop must be either None, integer or string!")
                 if not (isinstance(index_1d.step, int) or isinstance(index_1d.step, np.integer) or (index_1d.step is None)):
-                    raise ValueError("Invalid slice.step '{}'. slice.step must be either None, integer or string!".format(index_1d.step))
+                    raise ValueError(f"Invalid slice.step '{index_1d.step}'. slice.step must be either None, integer or string!")
                 return index_1d
         elif isinstance(index_1d, pd.Index):
             return index_1d
@@ -74,9 +74,9 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
                 index_1d = np.array([index_1d])
             index_1d = np.array(index_1d, copy = False)
             if index_1d.ndim != 1:
-                raise ValueError("{} index must be 1 dimension!".format(index_name))
+                raise ValueError(f"{index_name} index must be 1 dimension!")
             if index_1d.dtype.kind not in {'b', 'i', 'u', 'O', 'U'}:
-                raise ValueError("Unknown {} index dtype: {}!".format(index_name, index_1d.dtype))
+                raise ValueError(f"Unknown {index_name} index dtype: {index_1d.dtype}!")
             return index_1d
 
     def _process_pd_index(base_idx: pd.Index, index_1d: pd.Index) -> List[int]:
@@ -101,24 +101,24 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
             start = index_1d.start
             if isinstance(start, str):
                 if start not in base_idx:
-                    raise ValueError("Cannot locate slice.start '{}' in {} index!".format(start, index_name))
+                    raise ValueError(f"Cannot locate slice.start '{start}' in {index_name} index!")
                 start = base_idx.get_loc(start)
             elif start is None:
                 start = 0
             else:
                 if start < 0 or start >= base_idx.size:
-                    raise ValueError("slice.start '{}' is out of the boundary [{}, {}) for {} index!".format(start, 0, base_idx.size, index_name))
+                    raise ValueError(f"slice.start '{start}' is out of the boundary [0, {base_idx.size}) for {index_name} index!")
 
             stop = index_1d.stop
             if isinstance(stop, str):
                 if stop not in base_idx:
-                    raise ValueError("Cannot locate slice.stop '{}' in {} index!".format(stop, index_name))
+                    raise ValueError(f"Cannot locate slice.stop '{stop}' in {index_name} index!")
                 stop = base_idx.get_loc(stop) + np.sign(step) # if str , use [] instead of [)
             elif stop is None:
                 stop = base_idx.size
             else:
                 if stop < 0 or stop > base_idx.size:
-                    raise ValueError("slice.stop '{}' is out of the boundary [{}, {}] for {} index!".format(stop, 0, base_idx.size, index_name))
+                    raise ValueError(f"slice.stop '{stop}' is out of the boundary [0, {base_idx.size}] for {index_name} index!")
 
             indexer = range(start, stop, step)
         elif isinstance(index_1d, np.ndarray) and (index_1d.dtype.kind in {'b', 'i', 'u'}):
@@ -126,15 +126,15 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
 
             if index_1d.dtype.kind == 'b':
                 if index_1d.size != base_idx.size:
-                    raise ValueError("{} index size does not match: actual size {}, input size {}!".format(index_name, base_idx.size, index_1d.size))
+                    raise ValueError(f"{index_name} index size does not match: actual size {base_idx.size}, input size {index_1d.size}!")
                 indexer = np.where(index_1d)[0]
             elif index_1d.dtype.kind == 'i' or index_1d.dtype.kind == 'u':
                 if np.any(index_1d < 0):
-                    raise ValueError("Detect negative values in {} index!".format(index_name))
+                    raise ValueError(f"Detect negative values in {index_name} index!")
                 if np.any(index_1d >= base_idx.size):
-                    raise ValueError("Detect values exceeding the largest valid position {} in {} index!".format(base_idx.size - 1, index_name))
+                    raise ValueError(f"Detect values exceeding the largest valid position {base_idx.size - 1} in {index_name} index!")
                 if np.unique(index_1d).size < index_1d.size:
-                    raise ValueError("{} index values are not unique!".format(index_name))
+                    raise ValueError(f"{index_name} index values are not unique!")
         else:
             if not isinstance(index_1d, pd.Index):
                 assert isinstance(index_1d, np.ndarray) and index_1d.ndim == 1
@@ -150,7 +150,7 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
 
     if isinstance(index, tuple):
         if len(index) > 2:
-            raise ValueError("Index dimension {} exceeds 2!".format(len(index)))
+            raise ValueError(f"Index dimension {len(index)} exceeds 2!")
         elif len(index) == 1:
             bidx = _check_index_type(index[0], "row")
         else:
@@ -186,13 +186,14 @@ class UnimodalDataView:
         self._obj_name = obj_name
 
     def __repr__(self, repr_dict: Dict[str, str] = None) -> str:
-        repr_str = "View of {} object with n_obs x n_vars = {} x {}".format(self._obj_name, self._shape[0], self._shape[1])
-        repr_str += "\n    It contains {} matrices: {}".format(len(self.parent.matrices), str(list(self.parent.matrices))[1:-1])
-        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
+        repr_str = f"View of {self._obj_name} object with n_obs x n_vars = {self._shape[0]} x {self._shape[1]}"
+        repr_str += f"\n    Genome: {self.parent.get_genome()}; Modality: {self.parent.get_modality()}"
+        repr_str += f"\n    It contains {len(self.parent.matrices)} matrices: {str(list(self.parent.matrices))[1:-1]}"
+        repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm"]:
             str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else str(list(getattr(self.parent, key).keys()))[1:-1]
-            repr_str += "\n    {}: {}".format(key, str_out)
-        repr_str += "\n    uns: {}".format(str(list(self.metadata))[1:-1])
+            repr_str += f"\n    {key}: {str_out}"
+        repr_str += f"\n    uns: {str(list(self.metadata))[1:-1]}"
         return repr_str
 
     @property
@@ -277,7 +278,7 @@ class UnimodalDataView:
 
     def select_matrix(self, key: str) -> None:
         if key not in self.parent.matrices:
-            raise ValueError("Matrix key {} does not exist!".format(key))
+            raise ValueError(f"Matrix key '{key}' does not exist!")
         self._cur_matrix = key
 
     def __getitem__(self, index: INDEX) -> "UnimodalDataView":

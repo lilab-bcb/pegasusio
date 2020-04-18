@@ -9,39 +9,50 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
-from pegasusio import UnimodalData, VDJData, CITESeqData
+from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
 from .views import INDEX, UnimodalDataView
 from .vdj_data import VDJDataView
 
 
 class MultimodalData:
-    def __init__(self, data_dict: Union[Dict[str, UnimodalData], anndata.AnnData] = None, genome: str = None, modality: str = None):
-        if isinstance(data_dict, anndata.AnnData):
-            self.from_anndata(data_dict, genome = genome, modality = modality)
+    def __init__(self, data: Union[UnimodalData, List[UnimodalData], anndata.AnnData] = None, genome: str = None, modality: str = None):
+        if isinstance(data, anndata.AnnData):
+            self.from_anndata(data, genome = genome, modality = modality)
             return None
 
-        self.data = data_dict if data_dict is not None else dict()
+        self.data = dict()
         self._selected = self._unidata = None
-        if len(self.data) > 0:
+
+        if data is not None:
+            if isinstance(data, UnimodalData):
+                self._selected = data.get_uid()
+                assert self._selected is not None
+                self._unidata = self.data[self._selected] = data
+                return None
+
+            for unidata in data:
+                key = unidata.get_uid()
+                assert key is not None
+                self.data[key] = unidata
+
             self._selected = list(self.data)[0]
             self._unidata = self.data[self._selected]
 
 
     def __repr__(self) -> str:
-        repr_str = "MultimodalData object with {} UnimodalData: {}".format(len(self.data), str(list(self.data))[1:-1])
+        repr_str = f"MultimodalData object with {len(self.data)} UnimodalData: {str(list(self.data))[1:-1]}"
         if self._selected is not None:
-            repr_str += "\n    It currently binds to {} object {}\n\n".format(self._unidata.__class__.__name__, self._selected)
+            repr_str += f"\n    It currently binds to {self._unidata.__class__.__name__} object {self._selected}\n\n"
             repr_str += self._unidata.__repr__()
         else:
             repr_str += "\n    It currently binds to no UnimodalData object"
-
         return repr_str
 
 
     def update(self, data: "MultimodalData") -> None:
         for key in data.data:
             if key in self.data:
-                raise ValueError("Detected duplicated key {}!".format(key))
+                raise ValueError(f"Detected duplicated key '{key}'")
             self.data[key] = data.data[key]
 
 
@@ -176,10 +187,15 @@ class MultimodalData:
         assert self._unidata is not None and isinstance(self._unidata, VDJData)
         return self._unidata.get_chain(chain)
 
-    def load_control_list(self, antibody_control_csv: str) -> None:
-        """ Surrogate function for CITESeqData """
-        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
-        self._unidata.load_control_list(antibody_control_csv)
+    def set_aside_parameters(self, params: List[str] = ["Time"]) -> None:
+        """ Surrogate function for CytoData """
+        assert self._unidata is not None and isinstance(self._unidata, CytoData)
+        self._unidata.set_aside_parameters(params)
+
+    def load_control_list(self, control_csv: str) -> None:
+        """ Surrogate function for CITESeqData and CytoData """
+        assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
+        self._unidata.load_control_list(control_csv)
 
     def log_transform(self) -> None:
         """ Surrogate function for CITESeqData """
@@ -187,8 +203,8 @@ class MultimodalData:
         self._unidata.log_transform()
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
-        """ Surrogate function for CITESeqData """
-        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
+        """ Surrogate function for CITESeqData and CytoData"""
+        assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
         self._unidata.arcsinh_transform(cofactor = cofactor, jitter = jitter, random_state = random_state, select = select)
 
 
@@ -197,20 +213,22 @@ class MultimodalData:
         return list(self.data)
 
 
-    def add_data(self, key: str, uni_data: UnimodalData) -> None:
+    def add_data(self, unidata: UnimodalData) -> None:
         """ Add data, if _selected is not set, set as the first added dataset
         """
+        key = unidata.get_uid()
+        assert key is not None
         if key in self.data:
-            raise ValueError("Key {} already exists!".format(key))
-        self.data[key] = uni_data
+            raise ValueError(f"Key '{key}' already exists!")
+        self.data[key] = unidata
         if self._selected is None:
             self._selected = key
-            self._unidata = uni_data
+            self._unidata = unidata
 
 
     def select_data(self, key: str) -> None:
         if key not in self.data:
-            raise ValueError("Key {} does not exist!".format(key))
+            raise ValueError(f"Key '{key}' does not exist!")
         self._selected = key
         self._unidata = self.data[self._selected]
 
@@ -219,21 +237,36 @@ class MultimodalData:
         return self._selected
 
 
-    def get_data(self, key: str = None, modality: str = None) -> Union[UnimodalData, List[UnimodalData]]:
+    def get_data(self, key: str = None, genome: str = None, modality: str = None) -> Union[UnimodalData, List[UnimodalData]]:
+        """ get UnimodalData or list of UnimodalData based on MultimodalData key or genome or modality
+        """
+
         if key is not None:
             if key not in self.data:
-                raise ValueError("Key {} does not exist!".format(key))
+                raise ValueError(f"Key '{key}' does not exist!")
             return self.data[key]
 
-        if modality is None:
-            raise ValueError("Either key or modality needs to be set!")
-
         data_arr = []
-        for key in self.data:
-            if self.data[key].uns["modality"] == modality:
-                data_arr.append(self.data[key])
-        if len(data_arr) == 0:
-            raise ValueError("No UnimodalData with modality {}!".format(modality))
+
+        if genome is not None:
+            for key in self.data:
+                unidata = self.data[key]
+                if unidata.get_genome() == genome:
+                    data_arr.append(unidata)
+            
+            if len(data_arr) == 0:
+                raise ValueError(f"No UnimodalData with genome '{genome}'!")
+        else:
+            if modality is None:
+                raise ValueError("Either key or genome or modality needs to be set!")
+
+            for key in self.data:
+                unidata = self.data[key]
+                if unidata.get_modality() == modality:
+                    data_arr.append(unidata)
+
+                if len(data_arr) == 0:
+                    raise ValueError(f"No UnimodalData with modality '{modality}'!")
 
         return data_arr[0] if len(data_arr) == 1 else data_arr
 
@@ -250,19 +283,24 @@ class MultimodalData:
         unidata_arr = []
 
         for key in list(self.data):
-            genomes.append(key)
-            unidata_arr.append(self.data.pop(key))
+            unidata = self.data.pop(key)
+            assert unidata.get_modality() == modality
+            genomes.append(unidata.get_genome())
+            unidata_arr.append(unidata)
 
+        unikey = None
         if len(genomes) == 1:
-            unikey = genomes[0]
+            unikey = unidata_arr[0].get_uid()
             self.data[unikey] = unidata_arr[0]
         else:
-            unikey = ",".join(genomes)
+            genome = ",".join(genomes)
             feature_metadata = pd.concat([unidata.feature_metadata for unidata in unidata_arr], axis = 0)
             feature_metadata.reset_index(inplace = True)
             feature_metadata.fillna(value = "N/A", inplace = True)
             X = hstack([unidata.matrices["X"] for unidata in unidata_arr], format = "csr")
-            self.data[unikey] = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, {"genome": unikey, "modality": "rna"})
+            unidata = UnimodalData(unidata_arr[0].barcode_metadata, feature_metadata, {"X": X}, {"genome": genome, "modality": "rna"})
+            unikey = unidata.get_uid()
+            self.data[unikey] = unidata
             del unidata_arr
             gc.collect()
 
@@ -270,18 +308,21 @@ class MultimodalData:
         self._unidata = self.data[unikey]
 
 
-    def subset_data(self, data_subset: Set[str] = None, modality_subset: Set[str] = None) -> None:
-        """ Only keep data that are in data_subset and modality_subset
+    def subset_data(self, data_subset: Set[str] = None, genome_subset: Set[str] = None, modality_subset: Set[str] = None) -> None:
+        """ Only keep data that are in data_subset or genome_subset or modality_subset
         """
         if data_subset is not None:
             for key in self.list_data():
                 if key not in data_subset:
                     del self.data[key]
-
-        if modality_subset is not None:
+        elif genome_subset is not None:
             for key in self.list_data():
-                if self.data[key].uns["modality"] not in modality_subset:
-                    self.data[key]
+                if self.data[key].get_genome() not in genome_subset:
+                    del self.data[key]
+        elif modality_subset is not None:
+            for key in self.list_data():
+                if self.data[key].get_modality() not in modality_subset:
+                    del self.data[key]
 
 
     def scan_black_list(self, black_list: Set[str] = None):
@@ -307,7 +348,8 @@ class MultimodalData:
         """ Initialize from an anndata object
         """
         unidata = UnimodalData(data)
-        key = unidata.uns["genome"]
+        key = unidata.get_uid()
+        assert key is not None
         self.data = {key: unidata}
         self._selected = key
         self._unidata = unidata

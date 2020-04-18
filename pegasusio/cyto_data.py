@@ -1,103 +1,104 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix, hstack
-from typing import Dict, Union
+from typing import List, Dict, Union
 
 import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
-class CITESeqData(UnimodalData):
-    _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
-    _uns_keywords = ["_control_names", "_control_counts"]
+class CytoData(UnimodalData):
+    _matrix_keywords = ["arcsinh.transformed", "raw.data", "arcsinh.jitter"] # all in dense format, np.ndarray
+    _obsm_keywords = ["_parameters", "_controls"] # _parameters store parameters that are not used, e.g. Time
+    _uns_keywords = ["_parameter_names", "_control_names"]
     _var_keywords = ["_control_id"]
 
     def __init__(
         self,
         barcode_metadata: Union[dict, pd.DataFrame],
         feature_metadata: Union[dict, pd.DataFrame],
-        matrices: Dict[str, csr_matrix],
+        matrices: Dict[str, np.ndarray],
         metadata: dict,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
-        cur_matrix: str = None,
+        cur_matrix: str = "raw.data",
     ) -> None:
-        assert metadata["modality"] == "citeseq"
+        assert metadata["modality"] == "cyto"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
-        assert len(self.matrices) == 1
-        self._cur_matrix = list(self.matrices)[0]
+        assert len(self.matrices) == 1 and "raw.data" in self.matrices
 
-        if self._cur_matrix == "raw.count":
-            # Prepare for the control antibody list.
-            self.metadata["_control_names"] = np.array(["None"], dtype = object)
-            self.metadata["_control_counts"] = csr_matrix((self._shape[0], 1), dtype = np.int32)
-            self.metadata["_obs_keys"] = ["_control_counts"]
-            self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
+        # Prepare for the control list.
+        self.metadata["_control_names"] = np.array(["None"], dtype = object)
+        self.barcode_multiarrays["_controls"] = np.zeros((self._shape[0], 1), dtype = np.int32)
+        self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
-        raise ValueError("Cannot convert an AnnData object to a CITESeqData object!")
+        raise ValueError("Cannot convert an AnnData object to a CytoData object!")
 
     
     def to_anndata(self) -> anndata.AnnData:
-        raise ValueError("Cannot convert a CITESeqData object ot an AnnData object!")
+        raise ValueError("Cannot convert a CytoData object ot an AnnData object!")
 
 
     def __getitem__(self, index: INDEX) -> UnimodalDataView:
         barcode_index, feature_index = _parse_index(self, index)
-        return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CITESeqData")
+        return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix, obj_name = "CytoData")
+
+
+    def set_aside_parameters(self, params: List[str] = ["Time"]) -> None:
+        """ Move parameters in params from the raw.data matrix
+        """
+        assert len(self.matrices) == 1 and "raw.data" in self.matrices
+        assert "_parameter_names" not in self.metadata
+
+        locs = self.feature_metadata.index.get_indexer(params) 
+        if (locs < 0).sum() > 0:
+            raise ValueError(f"Detected unknown parameters {params[locs < 0]}!")
+        self.barcode_multiarrays["_parameters"] = self.matrices["raw.data"][:, locs]
+        self.metadata["_parameter_names"] = self.feature_metadata.index.values[locs] # with loc: List[int], this should be a copy not a reference
+        idx = np.ones(self._shape[1], dtype = bool)
+        idx[locs] = False
+        self._inplace_subset_var(idx)
 
 
     def load_control_list(self, control_csv: str) -> None:
-        assert "raw.count" in self.matrices
+        """ Load control csv and move control from matrix to obsm
+        """
+        assert "raw.data" in self.matrices
         assert self.metadata["_control_names"].size == 1
 
         ctrls = {"None": 0}
         series = pd.read_csv(control_csv, header=0, index_col=0, squeeze=True)
-        for antibody, control in series.iteritems():
+        for parameter, control in series.iteritems():
             pos = ctrls.get(control, None)
             if pos is None:
                 if control not in self.feature_metadata.index:
-                    raise ValueError(f"Detected unknown control antibody '{control}'!")
+                    raise ValueError(f"Detected unknown control parameter '{control}'!")
                 pos = len(ctrls)
                 ctrls[control] = pos
 
-            if antibody not in self.feature_metadata.index:
-                raise ValueError(f"Detected unknown CITE-Seq antibody '{antibody}'!")
-            self.feature_metadata.loc[antibody, "_control_id"] = pos
+            if parameter not in self.feature_metadata.index:
+                raise ValueError("Detected unknown signal parameter '{parameter}'!")
+            self.feature_metadata.loc[parameter, "_control_id"] = pos
 
         ctrl_names = np.empty(len(ctrls), dtype = object)
         for ctrl_name, pos in ctrls.items():
             ctrl_names[pos] = ctrl_name
+
         locs = self.feature_metadata.index.get_indexer(pd.Index(ctrl_names[1:], copy = False))
         idx = np.ones(self._shape[1], dtype = bool)
         idx[locs] = False
 
         self.metadata["_control_names"] = ctrl_names
-        self.metadata["_control_counts"] = hstack([self.metadata["_control_counts"], 
-                                                   self.matrices["raw.count"][:, locs]], 
-                                                   format = "csr")
+        self.barcode_multiarrays["_controls"] = np.hstack((self.barcode_multiarrays["_controls"], self.matrices["raw.data"][:, locs]))
         self._inplace_subset_var(idx)
 
         # Delete all other matrices in case users do transform before loading the controls
         for keyword in list(self.matrices):
-            if keyword != "raw.count":
+            if keyword != "raw.data":
                 del self.matrices[keyword]
-        self._cur_matrix = "raw.count"
-
-
-    def log_transform(self, select: bool = True) -> None:
-        """ ln(x+1)"""
-        if "raw.count" not in self.matrices:
-            raise ValueError("raw.count matrix must exist in order to calculate the log transformed matrix!")
-
-        log_mat = np.maximum(np.log1p(self.matrices["raw.count"].toarray(), dtype = np.float32) \
-                             - np.log1p(self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values], dtype = np.float32),
-                             0.0)
-        self.matrices["log.transformed"] = csr_matrix(log_mat)
-        if select:
-            self._cur_matrix = "log.transformed"
+        self._cur_matrix = "raw.data"
 
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
@@ -124,18 +125,18 @@ class CITESeqData(UnimodalData):
         ``None``
 
         Update ``self.matrices``:
-            * ``self.matrices['arcsinh.transformed']``: if jitter == False, csr_matrix.
+            * ``self.matrices['arcsinh.transformed']``: if jitter == False, np.ndarray.
             * ``self.matrices['arcsinh.jitter']``: if jitter == True, np.ndarray.
 
         Examples
         --------
-        >>> citeseq_data.arcsinh_transform(jitter = True)
+        >>> cyto_data.arcsinh_transform()
         """
-        if "raw.count" not in self.matrices:
-            raise ValueError("raw.count matrix must exist in order to calculate the arcsinh transformed matrix!")
+        if "raw.data" not in self.matrices:
+            raise ValueError("raw.data matrix must exist in order to calculate the arcsinh transformed matrix!")
 
-        signal = self.matrices["raw.count"].toarray()
-        control = self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values]
+        signal = self.matrices["raw.data"]
+        control = self.barcode_metadata["_controls"][:, self.feature_metadata["_control_id"].values]
 
         if jitter:
             np.random.seed(random_state)
@@ -149,7 +150,7 @@ class CITESeqData(UnimodalData):
         if jitter:
             self.matrices["arcsinh.jitter"] = arcsinh_mat
         else:
-            self.matrices["arcsinh.transformed"] = csr_matrix(arcsinh_mat)
+            self.matrices["arcsinh.transformed"] = arcsinh_mat
 
         if select:
             self._cur_matrix = "arcsinh.jitter" if jitter else "arcsinh.transformed"

@@ -55,7 +55,7 @@ class UnimodalData:
                 self.barcode_metadata = pd.DataFrame(data = self.barcode_metadata, index = pd.Index(barcodekey, name = "barcodekey"))
             else:
                 if not isinstance(self.barcode_metadata, pd.DataFrame):
-                    raise ValueError("Unknown barcode_metadata type: {}!".format(type(self.barcode_metadata)))
+                    raise ValueError(f"Unknown barcode_metadata type: {type(self.barcode_metadata)}!")
                 if "barcodekey" in self.barcode_metadata:
                     self.barcode_metadata.set_index("barcodekey", inplace=True)
                 elif self.barcode_metadata.index.name != "barcodekey":
@@ -65,7 +65,7 @@ class UnimodalData:
             if isinstance(self.feature_metadata, MutableMapping):
                 self.feature_metadata = pd.DataFrame(self.feature_metadata)
             if not isinstance(self.feature_metadata, pd.DataFrame):
-                raise ValueError("Unknown feature_metadata type: {}!".format(type(self.feature_metadata)))
+                raise ValueError(f"Unknown feature_metadata type: {type(self.feature_metadata)}!")
             if "featurekey" in self.feature_metadata:
                 self.polish_featurekey(self.feature_metadata, self.metadata.get('genome', None))
                 self.feature_metadata.set_index("featurekey", inplace=True)
@@ -76,18 +76,18 @@ class UnimodalData:
 
         for key, mat in self.matrices.items():
             if mat.shape[0] != self._shape[0]:
-                raise ValueError("Wrong number of barcodes : matrix {} has {} barcodes, barcodes file has {} barcodes.".format(key, mat.shape[0], self._shape[0]))
+                raise ValueError(f"Wrong number of barcodes : matrix '{key}' has {mat.shape[0]} barcodes, barcodes file has {self._shape[0]} barcodes.")
             if mat.shape[1] != self._shape[1]:
-                raise ValueError("Wrong number of features : matrix {} has {} features, features file has {} features.".format(key, mat.shape[1], self._shape[1]))
+                raise ValueError(f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features.")
 
 
     def __repr__(self) -> str:
-        repr_str = "{} object with n_obs x n_vars = {} x {}".format(self.__class__.__name__, self.barcode_metadata.shape[0], self.feature_metadata.shape[0])
-        repr_str += "\n    It contains {} matrices: {}".format(len(self.matrices), str(list(self.matrices))[1:-1])
-        repr_str += "\n    It currently binds to matrix '{}' as X\n".format(self._cur_matrix) if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
+        repr_str = f"{self.__class__.__name__} object with n_obs x n_vars = {self.barcode_metadata.shape[0]} x {self.feature_metadata.shape[0]}"
+        repr_str += f"\n    Genome: {self.get_genome()}; Modality: {self.get_modality()}"
+        repr_str += f"\n    It contains {len(self.matrices)} matrices: {str(list(self.matrices))[1:-1]}"
+        repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
-            repr_str += "\n    {}: {}".format(key, str(list(getattr(self, key).keys()))[1:-1])
-
+            repr_str += f"\n    {key}: {str(list(getattr(self, key).keys()))[1:-1]}"
         return repr_str
 
 
@@ -180,7 +180,7 @@ class UnimodalData:
         if genome is not None:
             # remove genome strings for 10x chemistry if > 1 genomes exist
             import re
-            prefix = re.compile("^{}_+".format(genome))
+            prefix = re.compile(f"^{genome}_+")
             if prefix.match(feature_metadata["featurekey"][0]):
                 feature_metadata["featurekey"] = np.array([prefix.sub("", x) for x in feature_metadata["featurekey"].values], dtype = object)
                 if "featureid" in feature_metadata:
@@ -204,19 +204,29 @@ class UnimodalData:
                 idn += 1                    
                 dup_ids[keys[i]] = idn
                 if idn > 1:
-                    keys[i] = keys[i] + ".#~{}".format(idn) # duplicate ID starts from 2. .#~ makes it unique.
+                    keys[i] = keys[i] + f".#~{idn}" # duplicate ID starts from 2. .#~ makes it unique.
+
+
+    def get_genome(self) -> str:
+        """ return genome
+        """
+        return self.metadata.get("genome", None)
 
 
     def get_modality(self) -> str:
-        """ return modality, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
+        """ return modality, can be either 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto' (flow cytometry / mass cytometry).
         """
         return self.metadata.get("modality", None)
 
 
-    def get_genome(self) -> str:
-        """ return genome key
+    def get_uid(self) -> str:
+        """ return uid used for indexing this object in a MultimodalData object. uid = genome + '-' + modality
         """
-        return self.metadata.get("genome", None)
+        genome = self.get_genome()
+        modality = self.get_modality()
+        if genome is None or modality is None:
+            return None
+        return genome + "-" + modality
 
 
     def list_keys(self, key_type: str = "matrix") -> List[str]:
@@ -235,7 +245,7 @@ class UnimodalData:
         elif key_type == "other":
             return list(self.metadata)
         else:
-            raise ValueError("Unknown type {}!".format(type))
+            raise ValueError(f"Unknown type {key_type}!")
 
 
     def current_matrix(self) -> str:
@@ -248,11 +258,11 @@ class UnimodalData:
         """ Add a new matrix, can be raw count or others
         """
         if key in self.matrices:
-            raise ValueError("Matrix key {} already exists!".format(key))
+            raise ValueError(f"Matrix key '{key}' already exists!")
         if mat.shape[0] != self._shape[0]:
-            raise ValueError("Wrong number of barcodes: matrix {} has {} barcodes, which does not match with the barcode file ({})!".format(key, mat.shape[0], self._shape[0]))
+            raise ValueError(f"Wrong number of barcodes: matrix '{key}' has {mat.shape[0]} barcodes, which does not match with the barcode file ({self._shape[0]})!")
         if mat.shape[1] != self._shape[1]:
-            raise ValueError("Wrong number of features: matrix {} has {} features, which does not match with the feature file ({})!".format(key, mat.shape[1], self._shape[1]))
+            raise ValueError(f"Wrong number of features: matrix '{key}' has {mat.shape[1]} features, which does not match with the feature file ({self._shape[1]})!")
 
         self.matrices[key] = mat
 
@@ -261,7 +271,7 @@ class UnimodalData:
         """ Select a matrix for self.X
         """
         if key not in self.matrices:
-            raise ValueError("Matrix key {} does not exist!".format(key))
+            raise ValueError(f"Matrix key '{key}' does not exist!")
         self._cur_matrix = key
 
 
@@ -269,7 +279,7 @@ class UnimodalData:
         """ Return a matrix indexed by key
         """
         if key not in self.matrices:
-            raise ValueError("Matrix key {} does not exist!".format(key))
+            raise ValueError(f"Matrix key '{key}' does not exist!")
         return self.matrices[key]
 
 

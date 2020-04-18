@@ -452,7 +452,7 @@ cpdef tuple read_fcs(char* fcs_file):
 
         pos = i - 1
         fiview[pos] = metadata.pop(f"$P{i}N")
-        fkview[pos] = metadata.get(f"$P{i}S", fiview[pos])
+        fkview[pos] = metadata.pop(f"$P{i}S", fiview[pos])
         PEsview[pos] = metadata.pop(f"$P{i}E")
 
         tmpstr = metadata.pop(f"$P{i}R")
