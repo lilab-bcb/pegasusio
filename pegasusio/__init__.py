@@ -22,6 +22,7 @@ from .citeseq_data import CITESeqData
 from .cyto_data import CytoData
 from .multimodal_data import MultimodalData
 from .readwrite import infer_file_type, read_input, write_output
+from .preprocessing import qc_metrics, filter_data
 
 from ._version import get_versions
 
