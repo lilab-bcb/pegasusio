@@ -214,7 +214,7 @@ def write_output(
     start = time.perf_counter()
 
     if isinstance(data, UnimodalData):
-        data = MutimodalData(data)
+        data = MultimodalData(data)
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 
