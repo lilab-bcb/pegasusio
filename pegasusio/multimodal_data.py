@@ -11,32 +11,19 @@ import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
 from .views import INDEX, UnimodalDataView
+from .datadict import MultiDataDict
 from .vdj_data import VDJDataView
 
 
 class MultimodalData:
-    def __init__(self, data: Union[UnimodalData, List[UnimodalData], anndata.AnnData] = None, genome: str = None, modality: str = None):
-        if isinstance(data, anndata.AnnData):
-            self.from_anndata(data, genome = genome, modality = modality)
-            return None
+    def __init__(self, unidata: Union[UnimodalData, anndata.AnnData] = None, genome: str = None, modality: str = None):
+        self.data = MultiDataDict()
+        self._selected = self._unidata = self._zarrobj = None
 
-        self.data = dict()
-        self._selected = self._unidata = None
-
-        if data is not None:
-            if isinstance(data, UnimodalData):
-                self._selected = data.get_uid()
-                assert self._selected is not None
-                self._unidata = self.data[self._selected] = data
-                return None
-
-            for unidata in data:
-                key = unidata.get_uid()
-                assert key is not None
-                self.data[key] = unidata
-
-            self._selected = list(self.data)[0]
-            self._unidata = self.data[self._selected]
+        if unidata is not None:
+            if isinstance(unidata, anndata.AnnData):
+                unidata = UnimodalData(unidata, genome = genome, modality = modality)
+            self.add_data(unidata)
 
 
     def __repr__(self) -> str:
@@ -147,6 +134,12 @@ class MultimodalData:
         """
         assert self._unidata is not None
         return self._unidata.list_keys(key_type)
+
+    def add_matrix(self, key: str, mat: csr_matrix) -> None:
+        """ Surrogate function for UnimodalData, add a new matrix
+        """
+        assert self._unidata is not None
+        self._unidata.add_matrix(key, mat)
 
     def select_matrix(self, key: str) -> None:
         """ Surrogate function for UnimodalData, select a matrix
@@ -347,17 +340,6 @@ class MultimodalData:
             self.data[key].scan_black_list(black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
-        """ Initialize from an anndata object
-        """
-        unidata = UnimodalData(data)
-        key = unidata.get_uid()
-        assert key is not None
-        self.data = {key: unidata}
-        self._selected = key
-        self._unidata = unidata
-
-
     def to_anndata(self) -> anndata.AnnData:
         """ Convert current data to an anndata object
         """
@@ -370,6 +352,7 @@ class MultimodalData:
         from copy import deepcopy
         new_data = MultimodalData(deepcopy(self.data))
         new_data._selected = self._selected
+        new_data._zarrobj = None # Should not copy _zarrobj
         if new_data._selected is not None:
             new_data._unidata = new_data.data[new_data._selected]
         return new_data
@@ -377,3 +360,24 @@ class MultimodalData:
 
     def __deepcopy__(self, memo):
         return self.copy()
+
+
+    def kick_start(self):
+        """ Begin to track changes in self.data """
+        self.data.kick_start(self._selected)
+
+
+    def write_back(self):
+        """ Write back changes and clear dirty bits
+        """
+        assert self._zarrobj is not None
+        if self.data.is_dirty():
+            self._zarrobj.write_multimodal_data(self, overwrite = False)
+            self.data.clear_dirty(self._selected)
+
+
+    def to_zip(self):
+        """ If data is backed as Zarr directory, convert it to zarr.zip
+        """
+        assert self._zarrobj is not None
+        self._zarrobj._to_zip()

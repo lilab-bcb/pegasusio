@@ -14,32 +14,8 @@ import anndata
 from pegasusio import modalities
 from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
+from .datadict import DataDict
 
-
-class DataDict(MutableMapping):
-    def __init__(self, initial_data = None):
-        self.mapping = initial_data if initial_data is not None else dict()
-        self.dirty = set() # record keywords in mapping and dirty
-
-    def __getitem__(self, key):
-        return self.mapping[key]
-
-    def __setitem__(self, key, value):
-        self.mapping[key] = value
-        self.dirty.add(key)
-
-    def __delitem__(self, key):
-        del self.mapping[key]
-        self.dirty.remove(key)
-
-    def __iter__(self):
-        return iter(self.mapping)
-
-    def __len__(self):
-        return len(self.mapping)
-
-    def __repr__(self):
-        return f"DataDict object with keys: {str(list(self.mapping))[1:-1]}"
 
 
 class UnimodalData:        
@@ -52,9 +28,11 @@ class UnimodalData:
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
         cur_matrix: str = "X",
+        genome: str = None, 
+        modality: str = None,
     ) -> None:
         if isinstance(barcode_metadata, anndata.AnnData):
-            self.from_anndata(barcode_metadata)
+            self.from_anndata(barcode_metadata, genome = genome, modality = modality)
             return None
 
         def replace_none_df(value):
@@ -117,6 +95,20 @@ class UnimodalData:
         self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
 
 
+    def _is_dirty(self) -> bool:
+        """ Check if any field is modified. 
+        """
+        return self.matrices.is_dirty() or self.metadata.is_dirty() or self.barcode_multiarrays.is_dirty() or self.feature_multiarrays.is_dirty()
+
+    def _clear_dirty(self) -> None:
+        """ Clear all dirty sets
+        """
+        self.matrices.clear_dirty()
+        self.barcode_multiarrays.clear_dirty()
+        self.feature_multiarrays.clear_dirty()
+        self.metadata.clear_dirty()
+
+
     @property
     def obs(self) -> pd.DataFrame:
         return self.barcode_metadata
@@ -169,8 +161,7 @@ class UnimodalData:
 
     @obsm.setter
     def obsm(self, obsm: Dict[str, np.ndarray]):
-        assert isinstance(obsm, DataDict)
-        self.barcode_multiarrays = obsm
+        self.barcode_multiarrays.overwrite(obsm)
 
     @property
     def varm(self) -> Dict[str, np.ndarray]:
@@ -178,8 +169,7 @@ class UnimodalData:
 
     @varm.setter
     def varm(self, varm: Dict[str, np.ndarray]):
-        assert isinstance(varm, DataDict)
-        self.feature_multiarrays = varm
+        self.feature_multiarrays.overwrite(varm)
 
     @property
     def uns(self) -> DataDict:
@@ -187,8 +177,7 @@ class UnimodalData:
 
     @uns.setter
     def uns(self, uns: DataDict):
-        assert isinstance(uns, DataDict)
-        self.metadata = uns
+        self.metadata.overwrite(uns)
 
     @property
     def shape(self) -> Tuple[int, int]:
