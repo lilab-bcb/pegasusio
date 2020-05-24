@@ -121,7 +121,7 @@ class ZarrFile:
 
 
     def read_csr(self, group: zarr.Group) -> csr_matrix:
-        return csr_matrix((group['data'], group['indices'], group['indptr']), shape = group.attrs['shape'])
+        return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
 
 
     def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.recarray]:
@@ -138,9 +138,12 @@ class ZarrFile:
             columns = [col for col in group.array_keys() if col != '_index']
 
         if group.attrs['data_type'] == 'data_frame':
-            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in columns},
-                index = pd.Index(self.read_series(group, '_index'), name = group.attrs['index_name']),
-                columns = columns)
+            data = [self.read_series(group, col) for col in columns]
+            if len(data) == 1:
+                data = data[0]
+            _index = self.read_series(group, '_index')
+            index = pd.Index(_index, name = group.attrs['index_name'], dtype = _index.dtype)
+            df = pd.DataFrame(data = data, index = index, columns = columns)
             return df
         else:
             array = np.rec.fromarrays([self.read_series(group, col) for col in columns],
@@ -176,7 +179,7 @@ class ZarrFile:
                 assert data_type == 'dict'
                 value = self.read_mapping(sub_group)
             res_dict[key] = value
-        
+
         return res_dict
 
 
