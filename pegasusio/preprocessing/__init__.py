@@ -1,1 +1,1 @@
-from .qc_utils import qc_metrics, filter_data
+from .qc_utils import apply_qc_filter

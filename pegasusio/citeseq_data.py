@@ -21,15 +21,14 @@ class CITESeqData(UnimodalData):
         metadata: dict,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
-        cur_matrix: str = None,
+        cur_matrix: str = "raw.count",
     ) -> None:
         assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
-        assert len(self.matrices) == 1
-        self._cur_matrix = list(self.matrices)[0]
-
-        if self._cur_matrix == "raw.count":
-            # Prepare for the control antibody list.
+        
+        # Prepare for the control antibody list if not loaded from Zarr
+        if "_control_names" not in self.metadata:
+            assert len(self.matrices) == 1 and "raw.count" in self.matrices
             self.metadata["_control_names"] = np.array(["None"], dtype = object)
             self.metadata["_control_counts"] = csr_matrix((self._shape[0], 1), dtype = np.int32)
             self.metadata["_obs_keys"] = ["_control_counts"]
@@ -77,20 +76,24 @@ class CITESeqData(UnimodalData):
         ctrls = {"None": 0}
         series = pd.read_csv(control_csv, header=0, index_col=0, squeeze=True)
         for antibody, control in series.iteritems():
+            if antibody not in self.feature_metadata.index:
+                continue
+
             pos = ctrls.get(control, None)
             if pos is None:
-                if control not in self.feature_metadata.index:
-                    raise ValueError(f"Detected unknown control antibody '{control}'!")
-                pos = len(ctrls)
-                ctrls[control] = pos
+                if control in self.feature_metadata.index:
+                    pos = len(ctrls)
+                    ctrls[control] = pos
+                else:
+                    logger.warning(f"Detected and ignored unknown control antibody '{control}'!")
+                    pos = 0
 
-            if antibody not in self.feature_metadata.index:
-                raise ValueError(f"Detected unknown CITE-Seq antibody '{antibody}'!")
             self.feature_metadata.loc[antibody, "_control_id"] = pos
 
         ctrl_names = np.empty(len(ctrls), dtype = object)
         for ctrl_name, pos in ctrls.items():
             ctrl_names[pos] = ctrl_name
+            
         locs = self.feature_metadata.index.get_indexer(pd.Index(ctrl_names[1:], copy = False))
         idx = np.ones(self._shape[1], dtype = bool)
         idx[locs] = False

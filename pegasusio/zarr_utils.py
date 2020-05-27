@@ -183,11 +183,8 @@ class ZarrFile:
         return res_dict
 
 
-    def read_unimodal_data(self, group: zarr.Group, ngene: int = None, select_singlets: bool = False) -> UnimodalData:
+    def read_unimodal_data(self, group: zarr.Group) -> UnimodalData:
         """ Read UnimodalData
-            ngene: filter barcodes with < ngene
-            select_singlets: only select singlets
-            The above two option only works if modality == 'rna'
         """
         metadata = self.read_mapping(group['metadata'])
         assert 'genome' in metadata
@@ -211,39 +208,19 @@ class ZarrFile:
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
                             feature_multiarrays = self.read_mapping(group['feature_multiarrays']))
 
-        if modality == 'rna':
-            unidata.filter(ngene, select_singlets)
-
         if group.attrs.get('_cur_matrix', None) is not None:
             unidata.select_matrix(group.attrs['_cur_matrix'])
 
         return unidata
 
 
-    def read_multimodal_data(self, ngene: int = None, select_singlets: bool = False, attach_zarrobj = False) -> MultimodalData:
+    def read_multimodal_data(self, attach_zarrobj = False) -> MultimodalData:
         """ Read MultimodalData
-            ngene: filter barcodes with < ngene
-            select_singlets: only select singlets
-            The above two option only works for dataset with modality == 'rna'
         """
         data = MultimodalData()
-        need_trim = (ngene is not None) or select_singlets
-        selected_barcodes = None
-
         for key, group in self.root.groups():
-            unidata = self.read_unimodal_data(group, ngene, select_singlets)
-            modality = unidata.get_modality()
-            assert modality is not None
-            if need_trim and modality == 'rna':
-                selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
+            unidata = self.read_unimodal_data(group)
             data.add_data(unidata)
-
-        if need_trim:
-            for key in data.list_data():
-                unidata = data.get_data(key)
-                if unidata.get_modality() != 'rna':
-                    selected = unidata.obs_names.isin(selected_barcodes)
-                    unidata._inplace_subset_obs(selected)
 
         if self.root.attrs.get('_selected', None) is not None:
             data.select_data(self.root.attrs['_selected'])
@@ -252,7 +229,6 @@ class ZarrFile:
             data._zarrobj = self
 
         return data
-
 
 
     def write_csr(self, group: zarr.Group, name: str, matrix: csr_matrix) -> None:

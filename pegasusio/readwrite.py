@@ -1,5 +1,4 @@
 import os
-import time
 import gzip
 import anndata
 from typing import Tuple, Set, Union
@@ -7,6 +6,7 @@ from typing import Tuple, Set, Union
 import logging
 logger = logging.getLogger(__name__)
 
+from pegasusio import timer
 from pegasusio import UnimodalData, MultimodalData
 
 from .hdf5_utils import load_10x_h5_file, load_pegasus_h5_file, load_loom_file, write_loom_file
@@ -30,7 +30,7 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     Returns
     -------
     `str`
-        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs'.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs'.
     `str`
         The path covering all input files. Most time this is the same as input_file. But for HCA mtx and csv, this should be parent directory.
     `str`
@@ -44,8 +44,6 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
 
     if input_file.endswith(".zarr") or input_file.endswith(".zarr.zip"):
         file_type = "zarr"
-    elif input_file.endswith(".h5sc"):
-        file_type = "h5sc"
     elif input_file.endswith(".h5ad"):
         file_type = "h5ad"
     elif input_file.endswith(".loom"):
@@ -85,6 +83,7 @@ def is_vdj_file(input_csv: str, file_type: str) -> bool:
         return line.find(",chain,v_gene,d_gene,j_gene,c_gene,") >= 0
 
 
+@timer(logger=logger)
 def read_input(
     input_file: str,
     file_type: str = None,
@@ -108,7 +107,7 @@ def read_input(
     input_file : `str`
         Input file name.
     file_type : `str`, optional (default: None)
-        File type, choosing from 'zarr', 'h5sc'(obsoleted), 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data). If None, inferred from input_file.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data). If None, inferred from input_file.
     mode: `str`, optional (default: 'r')
         File open mode, options are 'r' or 'a'. If mode == 'a', file_type must be zarr and ngene/select_singlets cannot be set.
     genome : `str`, optional (default: None)
@@ -139,8 +138,6 @@ def read_input(
     >>> data = io.read_input('example.h5ad')
     >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
-    start = time.perf_counter()
-
     input_file = os.path.expanduser(os.path.expandvars(input_file))
     if file_type is None:
         file_type, _, _ = infer_file_type(input_file)
@@ -157,8 +154,6 @@ def read_input(
         if file_type == "zarr":
             zf = ZarrFile(input_file)
             data = zf.read_multimodal_data(ngene = ngene, select_singlets = select_singlets)
-        elif file_type == "h5sc":
-            data = load_pegasus_h5_file(input_file, ngene=ngene, select_singlets=select_singlets)
         elif file_type == "h5ad":
             data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, modality = modality)
         elif file_type == "loom":
@@ -180,13 +175,12 @@ def read_input(
     data.kick_start()
     data.scan_black_list(black_list)    
 
-    end = time.perf_counter()
-    logger.info(f"{file_type} file '{input_file}' is loaded, time spent = {(end - start):.2f}s.")
+    logger.info(f"{file_type} file '{input_file}' is loaded.")
 
     return data
 
 
-
+@timer(logger=logger)
 def write_output(
     data: Union[MultimodalData, UnimodalData],
     output_file: str,
@@ -220,8 +214,6 @@ def write_output(
     --------
     >>> io.write_output(data, 'test.zarr')
     """
-    start = time.perf_counter()
-
     if isinstance(data, UnimodalData):
         data = MultimodalData(data)
 
@@ -256,5 +248,4 @@ def write_output(
     else:
         raise ValueError(f"Unknown file type '{file_type}'!")
 
-    end = time.perf_counter()
-    logger.info(f"{file_type} file '{output_file}' is written. Time spent = {(end - start):.2f}s.")
+    logger.info(f"{file_type} file '{output_file}' is written.")

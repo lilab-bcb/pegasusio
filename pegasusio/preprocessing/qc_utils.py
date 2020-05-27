@@ -5,131 +5,100 @@ from pegasusio import UnimodalData
 import logging
 logger = logging.getLogger(__name__)
 
-def qc_metrics(
-    data: UnimodalData,
-    mito_prefix: str = "MT-",
-    min_genes: int = 500,
-    max_genes: int = 6000,
-    min_umis: int = 100,
-    max_umis: int = 600000,
-    percent_mito: float = 10.0,
-    percent_cells: float = 0.05,
+
+
+def apply_qc_filter(
+    unidata: UnimodalData,
+    select_singlets: bool = False,
+    min_genes: int = None,
+    max_genes: int = None,
+    min_umis: int = None,
+    max_umis: int = None,
+    mito_prefix: str = None,
+    percent_mito: float = None
 ) -> None:
-    """Generate Quality Control (QC) metrics on the dataset.
+    """Generate Quality Control (QC) metrics and filter dataset based on the QCs.
 
     Parameters
     ----------
-    data: ``anndata.AnnData``
-       Annotated data matrix with rows for cells and columns for genes.
-    mito_prefix: ``str``, optional, default: ``"MT-"``
-       Prefix for mitochondrial genes.
-    min_genes: ``int``, optional, default: ``500``
+    data: ``UnimodalData``
+       Unimodal data matrix with rows for cells and columns for genes.
+    select_singlets: ``bool``, optional, default ``False``
+        If select only singlets.
+    min_genes: ``int``, optional, default: None
        Only keep cells with at least ``min_genes`` genes.
-    max_genes: ``int``, optional, default: ``6000``
+    max_genes: ``int``, optional, default: None
        Only keep cells with less than ``max_genes`` genes.
-    min_umis: ``int``, optional, default: ``100``
+    min_umis: ``int``, optional, default: None
        Only keep cells with at least ``min_umis`` UMIs.
-    max_umis: ``int``, optional, default: ``600,000``
+    max_umis: ``int``, optional, default: None
        Only keep cells with less than ``max_umis`` UMIs.
-    percent_mito: ``float``, optional, default: ``10.0``
-       Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts.
-    percent_cells: ``float``, optional, default: ``0.05``
-       Only assign genes to be ``robust`` that are expressed in at least ``percent_cells`` % of cells.
+    mito_prefix: ``str``, optional, default: None
+       Prefix for mitochondrial genes.
+    percent_mito: ``float``, optional, default: None
+       Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
 
     Returns
     -------
     ``None``
 
-    Update ``data.obs``:
+    Update ``unidata.obs``:
 
         * ``n_genes``: Total number of genes for each cell.
         * ``n_counts``: Total number of counts for each cell.
         * ``percent_mito``: Percent of mitochondrial genes for each cell.
-        * ``passed_qc``: Boolean type indicating if a cell passes the QC process based on the QC metrics.
-
-    Update ``data.var``:
-
-        * ``n_cells``: Total number of cells in which each gene is measured.
-        * ``percent_cells``: Percent of cells in which each gene is measured.
-        * ``robust``: Boolean type indicating if a gene is robust based on the QC metrics.
-        * ``highly_variable_features``: Boolean type indicating if a gene is a highly variable feature. By default, set all robust genes as highly variable features.
+        * ``demux_type``: this column might be deleted if select_singlets is on.
 
     Examples
     --------
-    >>> pg.qcmetrics(adata)
+    >>> apply_qc_filter(unidata, min_umis = 500, select_singlets = True)
     """
+    assert unidata.uns["modality"] == "rna"
 
-    data.obs["passed_qc"] = False
+    filters = []
 
-    data.obs["n_genes"] = data.X.getnnz(axis=1)
-    data.obs["n_counts"] = data.X.sum(axis=1).A1
+    if select_singlets and ("demux_type" in unidata.obs):
+        filters.append(unidata.obs["demux_type"] == "singlet")
+        unidata.obs.drop(columns="demux_type", inplace=True)
 
-    mito_prefixes = mito_prefix.split(",")
+    min_cond = min_genes is not None
+    max_cond = max_genes is not None
+    if min_cond or max_cond:
+        unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
+        if min_cond:
+            filter.append(unidata.obs["n_genes"] >= min_genes)
+        if max_cond:
+            filter.append(unidata.obs["n_genes"] < max_genes)
 
-    def startswith(name):
-        for prefix in mito_prefixes:
-            if name.startswith(prefix):
-                return True
-        return False
+    min_cond = min_umis is not None
+    max_cond = max_umis is not None
+    calc_mito = (mito_prefix is not None) and (percent_mito is not None)
+    if min_cond or max_cond or calc_mito:
+        unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
+        if min_cond:
+            filter.append(unidata.obs["n_counts"] >= min_umis)
+        if max_cond:
+            filter.append(unidata.obs["n_counts"] < max_umis)
+        if calc_mito:
+            mito_prefixes = mito_prefix.split(",")
 
-    mito_genes = data.var_names.map(startswith).values.nonzero()[0]
-    data.obs["percent_mito"] = (
-        data.X[:, mito_genes].sum(axis=1).A1
-        / np.maximum(data.obs["n_counts"].values, 1.0)
-    ) * 100
+            def _startswith(name):
+                for prefix in mito_prefixes:
+                    if name.startswith(prefix):
+                        return True
+                return False
 
-    # Assign passed_qc
-    filters = [
-        data.obs["n_genes"] >= min_genes,
-        data.obs["n_genes"] < max_genes,
-        data.obs["n_counts"] >= min_umis,
-        data.obs["n_counts"] < max_umis,
-        data.obs["percent_mito"] < percent_mito,
-    ]
+            mito_genes = unidata.var_names.map(startswith).values.nonzero()[0]
 
-    data.obs.loc[np.logical_and.reduce(filters), "passed_qc"] = True
+            unidata.obs["percent_mito"] = (
+                unidata.X[:, mito_genes].sum(axis=1).A1
+                / np.maximum(unidata.obs["n_counts"].values, 1.0)
+            ) * 100
 
-    var = data.var
-    data = data[
-        data.obs["passed_qc"]
-    ]  # compute gene stats in space of filtered cells only
+            filter.append(unidata.obs["percent_mito"] < percent_mito)
 
-    var["n_cells"] = data.X.getnnz(axis=0)
-    var["percent_cells"] = (var["n_cells"] / data.shape[0]) * 100
-    var["robust"] = var["percent_cells"] >= percent_cells
-    var["highly_variable_features"] = var[
-        "robust"
-    ]  # default all robust genes are "highly" variable
-
-def filter_data(data: UnimodalData) -> None:
-    """ Filter data based on qc_metrics calculated in ``pg.qc_metrics``.
-
-    Parameters
-    ----------
-    data: ``anndata.AnnData``
-        Annotated data matrix with rows for cells and columns for genes.
-
-    Returns
-    -------
-    ``None``
-
-    Update ``data`` with cells and genes after filtration.
-
-    Examples
-    --------
-    >>> pg.filter_data(adata)
-    """
-
-    assert "passed_qc" in data.obs
-    prior_shape = data.shape
-    data._inplace_subset_obs(data.obs["passed_qc"].values)
-    data._inplace_subset_var((data.var["n_cells"] > 0).values)
-    logger.info(
-        "After filtration, {nc}/{ncp} cells and {ng}/{ngp} genes are kept. Among {ng} genes, {nrb} genes are robust.".format(
-            nc=data.shape[0],
-            ng=data.shape[1],
-            ncp=prior_shape[0],
-            ngp=prior_shape[1],
-            nrb=data.var["robust"].sum(),
-        )
-    )
+    if len(filters) > 0:
+        selected = np.logical_and.reduce(filters)
+        prior_n = unidata.shape[0]
+        unidata._inplace_subset_obs(selected)
+        logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")

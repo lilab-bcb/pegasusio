@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
+from pegasusio import apply_qc_filter
 from .views import INDEX, UnimodalDataView
 from .datadict import MultiDataDict
 from .vdj_data import VDJDataView
@@ -233,44 +234,92 @@ class MultimodalData:
         return self._selected
 
 
-    def get_data(self, key: str = None, genome: str = None, modality: str = None) -> Union[UnimodalData, List[UnimodalData]]:
-        """ get UnimodalData or list of UnimodalData based on MultimodalData key or genome or modality
+    def get_data(self, key: str = None, genome: str = None, modality: str = None, keep_list: bool = False) -> Union[UnimodalData, List[UnimodalData]]:
+        """ get UnimodalData or list of UnimodalData based on MultimodalData key or genome or modality; accept negation '~' before genome or modality
+            keep_list = True will return a list even with one data point.
         """
-
         if key is not None:
             if key not in self.data:
                 raise ValueError(f"Key '{key}' does not exist!")
             return self.data[key]
 
         data_arr = []
-
+        negation = False
         if genome is not None:
-            for key in self.data:
-                unidata = self.data[key]
-                if unidata.get_genome() == genome:
+            if genome[0] == "~":
+                negation = True
+                genome = genome[1:]
+
+            for unidata in self.data.values():
+                cur_genome = unidata.get_genome()
+                if ((not negation) and (cur_genome == genome)) or (negation and (cur_genome != genome)):
                     data_arr.append(unidata)
             
             if len(data_arr) == 0:
-                raise ValueError(f"No UnimodalData with genome '{genome}'!")
+                raise ValueError(f"No UnimodalData {'without' if negation else 'with'} genome '{genome}'!")
         else:
             if modality is None:
                 raise ValueError("Either key or genome or modality needs to be set!")
 
-            for key in self.data:
-                unidata = self.data[key]
-                if unidata.get_modality() == modality:
+            if modality[0] == "~":
+                negation = True
+                modality = modality[1:]
+
+            for unidata in self.data.values():
+                cur_modality = unidata.modality()
+                if ((not negation) and (cur_modality == modality)) or (negation and (cur_modality != modality)):
                     data_arr.append(unidata)
 
                 if len(data_arr) == 0:
-                    raise ValueError(f"No UnimodalData with modality '{modality}'!")
+                    raise ValueError(f"No UnimodalData {'without' if negation else 'with'} modality '{modality}'!")
 
-        return data_arr[0] if len(data_arr) == 1 else data_arr
+        results = None
+        if keep_list or len(data_arr) > 1:
+            results = data_arr
+        else:
+            results = data_arr[0]
+
+        return results
 
 
     def drop_data(self, key: str) -> UnimodalData:
         if key not in self.data:
             raise ValueError("Key {} does not exist!".format(key))
         return self.data.pop(key)
+
+
+    def filter_data(self, select_singlets: bool = False, min_genes: int = None, max_genes: int = None, min_umis: int = None, max_umis: int = None, mito_prefix: str = None, percent_mito: float = None) -> None:
+        """
+        Filter all UnimodalData with modality == "rna". For all other modalities, select barcodes as Union of the selected "rna" barcodes.
+
+        Parameters
+        ----------
+        select_singlets: ``bool``, optional, default ``False``
+            If select only singlets.
+        min_genes: ``int``, optional, default: None
+           Only keep cells with at least ``min_genes`` genes.
+        max_genes: ``int``, optional, default: None
+           Only keep cells with less than ``max_genes`` genes.
+        min_umis: ``int``, optional, default: None
+           Only keep cells with at least ``min_umis`` UMIs.
+        max_umis: ``int``, optional, default: None
+           Only keep cells with less than ``max_umis`` UMIs.
+        mito_prefix: ``str``, optional, default: None
+           Prefix for mitochondrial genes.
+        percent_mito: ``float``, optional, default: None
+           Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
+        """
+        selected_barcodes = None
+        for unidata in self.get_data(modality = "rna", keep_list = True):
+            apply_qc_filter(unidata, select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+            selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
+        assert selected_barcodes is not None
+
+        for unidata in self.get_data(modality = "~rna", keep_list = True):
+            selected = unidata.obs_names.isin(selected_barcodes)
+            prior_n = unidata.shape[0]
+            unidata._inplace_subset_obs(selected)
+            logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")
 
 
     def concat_data(self, modality: str = "rna"):
@@ -381,3 +430,17 @@ class MultimodalData:
         """
         assert self._zarrobj is not None
         self._zarrobj._to_zip()
+
+
+    def _update_barcode_metadata_info(
+        self, row: pd.Series, attributes: Set[str], append_sample_name: bool
+    ) -> None:
+        for unidata in self.data.values():
+            unidata._update_barcode_metadata_info(row, attributes, append_sample_name)
+
+    def _update_genome(self, genome_dict: Dict[str, str]) -> None:
+        for key in self.list_data():
+            if key in genome_dict:
+                unidata = self.data.pop(key)
+                unidata.uns["genome"] = genome_dict[key]
+                self.data[unidata.get_uid()] = unidata

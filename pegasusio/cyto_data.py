@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Union
 
+import logging
+logger = logging.getLogger(__name__)
+
 import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
@@ -25,12 +28,13 @@ class CytoData(UnimodalData):
     ) -> None:
         assert metadata["modality"] == "cyto"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
-        assert len(self.matrices) == 1 and "raw.data" in self.matrices
 
-        # Prepare for the control list.
-        self.metadata["_control_names"] = np.array(["None"], dtype = object)
-        self.barcode_multiarrays["_controls"] = np.zeros((self._shape[0], 1), dtype = np.int32)
-        self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
+        # Prepare for the control list if not loaded from Zarr
+        if "_control_names" not in self.metadata:
+            assert len(self.matrices) == 1 and "raw.data" in self.matrices
+            self.metadata["_control_names"] = np.array(["None"], dtype = object)
+            self.barcode_multiarrays["_controls"] = np.zeros((self._shape[0], 1), dtype = np.int32)
+            self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
@@ -71,15 +75,18 @@ class CytoData(UnimodalData):
         ctrls = {"None": 0}
         series = pd.read_csv(control_csv, header=0, index_col=0, squeeze=True)
         for parameter, control in series.iteritems():
+            if parameter not in self.feature_metadata.index:
+                continue
+
             pos = ctrls.get(control, None)
             if pos is None:
-                if control not in self.feature_metadata.index:
-                    raise ValueError(f"Detected unknown control parameter '{control}'!")
-                pos = len(ctrls)
-                ctrls[control] = pos
+                if control in self.feature_metadata.index:
+                    pos = len(ctrls)
+                    ctrls[control] = pos
+                else:
+                    logger.warning(f"Detected and ignored unknown control parameter '{control}'!")
+                    pos = 0
 
-            if parameter not in self.feature_metadata.index:
-                raise ValueError("Detected unknown signal parameter '{parameter}'!")
             self.feature_metadata.loc[parameter, "_control_id"] = pos
 
         ctrl_names = np.empty(len(ctrls), dtype = object)

@@ -120,7 +120,7 @@ def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t")
     return feature_metadata, format_type
 
 
-def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, ngene: int = None) -> UnimodalData:
+def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> UnimodalData:
     """Load one gene-count matrix in mtx format into a UnimodalData object
     """
     fname = re.sub('(.mtx|.mtx.gz)$', '', file_name)
@@ -150,8 +150,6 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str, nge
     mat.eliminate_zeros()
 
     unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": modality, "genome": genome})
-    if modality == "rna":
-        unidata.filter(ngene=ngene)
     if format_type == "10x v3" or format_type == "10x v2":
         unidata.separate_channels()
 
@@ -281,7 +279,6 @@ def load_csv_file(
     sep: str = ",",
     genome: str = None,
     modality: str = None,
-    ngene: int = None
 ) -> MultimodalData:
     """Load count matrix from a CSV-style file, such as CSV file or DGE style tsv file.
 
@@ -296,8 +293,6 @@ def load_csv_file(
         The genome reference. If None, use "unknown" instead.
     modality: `str`, optional (default None)
         Modality. If None, use "rna" instead.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with modality == "rna"
 
     Returns
     -------
@@ -361,8 +356,6 @@ def load_csv_file(
         unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
     else:
         unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
-        if modality == "rna":
-            unidata.filter(ngene = ngene)
 
     data = MultimodalData(unidata)
 
