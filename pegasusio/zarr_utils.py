@@ -14,9 +14,9 @@ from typing import List, Dict, Tuple, Union
 import logging
 logger = logging.getLogger(__name__)
 
-from pegasusio import modalities, UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
+from pegasusio import modalities
+from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
 
-import time
 
 CHUNKSIZE = 1000000
 COMPRESSOR = Blosc(cname = 'lz4', clevel = 5)

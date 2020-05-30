@@ -19,12 +19,12 @@ modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac']
 from .decorators import timer, run_gc
 
 from .unimodal_data import UnimodalData
+from .preprocessing import apply_qc_filters
 from .vdj_data import VDJData
 from .citeseq_data import CITESeqData
 from .cyto_data import CytoData
 from .multimodal_data import MultimodalData
 from .readwrite import infer_file_type, read_input, write_output
-from .preprocessing import apply_qc_filter
 
 from ._version import get_versions
 

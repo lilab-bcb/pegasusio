@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 from pegasusio import timer
 from pegasusio import UnimodalData, MultimodalData
 
-from .hdf5_utils import load_10x_h5_file, load_pegasus_h5_file, load_loom_file, write_loom_file
+from .hdf5_utils import load_10x_h5_file, load_loom_file, write_loom_file
 from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
 from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
@@ -90,12 +90,10 @@ def read_input(
     mode: str = "r",
     genome: str = None,
     modality: str = None,
-    ngene: int = None,
-    select_singlets: bool = False,
     black_list: Set[str] = None,
     select_data: Set[str] = None,
     select_genome: Set[str] = None,
-    select_modality: Set[str] = None 
+    select_modality: Set[str] = None, 
 ) -> MultimodalData:
     """Load data into memory.
 
@@ -114,10 +112,6 @@ def read_input(
         For formats like loom, mtx, dge, csv and tsv, genome is used to provide genome name. In this case if genome is None, except mtx format, "unknown" is used as the genome name instead.
     modality : `str`, optional (default: None)
         Default modality, choosing from 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto' (flow cytometry / mass cytometry). If None, use 'rna' as default.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
-    select_singlets : `bool`, optional (default: False)
-        If this option is on, only keep DemuxEM-predicted singlets when loading data.
     black_list : `Set[str]`, optional (default: None)
         Attributes in black list will be poped out.
     select_data: `Set[str]`, optional (default: None)
@@ -145,31 +139,28 @@ def read_input(
     if mode == "a":
         if file_type != "zarr":
             raise ValueError("Only Zarr file can have mode 'a'!")
-        if (ngene is not None) or select_singlets:
-            logger.warning(f"File open mode 'a' does not allow setting of ngene or select_singlets options. Turn these options off.")
-
         zf = ZarrFile(input_file, mode = mode)
         data = zf.read_multimodal_data(attach_zarrobj = True)
     else:
         if file_type == "zarr":
             zf = ZarrFile(input_file)
-            data = zf.read_multimodal_data(ngene = ngene, select_singlets = select_singlets)
+            data = zf.read_multimodal_data()
         elif file_type == "h5ad":
             data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, modality = modality)
         elif file_type == "loom":
-            data = load_loom_file(input_file, genome = genome, modality = modality, ngene = ngene)
+            data = load_loom_file(input_file, genome = genome, modality = modality)
         elif file_type == "10x":
-            data = load_10x_h5_file(input_file, ngene=ngene)
+            data = load_10x_h5_file(input_file)
         elif file_type == "fcs":
             data = load_fcs_file(input_file, genome = genome)
         elif file_type == "mtx":
-            data = load_mtx_file(input_file, genome = genome, modality = modality, ngene = ngene)
+            data = load_mtx_file(input_file, genome = genome, modality = modality)
         else:
             assert file_type == "csv" or file_type == "tsv"
             if is_vdj_file(input_file, file_type):
                 data = load_10x_vdj_file(input_file, genome = genome, modality = modality)
             else:
-                data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, ngene = ngene)
+                data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality)
 
     data.subset_data(select_data, select_genome, select_modality)
     data.kick_start()

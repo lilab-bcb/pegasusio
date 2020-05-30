@@ -61,8 +61,13 @@ def aggregate_matrices(
     attributes: List[str] = [],
     default_ref: str = None,
     append_sample_name: bool = True,
-    ngene: int = None,
     select_singlets: bool = False,
+    min_genes: int = None,
+    max_genes: int = None,
+    min_umis: int = None,
+    max_umis: int = None,
+    mito_prefix: str = None,
+    percent_mito: float = None,
 ) -> MultimodalData:
     """Aggregate channel-specific count matrices into one big count matrix.
 
@@ -85,8 +90,18 @@ def aggregate_matrices(
         By default, append sample_name to each channel. Turn this option off if each channel has distinct barcodes.
     select_singlets : `bool`, optional (default: False)
         If we have demultiplexed data, turning on this option will make pegasus only include barcodes that are predicted as singlets.
-    ngene : `int`, optional (default: None)
-        The minimum number of expressed genes to keep one barcode.
+    min_genes: ``int``, optional, default: None
+       Only keep cells with at least ``min_genes`` genes.
+    max_genes: ``int``, optional, default: None
+       Only keep cells with less than ``max_genes`` genes.
+    min_umis: ``int``, optional, default: None
+       Only keep cells with at least ``min_umis`` UMIs.
+    max_umis: ``int``, optional, default: None
+       Only keep cells with less than ``max_umis`` UMIs.
+    mito_prefix: ``str``, optional, default: None
+       Prefix for mitochondrial genes.
+    percent_mito: ``float``, optional, default: None
+       Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
 
     Returns
     -------
@@ -114,10 +129,10 @@ def aggregate_matrices(
         else:
             idx = idx & (~(df[name].isin(content)))
 
-    df = df.loc[idx]
-
-    if df.shape[0] == 0:
+    if idx.sum() == 0:
         raise ValueError("No data pass the restrictions!")
+
+    df = df.loc[idx].sort_values(by = "Sample") # sort by sample_name
 
     # If Reference does not exist and default_ref is not None, add one Reference column
     if ("Reference" not in df.columns) and (default_ref is not None):
@@ -126,6 +141,8 @@ def aggregate_matrices(
     # Load data
     tot = 0
     dest_paths = [] # record localized file paths so that we can remove them later
+    curr_sample = ""
+    curr_row = curr_data = None
     aggrData = AggrData()
 
     for idx_num, row in df.iterrows():
@@ -151,19 +168,29 @@ def aggregate_matrices(
 
         genome, genome_dict = _parse_genome_string(row.get("Reference", None))
         modality = row.get("Modality", None)
-
-
-        data = read_input(input_file, file_type = file_type, genome = genome, modality = modality, ngene = ngene, select_singlets = select_singlets)
-        data._update_barcode_metadata_info(row, attributes, append_sample_name)
-
-        if (file_type in ["10x", "h5sc", "zarr"]) and (genome_dict is not None): # Process the case where some data are in hg19 and others in GRCh38 and people want to merge them. May need to remove in the future
+        data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
+        if (file_type in ["10x", "zarr"]) and (genome_dict is not None): # Process the case where some data are in hg19 and others in GRCh38 and people want to merge them. May need to remove in the future
             data._update_genome(genome_dict)
 
-        aggrData.add_data(data)
+        if row["Sample"] != curr_sample:
+            if curr_data is not None:
+                curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+                curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
+                aggrData.add_data(curr_data)
+            curr_data = data
+            curr_row = row
+            curr_sample = row["Sample"]
+        else:
+            curr_data.update(data)
 
         tot += 1
         logger.info(f"Loaded {input_file}.")
 
+    if curr_data is not None:
+        curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+        curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
+        aggrData.add_data(curr_data)
+        
     # Merge data
     aggregated_data = aggrData.aggregate()
     logger.info(f"Aggregated {tot} files.")

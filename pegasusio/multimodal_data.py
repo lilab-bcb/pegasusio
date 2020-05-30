@@ -10,21 +10,24 @@ logger = logging.getLogger(__name__)
 import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
-from pegasusio import apply_qc_filter
+from pegasusio import apply_qc_filters
 from .views import INDEX, UnimodalDataView
 from .datadict import MultiDataDict
 from .vdj_data import VDJDataView
 
 
 class MultimodalData:
-    def __init__(self, unidata: Union[UnimodalData, anndata.AnnData] = None, genome: str = None, modality: str = None):
-        self.data = MultiDataDict()
+    def __init__(self, unidata: Union[UnimodalData, anndata.AnnData, MultiDataDict] = None, genome: str = None, modality: str = None):
         self._selected = self._unidata = self._zarrobj = None
 
-        if unidata is not None:
-            if isinstance(unidata, anndata.AnnData):
-                unidata = UnimodalData(unidata, genome = genome, modality = modality)
-            self.add_data(unidata)
+        if isinstance(unidata, MultiDataDict):
+            self.data = unidata
+        else:
+            self.data = MultiDataDict()
+            if unidata is not None:
+                if isinstance(unidata, anndata.AnnData):
+                    unidata = UnimodalData(unidata, genome = genome, modality = modality)
+                self.add_data(unidata)
 
 
     def __repr__(self) -> str:
@@ -255,7 +258,7 @@ class MultimodalData:
                 if ((not negation) and (cur_genome == genome)) or (negation and (cur_genome != genome)):
                     data_arr.append(unidata)
             
-            if len(data_arr) == 0:
+            if len(data_arr) == 0 and not keep_list:
                 raise ValueError(f"No UnimodalData {'without' if negation else 'with'} genome '{genome}'!")
         else:
             if modality is None:
@@ -266,18 +269,18 @@ class MultimodalData:
                 modality = modality[1:]
 
             for unidata in self.data.values():
-                cur_modality = unidata.modality()
+                cur_modality = unidata.get_modality()
                 if ((not negation) and (cur_modality == modality)) or (negation and (cur_modality != modality)):
                     data_arr.append(unidata)
 
-                if len(data_arr) == 0:
+                if len(data_arr) == 0 and not keep_list:
                     raise ValueError(f"No UnimodalData {'without' if negation else 'with'} modality '{modality}'!")
 
         results = None
-        if keep_list or len(data_arr) > 1:
-            results = data_arr
-        else:
+        if len(data_arr) == 1 and not keep_list:
             results = data_arr[0]
+        else:
+            results = data_arr
 
         return results
 
@@ -311,7 +314,7 @@ class MultimodalData:
         """
         selected_barcodes = None
         for unidata in self.get_data(modality = "rna", keep_list = True):
-            apply_qc_filter(unidata, select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+            apply_qc_filters(unidata, select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
             selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
         assert selected_barcodes is not None
 

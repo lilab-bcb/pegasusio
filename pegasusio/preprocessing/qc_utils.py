@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def apply_qc_filter(
+def apply_qc_filters(
     unidata: UnimodalData,
     select_singlets: bool = False,
     min_genes: int = None,
@@ -51,7 +51,7 @@ def apply_qc_filter(
 
     Examples
     --------
-    >>> apply_qc_filter(unidata, min_umis = 500, select_singlets = True)
+    >>> apply_qc_filters(unidata, min_umis = 500, select_singlets = True)
     """
     assert unidata.uns["modality"] == "rna"
 
@@ -66,9 +66,9 @@ def apply_qc_filter(
     if min_cond or max_cond:
         unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
         if min_cond:
-            filter.append(unidata.obs["n_genes"] >= min_genes)
+            filters.append(unidata.obs["n_genes"] >= min_genes)
         if max_cond:
-            filter.append(unidata.obs["n_genes"] < max_genes)
+            filters.append(unidata.obs["n_genes"] < max_genes)
 
     min_cond = min_umis is not None
     max_cond = max_umis is not None
@@ -76,9 +76,9 @@ def apply_qc_filter(
     if min_cond or max_cond or calc_mito:
         unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
         if min_cond:
-            filter.append(unidata.obs["n_counts"] >= min_umis)
+            filters.append(unidata.obs["n_counts"] >= min_umis)
         if max_cond:
-            filter.append(unidata.obs["n_counts"] < max_umis)
+            filters.append(unidata.obs["n_counts"] < max_umis)
         if calc_mito:
             mito_prefixes = mito_prefix.split(",")
 
@@ -88,14 +88,14 @@ def apply_qc_filter(
                         return True
                 return False
 
-            mito_genes = unidata.var_names.map(startswith).values.nonzero()[0]
+            mito_genes = unidata.var_names.map(_startswith).values.nonzero()[0]
 
             unidata.obs["percent_mito"] = (
                 unidata.X[:, mito_genes].sum(axis=1).A1
                 / np.maximum(unidata.obs["n_counts"].values, 1.0)
             ) * 100
 
-            filter.append(unidata.obs["percent_mito"] < percent_mito)
+            filters.append(unidata.obs["percent_mito"] < percent_mito)
 
     if len(filters) > 0:
         selected = np.logical_and.reduce(filters)
