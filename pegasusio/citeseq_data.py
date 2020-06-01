@@ -3,6 +3,9 @@ import pandas as pd
 from scipy.sparse import csr_matrix, hstack
 from typing import List, Dict, Union
 
+import logging
+logger = logging.getLogger(__name__)
+
 import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView

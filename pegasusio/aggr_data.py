@@ -30,7 +30,7 @@ class AggrData:
 
 
     @run_gc
-    def _merge_matrices(self, feature_metadata: pd.DataFrame, unilist: List[UnimodalData]) -> Dict[str, csr_matrix]:
+    def _merge_matrices(self, feature_metadata: pd.DataFrame, unilist: List[UnimodalData], modality: str) -> Dict[str, csr_matrix]:
         """ Merge all matrices together """
         f2idx = pd.Series(data=range(feature_metadata.shape[0]), index=feature_metadata.index)
 
@@ -49,29 +49,41 @@ class AggrData:
                     mat = unidata.matrices.pop(mat_key, None)
                     if mat is not None:
                         mat_list.append(mat)
-                matrices[mat_key] = vstack(mat_list)
+                matrices[mat_key] = vstack(mat_list) if modality != "cyto" else np.vstack(mat_list)
         else:
             colmap = []
             for unidata in unilist:
                 colmap.append(f2idx[unidata.feature_metadata.index].values)
 
-            for mat_key in mat_keys:
-                data_list = []
-                row_list = []
-                col_list = []
-                row_base = 0
-                for i, unidata in enumerate(unilist):
-                    mat = unidata.matrices.pop(mat_key, None)
-                    if mat is not None:
-                        mat = mat.tocoo(copy = False) # convert to coo format
-                        data_list.append(mat.data)
-                        row_list.append(mat.row + row_base)
-                        col_list.append(colmap[i][mat.col])
-                        row_base += mat.shape[0]
-                data = np.concatenate(data_list)
-                row = np.concatenate(row_list)
-                col = np.concatenate(col_list)
-                matrices[mat_key] = coo_matrix((data, (row, col))).tocsr(copy = False)
+            if modality == "cyto":
+                # matrices are dense.
+                for mat_key in mat_keys:
+                    mat_list = []
+                    for i, unidata in enumerate(unilist):
+                        mat = unidata.matrices.pop(mat_key, None)
+                        if mat is not None:
+                            newmat = np.zeros((mat.shape[0], feature_metadata.shape[0]), dtype = mat.dtype)
+                            newmat[:, colmap[i]] = mat
+                            mat_list.append(newmat)
+                    matrices[mat_key] = np.vstack(mat_list)
+            else:
+                for mat_key in mat_keys:
+                    data_list = []
+                    row_list = []
+                    col_list = []
+                    row_base = 0
+                    for i, unidata in enumerate(unilist):
+                        mat = unidata.matrices.pop(mat_key, None)
+                        if mat is not None:
+                            mat = mat.tocoo(copy = False) # convert to coo format
+                            data_list.append(mat.data)
+                            row_list.append(mat.row + row_base)
+                            col_list.append(colmap[i][mat.col])
+                            row_base += mat.shape[0]
+                    data = np.concatenate(data_list)
+                    row = np.concatenate(row_list)
+                    col = np.concatenate(col_list)
+                    matrices[mat_key] = coo_matrix((data, (row, col))).tocsr(copy = False)
 
         return matrices
 
@@ -97,8 +109,10 @@ class AggrData:
     @run_gc
     def _aggregate_unidata(self, unilist: List[UnimodalData]) -> UnimodalData:
         if len(unilist) == 1:
+            del unilist[0].metadata["_sample"]
             return unilist[0]
 
+        modality = unilist[0].get_modality()
 
         barcode_metadata_dfs = [unidata.barcode_metadata for unidata in unilist]
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
@@ -108,6 +122,11 @@ class AggrData:
 
         var_dict = {}
         for unidata in unilist:
+            if modality == "citeseq":
+                unidata.feature_metadata.drop(columns = CITESeqData._var_keywords, inplace = True)
+            elif modality == "cyto":
+                unidata.feature_metadata.drop(columns = CytoData._var_keywords, inplace = True)
+
             idx = unidata.feature_metadata.columns.difference(["featureid"])
             if idx.size > 0:
                 var_dict[unidata.metadata["_sample"]] = unidata.feature_metadata[idx]
@@ -121,17 +140,21 @@ class AggrData:
         feature_metadata.fillna(value=fillna_dict, inplace=True)
 
 
-        matrices = self._merge_matrices(feature_metadata, unilist)
+        matrices = self._merge_matrices(feature_metadata, unilist, modality)
         
 
         uns_dict = {}
         metadata = {"genome": unilist[0].metadata["genome"], "modality": unilist[0].metadata["modality"]}
-        is_citeseq = isinstance(unilist[0], CITESeqData)
         for unidata in unilist:
             assert unidata.metadata.pop("genome") == metadata["genome"]
             assert unidata.metadata.pop("modality") == metadata["modality"]
-            if is_citeseq:
-                del unidata.metadata["_control_counts"]
+            if modality == "citeseq":
+                for key in CITESeqData._uns_keywords:
+                    unidata.metadata.pop(key, None)
+                del unidata.metadata["_obs_keys"]
+            elif modality == "cyto":
+                for key in CytoData._uns_keywords:
+                    unidata.metadata.pop(key, None)
             sample_name = unidata.metadata.pop("_sample")
             if len(unidata.metadata) > 0:
                 uns_dict[sample_name] = unidata.metadata.mapping
@@ -144,11 +167,9 @@ class AggrData:
 
         unidata = None
         if isinstance(unilist[0], CITESeqData):
-            metadata["_control_counts"] = csr_matrix((barcode_metadata.shape[0], 1), dtype = np.int32)
             unidata = CITESeqData(barcode_metadata, feature_metadata, matrices, metadata)
         elif isinstance(unilist[0], CytoData):
-            barcode_multiarrays = {"_controls": np.zeros((barcode_metadata.shape[0], 1), dtype = np.int32)}
-            unidata = CytoData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays = barcode_multiarrays)
+            unidata = CytoData(barcode_metadata, feature_metadata, matrices, metadata)
         elif isinstance(unilist[0], VDJData):
             self._vdj_update_metadata_matrices(metadata, matrices, unilist)
             unidata = VDJData(barcode_metadata, feature_metadata, matrices, metadata)

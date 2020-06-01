@@ -193,6 +193,8 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
     --------
     >>> io.load_mtx_file('example.mtx.gz', genome = 'mm10')
     """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{path} does not exist!")
 
     orig_file = path
     if os.path.isdir(orig_file):
@@ -304,6 +306,9 @@ def load_csv_file(
     >>> io.load_csv_file('example_ADT.csv')
     >>> io.load_csv_file('example.umi.dge.txt.gz', genome = 'GRCh38', sep = '\t')
     """
+    if not os.path.exists(input_csv):
+        raise FileNotFoundError(f"File {input_csv} does not exist!")
+
     barcode_metadata = feature_metadata = None
 
     input_csv = os.path.abspath(input_csv)

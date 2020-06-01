@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 
@@ -25,6 +26,8 @@ def load_fcs_file(input_fcs: str, genome: str = None) -> MultimodalData:
     --------
     >>> io.load_fcs_file('example.fcs', genome = 'GRCh38')
     """
+    if not os.path.isfile(input_fcs):
+        raise FileNotFoundError(f"File {input_fcs} does not exist!")
     feature_metadata, matrix, metadata = read_fcs(input_fcs)
     barcode_metadata = {"barcodekey": [f"event{i}" for i in range(1, matrix.shape[0] + 1)]}
     genome = "unknown" if genome is None else genome

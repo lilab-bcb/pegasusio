@@ -158,7 +158,7 @@ class MultimodalData:
         return self._unidata.get_matrix(key)
 
     def get_modality(self) -> str:
-        """ Surrogate function for UnimodalData, return modality, can be either 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'.
+        """ Surrogate function for UnimodalData, return modality, can be either 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto'.
         """
         assert self._unidata is not None
         return self._unidata.get_modality()
@@ -316,13 +316,13 @@ class MultimodalData:
         for unidata in self.get_data(modality = "rna", keep_list = True):
             apply_qc_filters(unidata, select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
             selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
-        assert selected_barcodes is not None
-
-        for unidata in self.get_data(modality = "~rna", keep_list = True):
-            selected = unidata.obs_names.isin(selected_barcodes)
-            prior_n = unidata.shape[0]
-            unidata._inplace_subset_obs(selected)
-            logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")
+        
+        if selected_barcodes is not None:
+            for unidata in self.get_data(modality = "~rna", keep_list = True):
+                selected = unidata.obs_names.isin(selected_barcodes)
+                prior_n = unidata.shape[0]
+                unidata._inplace_subset_obs(selected)
+                logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")
 
 
     def concat_data(self, modality: str = "rna"):
@@ -443,7 +443,8 @@ class MultimodalData:
 
     def _update_genome(self, genome_dict: Dict[str, str]) -> None:
         for key in self.list_data():
-            if key in genome_dict:
+            genome = self.data[key].get_genome()
+            if genome in genome_dict:
                 unidata = self.data.pop(key)
-                unidata.uns["genome"] = genome_dict[key]
+                unidata.uns["genome"] = genome_dict[genome]
                 self.data[unidata.get_uid()] = unidata
