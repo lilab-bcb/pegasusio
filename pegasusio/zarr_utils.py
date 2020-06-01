@@ -138,12 +138,10 @@ class ZarrFile:
             columns = [col for col in group.array_keys() if col != '_index']
 
         if group.attrs['data_type'] == 'data_frame':
-            data = [self.read_series(group, col) for col in columns]
-            if len(data) == 1:
-                data = data[0]
+            data = {col: self.read_series(group, col) for col in columns}
             _index = self.read_series(group, '_index')
             index = pd.Index(_index, name = group.attrs['index_name'], dtype = _index.dtype)
-            df = pd.DataFrame(data = data, index = index, columns = columns)
+            df = pd.DataFrame(data = data, index = index) # if add columns = columns, the generation will be slow
             return df
         else:
             array = np.rec.fromarrays([self.read_series(group, col) for col in columns],
@@ -308,7 +306,7 @@ class ZarrFile:
                 self.write_csr(sub_group, key, value)
             else:
                 # assume value is either list or tuple, converting it to np.ndarray
-                self.write_array(sub_group, key, np.array(value))
+                self.write_array(sub_group, key, value.astype(str) if is_categorical_dtype(value) else np.array(value))
 
         if overwrite:
             for key, value in mapping.items():

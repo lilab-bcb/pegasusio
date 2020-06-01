@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from subprocess import check_call
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Set
 
 from pegasusio import timer
 from pegasusio import MultimodalData, AggrData
@@ -41,7 +41,7 @@ def _parse_restriction_string(rstr: str) -> Tuple[str, bool, Set[str]]:
     return (name, isin, content)
 
 
-def _parse_genome_string(genome_str: str) -> Tuple[str, Dict[str, str]]
+def _parse_genome_string(genome_str: str) -> Tuple[str, Dict[str, str]]:
     genome = genome_dict = None
     if genome_str is not None:        
         if genome_str.find(":") < 0:
@@ -184,13 +184,12 @@ def aggregate_matrices(
             curr_data.update(data)
 
         tot += 1
-        logger.info(f"Loaded {input_file}.")
 
     if curr_data is not None:
         curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
         curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
         aggrData.add_data(curr_data)
-        
+
     # Merge data
     aggregated_data = aggrData.aggregate()
     logger.info(f"Aggregated {tot} files.")

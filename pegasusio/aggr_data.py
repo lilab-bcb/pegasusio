@@ -1,8 +1,7 @@
 import numpy as np
 import pandas as pd
-import warnings
-from scipy.sparse import csr_matrix, vstack
-from typing import List, Dict, Union, Set, Tuple
+from scipy.sparse import csr_matrix, vstack, coo_matrix
+from typing import List, Dict, Union
 from collections import defaultdict
 
 import logging
@@ -19,7 +18,7 @@ class AggrData:
 
     def add_data(self, data: MultimodalData) -> None:
         for key in data.list_data():
-            self.aggr[key] = data.get_data(key)
+            self.aggr[key].append(data.get_data(key))
 
 
     def _get_fillna_dict(self, df: pd.DataFrame) -> dict:
@@ -31,29 +30,48 @@ class AggrData:
 
 
     @run_gc
-    def _merge_matrices(self, feature_metadata: pd.DataFrame, unlist: List[UnimodalData]) -> Dict[str, csr_matrix]:
-        """ After running this function, all matrices in unilist are deleted. """
-        matrices_list = defaultdict(list)
+    def _merge_matrices(self, feature_metadata: pd.DataFrame, unilist: List[UnimodalData]) -> Dict[str, csr_matrix]:
+        """ Merge all matrices together """
         f2idx = pd.Series(data=range(feature_metadata.shape[0]), index=feature_metadata.index)
 
+        mat_keys = set()
+        no_reorg = True
         for unidata in unilist:
-            if feature_metadata.shape[0] > unidata.feature_metadata.shape[0] or (feature_metadata.index != unidata.feature_metadata.index).sum() > 0:
-                mat_shape = (unidata.shape[0], f2idx.size)
-                for mat_key in unidata.list_keys():
-                    unidata.select_matrix(mat_key)
-                    mat = csr_matrix(mat_shape, dtype = unidata.X.dtype)
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        mat[:, f2idx[unidata.feature_metadata.index].values] = unidata.X
-                    matrices_list[mat_key].append(mat)
-            else:
-                for mat_key in unidata.list_keys():
-                    unidata.select_matrix(mat_key)
-                    matrices_list[mat_key].append(unidata.X)
+            mat_keys.update(unidata.matrices)
+            if no_reorg and (feature_metadata.shape[0] > unidata.feature_metadata.shape[0] or (feature_metadata.index != unidata.feature_metadata.index).sum() > 0):
+                no_reorg = False
 
         matrices = {}
-        for mat_key in matrices_list:
-            matrices[mat_key] = vstack(matrices_list[mat_key])
+        if no_reorg:
+            for mat_key in mat_keys:
+                mat_list = []
+                for unidata in unilist:
+                    mat = unidata.matrices.pop(mat_key, None)
+                    if mat is not None:
+                        mat_list.append(mat)
+                matrices[mat_key] = vstack(mat_list)
+        else:
+            colmap = []
+            for unidata in unilist:
+                colmap.append(f2idx[unidata.feature_metadata.index].values)
+
+            for mat_key in mat_keys:
+                data_list = []
+                row_list = []
+                col_list = []
+                row_base = 0
+                for i, unidata in enumerate(unilist):
+                    mat = unidata.matrices.pop(mat_key, None)
+                    if mat is not None:
+                        mat = mat.tocoo(copy = False) # convert to coo format
+                        data_list.append(mat.data)
+                        row_list.append(mat.row + row_base)
+                        col_list.append(colmap[i][mat.col])
+                        row_base += mat.shape[0]
+                data = np.concatenate(data_list)
+                row = np.concatenate(row_list)
+                col = np.concatenate(col_list)
+                matrices[mat_key] = coo_matrix((data, (row, col))).tocsr(copy = False)
 
         return matrices
 
@@ -81,10 +99,19 @@ class AggrData:
         if len(unilist) == 1:
             return unilist[0]
 
+
         barcode_metadata_dfs = [unidata.barcode_metadata for unidata in unilist]
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
         fillna_dict = self._get_fillna_dict(barcode_metadata)
         barcode_metadata.fillna(value=fillna_dict, inplace=True)
+
+
+        var_dict = {}
+        for unidata in unilist:
+            idx = unidata.feature_metadata.columns.difference(["featureid"])
+            if idx.size > 0:
+                var_dict[unidata.metadata["_sample"]] = unidata.feature_metadata[idx]
+                unidata.feature_metadata.drop(columns = idx, inplace = True)
 
         feature_metadata = unilist[0].feature_metadata
         for other in unilist[1:]:
@@ -93,8 +120,27 @@ class AggrData:
         fillna_dict = self._get_fillna_dict(feature_metadata)
         feature_metadata.fillna(value=fillna_dict, inplace=True)
 
+
         matrices = self._merge_matrices(feature_metadata, unilist)
-        metadata = unilist[0].metadata.mapping
+        
+
+        uns_dict = {}
+        metadata = {"genome": unilist[0].metadata["genome"], "modality": unilist[0].metadata["modality"]}
+        is_citeseq = isinstance(unilist[0], CITESeqData)
+        for unidata in unilist:
+            assert unidata.metadata.pop("genome") == metadata["genome"]
+            assert unidata.metadata.pop("modality") == metadata["modality"]
+            if is_citeseq:
+                del unidata.metadata["_control_counts"]
+            sample_name = unidata.metadata.pop("_sample")
+            if len(unidata.metadata) > 0:
+                uns_dict[sample_name] = unidata.metadata.mapping
+
+        if len(var_dict) > 0:
+            metadata["var_dict"] = var_dict
+        if len(uns_dict) > 0:
+            metadata["uns_dict"] = uns_dict
+
 
         unidata = None
         if isinstance(unilist[0], CITESeqData):
