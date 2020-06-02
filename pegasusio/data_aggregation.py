@@ -71,7 +71,7 @@ def aggregate_matrices(
 ) -> MultimodalData:
     """Aggregate channel-specific count matrices into one big count matrix.
 
-    This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column is required. An aggregated Multimodal Data will be returned.
+    This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
     In the Reference column, you can replace genome names by using "hg19:GRCh38,mm9:mm10", which will replace all hg19 to GRCh38 and all mm9 to mm10. However, in this case, the genome passed to read_input will be None.
 
