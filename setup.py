@@ -44,7 +44,6 @@ setup(
         "Topic :: Software Development :: Build Tools",
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Framework :: Jupyter",
@@ -58,5 +57,6 @@ setup(
     ext_modules=cythonize(extensions),
     setup_requires=["Cython"],
     install_requires=requires,
-    python_requires="~=3.5",
+    python_requires="~=3.6",
+    entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )

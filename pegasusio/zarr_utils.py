@@ -11,32 +11,46 @@ from zarr import Blosc
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
-from pegasusio import modalities, UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
+import logging
+logger = logging.getLogger(__name__)
+
+from pegasusio import modalities
+from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
 
 
-CHUNKSIZE = 1000000
+CHUNKSIZE = 1000000.0
 COMPRESSOR = Blosc(cname = 'lz4', clevel = 5)
 
 
 def calc_chunk(shape: tuple) -> tuple:
     ndim = len(shape)
-    chunks = [0] * ndim
+    chunks = [1] * ndim
     ords = np.argsort(shape)
-    chunk_size = CHUNKSIZE * 1.0
-    chunk_value = -1
-    for i, idx in enumerate(ords):
-        if chunk_value < 0:
-            if shape[idx] ** (ndim - i) < chunk_size:
-                chunks[idx] = shape[idx]
-                chunk_size /= chunks[idx]
+    if shape[ords[0]] > 0:
+        chunk_size = CHUNKSIZE
+        chunk_value = -1
+        for i, idx in enumerate(ords):
+            if chunk_value < 0:
+                if shape[idx] ** (ndim - i) < chunk_size:
+                    chunks[idx] = shape[idx]
+                    chunk_size /= chunks[idx]
+                else:
+                    chunk_value = int(np.ceil(chunk_size ** (1.0 / (ndim - i))))
+                    chunks[idx] = chunk_value
             else:
-                chunk_value = int(np.ceil(chunk_size ** (1.0 / (ndim - i))))
                 chunks[idx] = chunk_value
-        else:
-            chunks[idx] = chunk_value
-
     return tuple(chunks)
 
+
+def check_and_remove_existing_path(path: str) -> None:
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            logger.warning(f"Detected and removed pre-existing directory {path}.")
+            shutil.rmtree(path)
+        else:
+            assert os.path.isfile(path)
+            logger.warning(f"Detected and removed pre-existing file {path}.")
+            os.unlink(path)
 
 
 class ZarrFile:
@@ -52,23 +66,15 @@ class ZarrFile:
 
         if mode == 'w':
             # Create a new zarr file
-            if storage_type == 'ZipStore':
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                self.store = zarr.ZipStore(path, mode = 'w')
-            else:
-                if os.path.isfile(path):
-                    os.unlink(path)
-                zarr.NestedDirectoryStore(path)
+            check_and_remove_existing_path(path)
+            self.store = zarr.ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else zarr.NestedDirectoryStore(path)
             self.root = zarr.group(self.store, overwrite = True)
-            self.root.attrs['store'] = storage_type
         else:
             # Load existing zarr file
-            try:
-                self.root = zarr.open(path, mode = mode)
-            except ValueError:
-                self.store = zarr.ZipStore(path, mode = mode)
-                self.root = zarr.open_group(self.store, mode = mode)
+            self.store = zarr.NestedDirectoryStore(path) if os.path.isdir(path) else zarr.ZipStore(path, mode = 'r')
+            if mode == 'a' and isinstance(self.store, zarr.ZipStore):
+                self._to_directory()
+            self.root = zarr.open(self.store, mode = mode)
 
 
     def __del__(self):
@@ -76,9 +82,46 @@ class ZarrFile:
             self.store.close()
 
 
+    def _to_zip(self):
+        if not isinstance(self.store, zarr.ZipStore):
+            zip_path = self.store.path + '.zip'
+            zip_store = zarr.ZipStore(zip_path, mode = 'w')
+            zarr.copy_store(self.store, zip_store)
+            zip_store.close()
+
+            shutil.rmtree(self.store.path)
+
+            self.store = zarr.ZipStore(zip_path, mode = 'r')
+            self.root = zarr.open_group(self.store, mode = 'r')
+
+
+    def _to_directory(self):
+        orig_path = self.store.path
+
+        if not orig_path.endswith('.zip'):
+            self.store.close()
+            zip_path = orig_path + '.zip'
+            check_and_remove_existing_path(zip_path)
+            os.replace(orig_path, zip_path)
+            self.store = zarr.ZipStore(zip_path, mode = 'r')
+        else:
+            zip_path = orig_path
+
+        dest_path = zip_path[:-4]
+        check_and_remove_existing_path(dest_path)
+        dir_store = zarr.NestedDirectoryStore(dest_path)
+        zarr.copy_store(self.store, dir_store)
+        self.store.close()
+        os.remove(zip_path)
+
+        self.store = dir_store
+        self.root = zarr.open_group(self.store)
+
+        logger.info(f"Converted ZipStore zarr file {orig_path} to NestedDirectoryStore {dest_path}.")
+
 
     def read_csr(self, group: zarr.Group) -> csr_matrix:
-        return csr_matrix((group['data'], group['indices'], group['indptr']), shape = group.attrs['shape'])
+        return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
 
 
     def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.recarray]:
@@ -95,9 +138,10 @@ class ZarrFile:
             columns = [col for col in group.array_keys() if col != '_index']
 
         if group.attrs['data_type'] == 'data_frame':
-            df = pd.DataFrame(data = {col: self.read_series(group, col) for col in columns},
-                index = pd.Index(self.read_series(group, '_index'), name = group.attrs['index_name']),
-                columns = columns)
+            data = {col: self.read_series(group, col) for col in columns}
+            _index = self.read_series(group, '_index')
+            index = pd.Index(_index, name = group.attrs['index_name'], dtype = _index.dtype)
+            df = pd.DataFrame(data = data, index = index) # if add columns = columns, the generation will be slow
             return df
         else:
             array = np.rec.fromarrays([self.read_series(group, col) for col in columns],
@@ -133,29 +177,26 @@ class ZarrFile:
                 assert data_type == 'dict'
                 value = self.read_mapping(sub_group)
             res_dict[key] = value
-        
+
         return res_dict
 
 
-    def read_unimodal_data(self, group: zarr.Group, ngene: int = None, select_singlets: bool = False) -> UnimodalData:
+    def read_unimodal_data(self, group: zarr.Group) -> UnimodalData:
         """ Read UnimodalData
-            ngene: filter barcodes with < ngene
-            select_singlets: only select singlets
-            The above two option only works if modality == "rna"
         """
         metadata = self.read_mapping(group['metadata'])
-        assert "genome" in metadata
-        if "modality" not in metadata:
-            assert metadata.get("experiment_type", "none") in modalities
-            metadata["modality"] = metadata.pop("experiment_type")
+        assert 'genome' in metadata
+        if 'modality' not in metadata:
+            assert metadata.get('experiment_type', 'none') in modalities
+            metadata['modality'] = metadata.pop('experiment_type')
 
         DataClass = UnimodalData
-        modality = metadata["modality"]
-        if modality == "tcr" or modality == "bcr":
+        modality = metadata['modality']
+        if modality == 'tcr' or modality == 'bcr':
             DataClass = VDJData
-        elif modality == "citeseq":
+        elif modality == 'citeseq':
             DataClass = CITESeqData
-        elif modality == "cyto":
+        elif modality == 'cyto':
             DataClass = CytoData
 
         unidata = DataClass(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
@@ -165,39 +206,27 @@ class ZarrFile:
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
                             feature_multiarrays = self.read_mapping(group['feature_multiarrays']))
 
-        if modality == "rna":
-            unidata.filter(ngene, select_singlets)
+        if group.attrs.get('_cur_matrix', None) is not None:
+            unidata.select_matrix(group.attrs['_cur_matrix'])
 
         return unidata
 
 
-    def read_multimodal_data(self, ngene: int = None, select_singlets: bool = False) -> MultimodalData:
+    def read_multimodal_data(self, attach_zarrobj = False) -> MultimodalData:
         """ Read MultimodalData
-            ngene: filter barcodes with < ngene
-            select_singlets: only select singlets
-            The above two option only works for dataset with modality == "rna"
         """
         data = MultimodalData()
-        need_trim = (ngene is not None) or select_singlets
-        selected_barcodes = None
-
         for key, group in self.root.groups():
-            unidata = self.read_unimodal_data(group, ngene, select_singlets)
-            modality = unidata.get_modality()
-            assert modality is not None
-            if need_trim and modality == "rna":
-                selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
+            unidata = self.read_unimodal_data(group)
             data.add_data(unidata)
 
-        if need_trim:
-            for key in data.list_data():
-                unidata = data.get_data(key)
-                if unidata.get_modality() != "rna":
-                    selected = unidata.obs_names.isin(selected_barcodes)
-                    unidata._inplace_subset_obs(selected)
+        if self.root.attrs.get('_selected', None) is not None:
+            data.select_data(self.root.attrs['_selected'])
+
+        if attach_zarrobj:
+            data._zarrobj = self
 
         return data
-
 
 
     def write_csr(self, group: zarr.Group, name: str, matrix: csr_matrix) -> None:
@@ -210,10 +239,11 @@ class ZarrFile:
 
     def write_series(self, group: zarr.Group, name: str, array: np.ndarray, data_type: str) -> None:
         if data_type == 'data_frame':
-            if is_string_dtype(array):
-                keywords = np.unique(array)
-                if keywords.size <= array.size / 2.0: # at least half
+            if not is_categorical_dtype(array) and name != '_index' and is_string_dtype(array):
+                keywords = set(array)
+                if len(keywords) <= array.size / 10.0: # at least 10x reduction
                     array = pd.Categorical(array, categories = natsorted(keywords))
+
             if is_categorical_dtype(array):
                 # write category keys
                 categories = group.require_group('_categories')
@@ -225,6 +255,7 @@ class ZarrFile:
                 # write codes
                 codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True)
                 codes_arr.attrs['ordered'] = array.ordered
+
                 return None
 
         dtype = str if array.dtype.kind == 'O' else array.dtype
@@ -257,11 +288,11 @@ class ZarrFile:
             group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
 
 
-    def write_mapping(self, group: zarr.Group, name: str, mapping: dict) -> None:
-        sub_group = group.create_group(name, overwrite = True)
-        scalar_dict = {}
+    def write_mapping(self, group: zarr.Group, name: str, mapping: dict, overwrite = True) -> None:
+        sub_group = group.require_group(name, overwrite = overwrite)
+        scalar_dict = sub_group.attrs.pop('scalar', {}) # if overwrite == True, there should be no 'scalar'
 
-        for key, value in mapping.items():
+        def _write_one_pair(key, value):
             if is_scalar(value):
                 scalar_dict[key] = value
             elif isinstance(value, np.ndarray):
@@ -275,7 +306,19 @@ class ZarrFile:
                 self.write_csr(sub_group, key, value)
             else:
                 # assume value is either list or tuple, converting it to np.ndarray
-                self.write_array(sub_group, key, np.array(value))
+                self.write_array(sub_group, key, value.astype(str) if is_categorical_dtype(value) else np.array(value))
+
+        if overwrite:
+            for key, value in mapping.items():
+                _write_one_pair(key, value)
+        else:
+            for key in mapping.deleted:
+                if key in scalar_dict:
+                    del scalar_dict[key]
+                else:
+                    del sub_group[key]
+            for key in mapping.modified:
+                _write_one_pair(key, mapping[key])
 
         attrs_dict = {'data_type' : 'dict'}
         if len(scalar_dict) > 0:
@@ -283,24 +326,35 @@ class ZarrFile:
         sub_group.attrs.update(**attrs_dict)
 
 
-
-    def write_unimodal_data(self, group: zarr.Group, name: str, data: UnimodalData) -> None:
+    def write_unimodal_data(self, group: zarr.Group, name: str, data: UnimodalData, overwrite: bool = True) -> None:
         """ Write UnimodalData
         """
-        sub_group = group.create_group(name, overwrite = True)
-        sub_group.attrs['data_type'] = 'UnimodalData'
+        sub_group = group.require_group(name, overwrite = overwrite)
+        attrs_dict = {'data_type': 'UnimodalData', '_cur_matrix': data.current_matrix()}
+        sub_group.attrs.update(**attrs_dict)
 
         self.write_dataframe(sub_group, 'barcode_metadata', data.barcode_metadata)
         self.write_dataframe(sub_group, 'feature_metadata', data.feature_metadata)
-        self.write_mapping(sub_group, 'matrices', data.matrices)
-        self.write_mapping(sub_group, 'metadata', data.metadata)
-        self.write_mapping(sub_group, 'barcode_multiarrays', data.barcode_multiarrays)
-        self.write_mapping(sub_group, 'feature_multiarrays', data.feature_multiarrays)
+
+        if overwrite or data.matrices.is_dirty():
+            self.write_mapping(sub_group, 'matrices', data.matrices, overwrite = overwrite)
+        if overwrite or data.metadata.is_dirty():
+            self.write_mapping(sub_group, 'metadata', data.metadata, overwrite = overwrite)
+        if overwrite or data.barcode_multiarrays.is_dirty():
+            self.write_mapping(sub_group, 'barcode_multiarrays', data.barcode_multiarrays, overwrite = overwrite)
+        if overwrite or data.feature_multiarrays.is_dirty():
+            self.write_mapping(sub_group, 'feature_multiarrays', data.feature_multiarrays, overwrite = overwrite)
 
 
-    def write_multimodal_data(self, data: MultimodalData) -> None:
+    def write_multimodal_data(self, data: MultimodalData, overwrite: bool = True) -> None:
         """ Write MultimodalData
         """
-        for key in data.list_data():
-            unidata = data.get_data(key)
-            self.write_unimodal_data(self.root, key, unidata)
+        if overwrite:
+            for key in data.list_data():
+                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = overwrite)
+        else:
+            for key in data.data.deleted:
+                del self.root[key]
+            for key in data.data.accessed:
+                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = key in data.data.modified)            
+        self.root.attrs['_selected'] = data._selected

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from pegasusio import modalities, UnimodalData, CITESeqData, MultimodalData
 
 
-def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
+def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
     """Load 10x v2 format matrix from hdf5 file
 
     Parameters
@@ -18,8 +18,6 @@ def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
 
     h5_in : h5py.Group
         An instance of h5py.Group class that is connected to a 10x v2 formatted hdf5 file.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
 
     Returns
     -------
@@ -53,7 +51,6 @@ def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         	{"X": mat}, 
         	{"modality": "rna", "genome": genome}
         )
-        unidata.filter(ngene=ngene)
         unidata.separate_channels()
 
         data.add_data(unidata)
@@ -61,16 +58,14 @@ def load_10x_h5_file_v2(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file_v3(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
-    """Load 10x v3 format matrix from hdf5 file
+def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
+    """Load 10x v3 format matrix from hdf5 file, allowing detection of crispr and citeseq libraries
 
     Parameters
     ----------
 
     h5_in : h5py.Group
         An instance of h5py.Group class that is connected to a 10x v3 formatted hdf5 file.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
 
     Returns
     -------
@@ -91,19 +86,36 @@ def load_10x_h5_file_v3(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
         shape=(N, M),
     )
     barcodes = h5_in["matrix/barcodes"][...].astype(str)
-    genomes = h5_in["matrix/features/genome"][...].astype(str)
-    ids = h5_in["matrix/features/id"][...].astype(str)
-    names = h5_in["matrix/features/name"][...].astype(str)
+    df = pd.DataFrame(data = {"genome": h5_in["matrix/features/genome"][...].astype(str),
+                              "feature_type": h5_in["matrix/features/feature_type"][...].astype(str),
+                              "id": h5_in["matrix/features/id"][...].astype(str),
+                              "name": h5_in["matrix/features/name"][...].astype(str)})
+
+    genomes = list(df["genome"].unique())
+    if "" in genomes:
+        genomes.remove("")
+    default_genome = genomes[0] if len(genomes) == 1 else None
 
     data = MultimodalData()
-    for genome in np.unique(genomes):
-        idx = genomes == genome
-
+    gb = df.groupby(by = ["genome", "feature_type"])
+    for name, group in gb:
         barcode_metadata = {"barcodekey": barcodes}
-        feature_metadata = {"featurekey": names[idx], "featureid": ids[idx]}
-        mat = bigmat[:, idx].copy()
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
-        unidata.filter(ngene=ngene)
+        feature_metadata = {"featurekey": group["name"].values, "featureid": group["id"].values}
+        mat = bigmat[:, gb.groups[name]]
+
+        genome = name[0] if (name[0] != "" or default_genome is None) else default_genome
+        modality = "custom"
+        if name[1] == "Gene Expression":
+            modality = "rna"
+        elif name[1] == "CRISPR Guide Capture":
+            modality = "crispr"
+        elif name[1] == "Antibody Capture":
+            modality = "citeseq"
+
+        if modality == "citeseq":
+            unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
+        else:
+            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
         unidata.separate_channels()
 
         data.add_data(unidata)
@@ -111,7 +123,7 @@ def load_10x_h5_file_v3(h5_in: h5py.Group, ngene: int = None) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file(input_h5: str, ngene: int = None) -> MultimodalData:
+def load_10x_h5_file(input_h5: str) -> MultimodalData:
     """Load 10x format matrix (either v2 or v3) from hdf5 file
 
     Parameters
@@ -119,8 +131,6 @@ def load_10x_h5_file(input_h5: str, ngene: int = None) -> MultimodalData:
 
     input_h5 : `str`
         The matrix in 10x v2 or v3 hdf5 format.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
 
     Returns
     -------
@@ -134,12 +144,12 @@ def load_10x_h5_file(input_h5: str, ngene: int = None) -> MultimodalData:
     data = None
     with h5py.File(input_h5, 'r') as h5_in:
         load_file = load_10x_h5_file_v3 if "matrix" in h5_in.keys() else load_10x_h5_file_v2
-        data = load_file(h5_in, ngene)
+        data = load_file(h5_in)
 
     return data
 
 
-def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ngene: int = None) -> MultimodalData:
+def load_loom_file(input_loom: str, genome: str = None, modality: str = None) -> MultimodalData:
     """Load count matrix from a LOOM file.
 
     Parameters
@@ -151,8 +161,6 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ng
         The genome reference. If None, use "unknown" instead. If not None and input loom contains genome attribute, the attribute will be overwritten.
     modality: `str`, optional (default None)
         Modality. If None, use "rna" instead. If not None and input loom contains modality attribute, the attribute will be overwritten.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to data with modality == "rna".
 
     Returns
     -------
@@ -161,7 +169,7 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ng
 
     Examples
     --------
-    >>> io.load_loom_file('example.loom', genome = 'GRCh38', ngene = 200)
+    >>> io.load_loom_file('example.loom', genome = 'GRCh38')
     """
     col_trans = {"CellID": "barcodekey", "obs_names": "barcodekey"}
     row_trans = {"Gene": "featurekey", "var_names": "featurekey", "Accession": "featureid",  "gene_ids": "featureid"}
@@ -210,8 +218,6 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None, ng
                 metadata["modality"] = "rna"
             
         unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays)
-        if metadata["modality"] == "rna":
-            unidata.filter(ngene = ngene)
 
     data = MultimodalData(unidata)
     return data
@@ -259,94 +265,3 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
     loompy.create(output_file, layers, row_attrs, col_attrs, file_attrs = file_attrs)
 
     logger.info(f"{output_file} is written.")
-
-
-
-
-
-
-
-
-
-
-def load_pegasus_h5_file(
-    input_h5: str, ngene: int = None, select_singlets: bool = False
-) -> MultimodalData:
-    """Load matrices from pegasus-format hdf5 file (deprecated)
-
-    Parameters
-    ----------
-
-    input_h5 : `str`
-        pegasus-format hdf5 file.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes.
-    select_singlets: `bool`, optional (default: False)
-        If only load singlets.
-
-    Returns
-    -------
-
-    A MultimodalData object containing (genome, UnimodalData) pair per genome.
-
-    Examples
-    --------
-    >>> io.load_pegasus_h5_file('example.h5sc')
-    """
-    cite_seq_name = None
-    selected_barcodes = None
-
-    data = MultimodalData()
-    with h5py.File(input_h5, 'r') as h5_in:
-        for genome in h5_in.keys():
-            group = h5_in[genome]            
-
-            M, N = group["shape"][...]
-            mat = csr_matrix(
-                (
-                    group["data"][...],
-                    group["indices"][...],
-                    group["indptr"][...],
-                ),
-                shape=(N, M),
-            )
-
-            barcode_metadata = {}
-            sub_group = group["_barcodes"]
-            for key in sub_group.keys():
-                if key != "barcodekey":
-                    continue
-                values = sub_group[key][...]
-                if values.dtype.kind == "S":
-                    values = values.astype(str)
-                barcode_metadata[key] = values
-
-            feature_metadata = {}
-            sub_group = group["_features"]
-            for key in sub_group.keys():
-                values = sub_group[key][...]
-                if values.dtype.kind == "S":
-                    values = values.astype(str)
-                if key == "featurename":
-                    key = "featurekey"
-                elif key == "featurekey":
-                    key = "featureid"                    
-                feature_metadata[key] = values
-
-            if genome.startswith("CITE_Seq_"):
-                genome = genome[9:]
-                unidata = CITESeqData(barcode_metadata, feature_metadata, {"log.transformed": mat.astype(np.float32)}, {"modality": "citeseq", "genome": genome})
-                cite_seq_name = unidata.get_uid()
-            else:
-                unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
-                unidata.filter(ngene, select_singlets)
-                selected_barcodes = unidata.obs_names
-
-            data.add_data(unidata)
-
-    if (cite_seq_name is not None) and (selected_barcodes is not None):
-        unidata = data.get_data(cite_seq_name)
-        selected = unidata.obs_names.isin(selected_barcodes)
-        unidata._inplace_subset_obs(selected)
-
-    return data

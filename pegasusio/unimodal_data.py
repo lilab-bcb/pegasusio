@@ -1,4 +1,3 @@
-import gc
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
@@ -11,35 +10,12 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
+from pegasusio import run_gc
 from pegasusio import modalities
 from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
+from .datadict import DataDict
 
-
-class DataDict(MutableMapping):
-    def __init__(self, initial_data = None):
-        self.mapping = initial_data if initial_data is not None else dict()
-        self.dirty = set() # record keywords in mapping and dirty
-
-    def __getitem__(self, key):
-        return self.mapping[key]
-
-    def __setitem__(self, key, value):
-        self.mapping[key] = value
-        self.dirty.add(key)
-
-    def __delitem__(self, key):
-        del self.mapping[key]
-        self.dirty.remove(key)
-
-    def __iter__(self):
-        return iter(self.mapping)
-
-    def __len__(self):
-        return len(self.mapping)
-
-    def __repr__(self):
-        return f"DataDict object with keys: {str(list(self.mapping))[1:-1]}"
 
 
 class UnimodalData:        
@@ -52,9 +28,11 @@ class UnimodalData:
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
         cur_matrix: str = "X",
+        genome: str = None, 
+        modality: str = None,
     ) -> None:
         if isinstance(barcode_metadata, anndata.AnnData):
-            self.from_anndata(barcode_metadata)
+            self.from_anndata(barcode_metadata, genome = genome, modality = modality)
             return None
 
         def replace_none_df(value):
@@ -117,6 +95,20 @@ class UnimodalData:
         self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
 
 
+    def _is_dirty(self) -> bool:
+        """ Check if any field is modified. 
+        """
+        return self.matrices.is_dirty() or self.metadata.is_dirty() or self.barcode_multiarrays.is_dirty() or self.feature_multiarrays.is_dirty()
+
+    def _clear_dirty(self) -> None:
+        """ Clear all dirty sets
+        """
+        self.matrices.clear_dirty()
+        self.barcode_multiarrays.clear_dirty()
+        self.feature_multiarrays.clear_dirty()
+        self.metadata.clear_dirty()
+
+
     @property
     def obs(self) -> pd.DataFrame:
         return self.barcode_metadata
@@ -169,8 +161,7 @@ class UnimodalData:
 
     @obsm.setter
     def obsm(self, obsm: Dict[str, np.ndarray]):
-        assert isinstance(obsm, DataDict)
-        self.barcode_multiarrays = obsm
+        self.barcode_multiarrays.overwrite(obsm)
 
     @property
     def varm(self) -> Dict[str, np.ndarray]:
@@ -178,8 +169,7 @@ class UnimodalData:
 
     @varm.setter
     def varm(self, varm: Dict[str, np.ndarray]):
-        assert isinstance(varm, DataDict)
-        self.feature_multiarrays = varm
+        self.feature_multiarrays.overwrite(varm)
 
     @property
     def uns(self) -> DataDict:
@@ -187,8 +177,7 @@ class UnimodalData:
 
     @uns.setter
     def uns(self, uns: DataDict):
-        assert isinstance(uns, DataDict)
-        self.metadata = uns
+        self.metadata.overwrite(uns)
 
     @property
     def shape(self) -> Tuple[int, int]:
@@ -257,16 +246,16 @@ class UnimodalData:
     def list_keys(self, key_type: str = "matrix") -> List[str]:
         """ Return available keys in metadata, key_type = barcode, feature, matrix, other
         """
-        if key_type == "barcode":
+        if key_type == "matrix":
+            return list(self.matrices)
+        elif key_type == "barcode":
             return [
                 self.barcode_metadata.index.name
             ] + self.barcode_metadata.columns.tolist()
         elif key_type == "feature":
             return [
                 self.feature_metadata.index.name
-            ] + self.feature_metadata.columns.tolist()
-        elif key_type == "matrix":
-            return list(self.matrices)
+            ] + self.feature_metadata.columns.tolist()            
         elif key_type == "other":
             return list(self.metadata)
         else:
@@ -319,6 +308,7 @@ class UnimodalData:
             X.data[...] = orig_data
 
 
+    @run_gc
     def _inplace_subset_obs(self, index: List[bool]) -> None:
         """ Subset barcode_metadata inplace """
         if isinstance(index, pd.Series):
@@ -332,9 +322,9 @@ class UnimodalData:
             for key in self.metadata["_obs_keys"]:
                 self.metadata[key] = self.metadata[key][index]
         self._update_shape()
-        gc.collect()
 
 
+    @run_gc
     def _inplace_subset_var(self, index: List[bool]) -> None:
         """ Subset feature_metadata inplace """
         if isinstance(index, pd.Series):
@@ -348,26 +338,6 @@ class UnimodalData:
             for key in self.metadata["_var_keys"]:
                 self.metadata[key] = self.metadata[key][index]
         self._update_shape()
-        gc.collect()
-
-
-    def filter(self, ngene: int = None, select_singlets: bool = False) -> None:
-        """ Filter out low quality barcodes, only keep barcodes satisfying ngene >= ngene and selecting singlets if select_singlets is True
-        """
-        if (len(self.matrices) == 0) or ((ngene is None) and (not select_singlets)):
-            return None
-
-        self.select_matrix("X")
-        selected = np.ones(self.X.shape[0], dtype=bool)
-        if ngene is not None:
-            selected = selected & (self.X.getnnz(axis=1) >= ngene)
-        if select_singlets and ("demux_type" in self.barcode_metadata):
-            selected = (
-                selected & (self.barcode_metadata["demux_type"] == "singlet").values
-            )
-            self.barcode_metadata.drop(columns="demux_type", inplace=True)
-
-        self._inplace_subset_obs(selected)
 
 
     def separate_channels(self) -> None:
@@ -388,24 +358,6 @@ class UnimodalData:
             
         self.barcode_metadata.index = pd.Index(barcodes, name="barcodekey")
 
-
-    def update_barcode_metadata_info(
-        self, sample_name: str, row: "pd.Series", attributes: List[str]
-    ) -> None:
-        """ Update barcodekey, update channel and add attributes
-        """
-        nsample = self.barcode_metadata.shape[0]
-        barcodes = [sample_name + "-" + x for x in self.barcode_metadata.index]
-        self.barcode_metadata.index = pd.Index(barcodes, name="barcodekey")
-        if "Channel" in self.barcode_metadata:
-            self.barcode_metadata["Channel"] = [
-                sample_name + "-" + x for x in self.barcode_metadata["Channel"]
-            ]
-        else:
-            self.barcode_metadata["Channel"] = np.repeat(sample_name, nsample)
-        if attributes is not None:
-            for attr in attributes:
-                self.barcode_metadata[attr] = np.repeat(row[attr], nsample)
 
 
     def scan_black_list(self, black_list: Set[str]):
@@ -539,3 +491,29 @@ class UnimodalData:
     def __getitem__(self, index: INDEX) -> UnimodalDataView:
         barcode_index, feature_index = _parse_index(self, index)
         return UnimodalDataView(self, barcode_index, feature_index, self._cur_matrix)
+
+
+    def _update_barcode_metadata_info(
+        self, row: pd.Series, attributes: Set[str], append_sample_name: bool
+    ) -> None:
+        """ Update barcodekey, update channel and add attributes
+        """
+        nsample = self.barcode_metadata.shape[0]
+        sample_name = row["Sample"]
+
+        if append_sample_name:
+            barcodes = [sample_name + "-" + x for x in self.barcode_metadata.index]
+            self.barcode_metadata.index = pd.Index(barcodes, name="barcodekey")
+            if "Channel" in self.barcode_metadata:
+                self.barcode_metadata["Channel"] = [
+                    sample_name + "-" + x for x in self.barcode_metadata["Channel"]
+                ]
+
+        if "Channel" not in self.barcode_metadata:
+            self.barcode_metadata["Channel"] = np.repeat(sample_name, nsample)
+            
+        for attr in attributes:
+            self.barcode_metadata[attr] = np.repeat(row[attr], nsample)
+
+        self.metadata["_sample"] = sample_name # record sample_name for merging
+
