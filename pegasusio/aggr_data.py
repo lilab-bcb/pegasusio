@@ -41,6 +41,11 @@ class AggrData:
             if no_reorg and (feature_metadata.shape[0] > unidata.feature_metadata.shape[0] or (feature_metadata.index != unidata.feature_metadata.index).sum() > 0):
                 no_reorg = False
 
+        if modality == "bcr" or modality == "tcr":
+            for key in VDJData._uns_keywords:
+                mat_keys.discard(key[1:])
+
+
         matrices = {}
         if no_reorg:
             for mat_key in mat_keys:
@@ -90,20 +95,23 @@ class AggrData:
 
     @run_gc
     def _vdj_update_metadata_matrices(self, metadata: dict, matrices: dict, unilist: List[UnimodalData]) -> None:
+        metadata.pop("uns_dict", None)
         for key in VDJData._uns_keywords:
             values = set()
             for unidata in unilist:
                 values.update(unidata.metadata[key])
-            val2num = dict(zip(values, range(len(values))))
+            values.discard("None") # None must be 0 for sparse matrix
+            metadata[key] = np.array(["None"] + list(values), dtype = np.object)
+            val2num = dict(zip(metadata[key], range(metadata[key].size)))
+
             mat_key = key[1:]
-            mat = matrices[mat_key]
-            start = end = 0
+            mat_list = []
             for unidata in unilist:
+                mat = unidata.matrices.pop(mat_key)
                 old2new = np.array([val2num[val] for val in unidata.metadata[key]], dtype = np.int32)
-                end = start + unidata.matrices[mat_key].data.size
-                mat[start:end] = old2new[mat[start:end]]
-                start = end
-            metadata[key] = list(values)
+                mat.data = old2new[mat.data]
+                mat_list.append(mat)
+            matrices[mat_key] = vstack(mat_list)
 
 
     @run_gc

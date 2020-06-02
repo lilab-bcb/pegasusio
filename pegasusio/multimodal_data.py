@@ -441,10 +441,29 @@ class MultimodalData:
         for unidata in self.data.values():
             unidata._update_barcode_metadata_info(row, attributes, append_sample_name)
 
+
     def _update_genome(self, genome_dict: Dict[str, str]) -> None:
         for key in self.list_data():
             genome = self.data[key].get_genome()
             if genome in genome_dict:
                 unidata = self.data.pop(key)
                 unidata.uns["genome"] = genome_dict[genome]
+                self.data[unidata.get_uid()] = unidata
+
+
+    def _propogate_genome(self) -> None:
+        genomes = set()
+        unknowns = []
+        for key in self.data:
+            genome = self.data[key].get_genome()
+            if genome == "unknown":
+                unknowns.append(key)
+            else:
+                genomes.add(genome)
+
+        if len(genomes) == 1 and len(unknowns) > 0:
+            genome = list(genomes)[0]
+            for key in unknowns:
+                unidata = self.data.pop(key)
+                unidata.uns["genome"] = genome
                 self.data[unidata.get_uid()] = unidata

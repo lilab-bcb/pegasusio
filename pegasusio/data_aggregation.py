@@ -174,6 +174,7 @@ def aggregate_matrices(
 
         if row["Sample"] != curr_sample:
             if curr_data is not None:
+                curr_data._propogate_genome()
                 curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
                 curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
                 aggrData.add_data(curr_data)
@@ -186,6 +187,7 @@ def aggregate_matrices(
         tot += 1
 
     if curr_data is not None:
+        curr_data._propogate_genome()
         curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
         curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
         aggrData.add_data(curr_data)

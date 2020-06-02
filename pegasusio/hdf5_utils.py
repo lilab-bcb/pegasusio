@@ -59,7 +59,7 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
 
 
 def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
-    """Load 10x v3 format matrix from hdf5 file
+    """Load 10x v3 format matrix from hdf5 file, allowing detection of crispr and citeseq libraries
 
     Parameters
     ----------
@@ -86,18 +86,36 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
         shape=(N, M),
     )
     barcodes = h5_in["matrix/barcodes"][...].astype(str)
-    genomes = h5_in["matrix/features/genome"][...].astype(str)
-    ids = h5_in["matrix/features/id"][...].astype(str)
-    names = h5_in["matrix/features/name"][...].astype(str)
+    df = pd.DataFrame(data = {"genome": h5_in["matrix/features/genome"][...].astype(str),
+                              "feature_type": h5_in["matrix/features/feature_type"][...].astype(str),
+                              "id": h5_in["matrix/features/id"][...].astype(str),
+                              "name": h5_in["matrix/features/name"][...].astype(str)})
+
+    genomes = list(df["genome"].unique())
+    if "" in genomes:
+        genomes.remove("")
+    default_genome = genomes[0] if len(genomes) == 1 else None
 
     data = MultimodalData()
-    for genome in np.unique(genomes):
-        idx = genomes == genome
-
+    gb = df.groupby(by = ["genome", "feature_type"])
+    for name, group in gb:
         barcode_metadata = {"barcodekey": barcodes}
-        feature_metadata = {"featurekey": names[idx], "featureid": ids[idx]}
-        mat = bigmat[:, idx].copy()
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": "rna", "genome": genome})
+        feature_metadata = {"featurekey": group["name"].values, "featureid": group["id"].values}
+        mat = bigmat[:, gb.groups[name]]
+
+        genome = name[0] if (name[0] != "" or default_genome is None) else default_genome
+        modality = "custom"
+        if name[1] == "Gene Expression":
+            modality = "rna"
+        elif name[1] == "CRISPR Guide Capture":
+            modality = "crispr"
+        elif name[1] == "Antibody Capture":
+            modality = "citeseq"
+
+        if modality == "citeseq":
+            unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
+        else:
+            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
         unidata.separate_channels()
 
         data.add_data(unidata)
