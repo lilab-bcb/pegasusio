@@ -57,5 +57,6 @@ setup(
     ext_modules=cythonize(extensions),
     setup_requires=["Cython"],
     install_requires=requires,
-    python_requires="~=3.5",
+    python_requires="~=3.6",
+    entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )

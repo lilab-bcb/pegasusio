@@ -7,7 +7,7 @@ class AggregateMatrix(Base):
 Aggregate multiple single-modality or multi-modality data into one big MultimodalData object and write it back to disk as a zipped Zarr file.
 
 Usage:
-  pegasusio aggregate_matrix <csv_file> <output_name> [--restriction <restriction>... --attributes <attributes> --default-reference <reference> --select-only-singlets --minimum-number-of-genes <ngene>]
+  pegasusio aggregate_matrix <csv_file> <output_name> [--restriction <restriction>... options]
   pegasusio aggregate_matrix -h
 
 Arguments:

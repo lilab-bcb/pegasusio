@@ -18,27 +18,27 @@ from pegasusio import modalities
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
 
 
-CHUNKSIZE = 1000000
+CHUNKSIZE = 1000000.0
 COMPRESSOR = Blosc(cname = 'lz4', clevel = 5)
 
 
 def calc_chunk(shape: tuple) -> tuple:
     ndim = len(shape)
-    chunks = [0] * ndim
+    chunks = [1] * ndim
     ords = np.argsort(shape)
-    chunk_size = CHUNKSIZE * 1.0
-    chunk_value = -1
-    for i, idx in enumerate(ords):
-        if chunk_value < 0:
-            if shape[idx] ** (ndim - i) < chunk_size:
-                chunks[idx] = shape[idx]
-                chunk_size /= chunks[idx]
+    if shape[ords[0]] > 0:
+        chunk_size = CHUNKSIZE
+        chunk_value = -1
+        for i, idx in enumerate(ords):
+            if chunk_value < 0:
+                if shape[idx] ** (ndim - i) < chunk_size:
+                    chunks[idx] = shape[idx]
+                    chunk_size /= chunks[idx]
+                else:
+                    chunk_value = int(np.ceil(chunk_size ** (1.0 / (ndim - i))))
+                    chunks[idx] = chunk_value
             else:
-                chunk_value = int(np.ceil(chunk_size ** (1.0 / (ndim - i))))
                 chunks[idx] = chunk_value
-        else:
-            chunks[idx] = chunk_value
-
     return tuple(chunks)
 
 
