@@ -169,7 +169,7 @@ def _locate_mtx_file(path: str) -> str:
     return file_names[0] if len(file_names) > 0 else None
 
 
-def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: int = None) -> MultimodalData:
+def load_mtx_file(path: str, genome: str = None, modality: str = None) -> MultimodalData:
     """Load gene-count matrix from Market Matrix files (10x v2, v3 and HCA DCP formats)
 
     Parameters
@@ -181,8 +181,6 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
         Genome name of the matrix. If None, genome will be inferred from path.
     modality: `str`, optional (default: None)
         Modality, choosing from 'rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr' or 'atac'. If None, use 'rna' as default.
-    ngene : `int`, optional (default: None)
-        Minimum number of genes to keep a barcode. Default is to keep all barcodes. Only apply to 'rna' modality
 
     Returns
     -------
@@ -214,13 +212,11 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
         if genome is None:
             genome = os.path.basename(path)
         data.add_data(
-            genome,
             load_one_mtx_file(
                 path,
                 file_name,
                 genome,
-                modality,
-                ngene=ngene,
+                modality
             ),
         )
     else:
@@ -229,7 +225,7 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
                 file_name = _locate_mtx_file(dir_entry.path)
                 if file_name is None:
                     raise ValueError(f"Folder {dir_entry.path} does not contain a mtx file!")
-                data.add_data(dir_entry.name, load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, modality, ngene=ngene))
+                data.add_data(load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, modality))
 
     return data
 
