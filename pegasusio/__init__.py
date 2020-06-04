@@ -28,7 +28,9 @@ from .aggr_data import AggrData
 from .readwrite import infer_file_type, read_input, write_output
 from .data_aggregation import aggregate_matrices
 
-from ._version import get_versions
+from importlib_metadata import version, PackageNotFoundError
 
-__version__ = get_versions()["version"]
-del get_versions
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:
+    pass
