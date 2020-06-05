@@ -12,7 +12,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pegasusio import UnimodalData, CITESeqData, MultimodalData
-from pegasusio.cylib.io import read_mtx, write_mtx, read_csv, write_dense
 
 
 def _enumerate_files(path: str, parts: List[str], repl_list1: List[str], repl_list2: List[str] = None) -> str:
@@ -90,7 +89,7 @@ def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t")
         series = feature_metadata.iloc[0]
         assert "featurekey" in series.values and "featurename" in series.values
         series[series.eq("featurekey")] = "featureid"
-        series[series.eq("featurename")] = "featurekey"        
+        series[series.eq("featurename")] = "featurekey"
         feature_metadata = pd.DataFrame(data = feature_metadata.iloc[1:].values, columns = series.values)
     elif format_type == "Pegasus":
         # Pegasus format features.tsv.gz
@@ -123,6 +122,11 @@ def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t")
 def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> UnimodalData:
     """Load one gene-count matrix in mtx format into a UnimodalData object
     """
+    try:
+        from pegasusio.cylib.io import read_mtx
+    except ModuleNotFoundError:
+        print("No module named 'pegasusio.cylib.io'")
+
     fname = re.sub('(.mtx|.mtx.gz)$', '', file_name)
     barcode_file, feature_file = _locate_barcode_and_feature_files(path, fname)
 
@@ -158,7 +162,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> 
 
 def _locate_mtx_file(path: str) -> str:
     """ Locate one mtx file in the path directory; first choose matrix.mtx.gz or matrix.mtx if multiple mtx files exist."""
-    file_names = []    
+    file_names = []
     with os.scandir(path) as dir_iter:
         for dir_entry in dir_iter:
             file_name = dir_entry.name
@@ -238,9 +242,14 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None, ngene: in
 def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
     """ Write Unimodal data to mtx
     """
+    try:
+        from pegasusio.cylib.io import write_mtx
+    except ModuleNotFoundError:
+        print("No module named 'pegasusio.cylib.io'")
+
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
-    
+
     for key in unidata.list_keys():
         matrix = unidata.matrices[key]
         mtx_file = os.path.join(output_dir, ("matrix" if key == "X" else key) + ".mtx.gz")
@@ -271,7 +280,7 @@ def write_mtx_file(data: MultimodalData, output_directory: str, precision: int =
 
     for key in data.list_data():
         _write_mtx(data.get_data(key), os.path.join(output_dir, key), precision)
-    
+
     logger.info("Mtx files are written.")
 
 
@@ -306,6 +315,11 @@ def load_csv_file(
     >>> io.load_csv_file('example_ADT.csv')
     >>> io.load_csv_file('example.umi.dge.txt.gz', genome = 'GRCh38', sep = '\t')
     """
+    try:
+        from pegasusio.cylib.io import read_csv
+    except ModuleNotFoundError:
+        print("No module named 'pegasusio.cylib.io'")
+
     if not os.path.exists(input_csv):
         raise FileNotFoundError(f"File {input_csv} does not exist!")
 
@@ -413,6 +427,11 @@ def _write_scp_coords(unidata: UnimodalData, output_name: str, precision: int = 
 def _write_scp_expression(unidata: UnimodalData, output_name: str, is_sparse: bool, precision: int = 2) -> None:
     """ Only write the main matrix X
     """
+    try:
+        from pegasusio.cylib.io import write_mtx, write_dense
+    except ModuleNotFoundError:
+        print("No module named 'pegasusio.cylib.io'")
+
     matrix = unidata.get_matrix("X")
     if is_sparse:
         barcode_file = f"{output_name}.scp.barcodes.tsv"
@@ -421,10 +440,10 @@ def _write_scp_expression(unidata: UnimodalData, output_name: str, is_sparse: bo
         logger.info(f"Barcode file {barcode_file} is written.")
 
         feature_file = f"{output_name}.scp.features.tsv"
-        
+
         gene_names = unidata.var_names.values
         gene_ids = unidata.var["featureid"].values if "featureid" in unidata.var else (unidata.var["gene_ids"] if "gene_ids" in unidata.var else gene_names)
-        
+
         df = pd.DataFrame({"gene_names": gene_names, "gene_ids": gene_ids})[["gene_ids", "gene_names"]]
         df.to_csv(feature_file, sep="\t", header=False, index=False)
         logger.info(f"Feature file {feature_file} is written.")
@@ -506,5 +525,5 @@ def write_scp_file(data: MultimodalData, output_name: str, is_sparse: bool = Tru
             _write_scp_metadata(unidata, out_new_name, precision = precision)
             _write_scp_coords(unidata, out_new_name, precision = precision)
             _write_scp_expression(unidata, out_new_name, is_sparse, precision = precision)
-    
+
     logger.info("write_scp_file is done.")
