@@ -7,5 +7,7 @@
 
 
     installation
-    tutorial
     api/index
+    command_line
+    convert
+    tutorials/index

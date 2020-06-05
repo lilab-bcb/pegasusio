@@ -1,5 +1,5 @@
 Installation
--------------
+==============
 
 PegasusIO is released on PyPI_, and can be installed using pip::
 

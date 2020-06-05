@@ -8,11 +8,8 @@ Import *PegasusIO* to Python environment by::
 
 	import pegasusio as io
 
-Analysis Tools
---------------
-
 Read and Write
-~~~~~~~~~~~~~~
+----------------
 
 .. autosummary::
 	:toctree: .
