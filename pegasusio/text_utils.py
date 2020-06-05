@@ -149,7 +149,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> 
     mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
     mat.eliminate_zeros()
 
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"modality": modality, "genome": genome})
+    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
     if format_type == "10x v3" or format_type == "10x v2":
         unidata.separate_channels()
 

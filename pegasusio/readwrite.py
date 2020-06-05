@@ -97,7 +97,7 @@ def read_input(
 ) -> MultimodalData:
     """Load data into memory.
 
-    This function is used to load input data into memory. Inputs can be in 10x genomics v2 & v3 formats (hdf5 or mtx), HCA DCP mtx and csv formats, Drop-seq dge format, and CSV format.
+    This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data) formats.
 
     Parameters
     ----------
