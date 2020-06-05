@@ -8,6 +8,7 @@ RUN apt-get -qq update && \
         build-essential \
         gnupg \
         curl \
+        git \
         python3 \
         python3-dev \
         python3-pip
@@ -34,4 +35,4 @@ COPY . /pegasusio/
 WORKDIR /pegasusio/tests
 RUN git clone https://github.com/klarman-cell-observatory/pegasus-test-data.git
 WORKDIR /pegasusio/
-RUN pip install -e .
+RUN pip3 install -e .
