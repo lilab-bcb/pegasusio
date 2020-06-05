@@ -13,11 +13,13 @@ requires = [
     "Cython",
     "anndata",
     "loompy",
+    "docopt",
     "natsort",
     "numpy",
     "pandas",
     "scipy",
     "setuptools",
+    "importlib-metadata",
     "zarr"
 ]
 
