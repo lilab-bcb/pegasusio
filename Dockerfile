@@ -28,7 +28,7 @@ RUN apt-get -qq -y remove curl gnupg && \
     apt-get -qq -y autoremove && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/log/dpkg.log && \
-    rm /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+    ln -s /usr/bin/python3 /usr/bin/python
 
 COPY . /pegasusio/
 WORKDIR /pegasusio/tests
