@@ -6,3 +6,8 @@ build/
 dist/
 pegasusio.egg-info/
 pegasusio/cylib/*.so
+
+# docs
+docs/_build
+docs/api/*.rst
+!docs/api/index.rst
