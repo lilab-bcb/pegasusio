@@ -3,11 +3,10 @@ import numpy as np
 import pandas as pd
 
 from pegasusio import CytoData, MultimodalData
-from pegasusio.cylib.io import read_fcs
 
 
 def load_fcs_file(input_fcs: str, genome: str = None) -> MultimodalData:
-    """Load Cyto data from a FCS file, support v2.0, v3.0 and v3.1. 
+    """Load Cyto data from a FCS file, support v2.0, v3.0 and v3.1.
 
     Parameters
     ----------
@@ -26,6 +25,11 @@ def load_fcs_file(input_fcs: str, genome: str = None) -> MultimodalData:
     --------
     >>> io.load_fcs_file('example.fcs', genome = 'GRCh38')
     """
+    try:
+        from pegasusio.cylib.io import read_fcs
+    except ModuleNotFoundError:
+        print("No module named 'pegasusio.cylib.io'")
+
     if not os.path.isfile(input_fcs):
         raise FileNotFoundError(f"File {input_fcs} does not exist!")
     feature_metadata, matrix, metadata = read_fcs(input_fcs)
