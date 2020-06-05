@@ -256,7 +256,6 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
         layers["" if matkey == "X" else matkey] = data.get_matrix(matkey).T
 
     file_attrs = {}
-    print(type(data.uns))
     for key, value in data.uns.items():
         if isinstance(value, str):
             file_attrs[key] = value
