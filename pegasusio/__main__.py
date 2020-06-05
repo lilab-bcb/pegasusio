@@ -1,10 +1,10 @@
 """
-Pegasusio is the IO component of Pegasus and a multi-modality single-cell genomics IO package. It is a command line tool, a python package and a base for Cloud-based analysis workflows.
+PegasusIO is the IO component of Pegasus and a multi-modality single-cell genomics IO package. It is a command line tool, a python package and a base for Cloud-based analysis workflows.
 
 Usage:
-  pegasus <command> [<args>...]
-  pegasus -h | --help
-  pegasus -v | --version
+  pegasusio <command> [<args>...]
+  pegasusio -h | --help
+  pegasusio -v | --version
 
 Sub-commands:
   aggregate_matrix        Aggregate multi-modality single-cell genomics data into one data object. It also enables users to import metadata into the aggregated data.
@@ -14,7 +14,7 @@ Options:
   -v, --version       Show version.
 
 Description:
-  This is Pegasusio, the IO component of Pegasus.
+  This is PegasusIO, the IO component of Pegasus.
 """
 
 from docopt import docopt

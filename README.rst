@@ -1,5 +1,5 @@
 =========================================================
-Pegasusio for reading / writing single-cell genomics data
+PegasusIO for reading / writing single-cell genomics data
 =========================================================
 
 |PyPI|
@@ -8,6 +8,6 @@ Pegasusio for reading / writing single-cell genomics data
    :target: https://pypi.org/project/pegasusio
 
 
-Pegasusio is the IO package for Pegasus.
+PegasusIO is the IO package for Pegasus.
 
-`Read documentation <http://pegasus.readthedocs.io>`__
+`Read documentation <http://pegasusio.readthedocs.io>`__

@@ -12,13 +12,12 @@ import anndata
 
 from pegasusio import run_gc
 from pegasusio import modalities
-from pegasusio.cylib.funcs import split_barcode_channel
 from .views import INDEX, _parse_index, UnimodalDataView
 from .datadict import DataDict
 
 
 
-class UnimodalData:        
+class UnimodalData:
     def __init__(
         self,
         barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
@@ -28,7 +27,7 @@ class UnimodalData:
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
         cur_matrix: str = "X",
-        genome: str = None, 
+        genome: str = None,
         modality: str = None,
     ) -> None:
         if isinstance(barcode_metadata, anndata.AnnData):
@@ -92,11 +91,11 @@ class UnimodalData:
 
 
     def _update_shape(self) -> None:
-        self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape 
+        self._shape = (self.barcode_metadata.shape[0], self.feature_metadata.shape[0]) # shape
 
 
     def _is_dirty(self) -> bool:
-        """ Check if any field is modified. 
+        """ Check if any field is modified.
         """
         return self.matrices.is_dirty() or self.metadata.is_dirty() or self.barcode_multiarrays.is_dirty() or self.feature_multiarrays.is_dirty()
 
@@ -182,7 +181,7 @@ class UnimodalData:
     @property
     def shape(self) -> Tuple[int, int]:
         return self._shape
-    
+
     @shape.setter
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape attribute!")
@@ -215,7 +214,7 @@ class UnimodalData:
                     if ids is not None:
                         keys[i] = keys[i] + '_' + ids[i]
                         idn = dup_ids[keys[i]]
-                idn += 1                    
+                idn += 1
                 dup_ids[keys[i]] = idn
                 if idn > 1:
                     keys[i] = keys[i] + f".#~{idn}" # duplicate ID starts from 2. .#~ makes it unique.
@@ -255,7 +254,7 @@ class UnimodalData:
         elif key_type == "feature":
             return [
                 self.feature_metadata.index.name
-            ] + self.feature_metadata.columns.tolist()            
+            ] + self.feature_metadata.columns.tolist()
         elif key_type == "other":
             return list(self.metadata)
         else:
@@ -346,6 +345,11 @@ class UnimodalData:
         if self.barcode_metadata.shape[0] == 0:
             return None # no data
 
+        try:
+            from pegasusio.cylib.funcs import split_barcode_channel
+        except ModuleNotFoundError:
+            print("No module named 'pegasusio.cylib.funcs'")
+
         barcodes, channels = split_barcode_channel(self.barcode_metadata.index.values)
 
         if channels[0] is None:
@@ -355,7 +359,7 @@ class UnimodalData:
             # we have multiple channels
             self.barcode_metadata["Channel"] = channels
             barcodes = np.array([x + "-" + y for x, y in zip(channels, barcodes)], dtype = object)
-            
+
         self.barcode_metadata.index = pd.Index(barcodes, name="barcodekey")
 
 
@@ -391,7 +395,7 @@ class UnimodalData:
         """
         self.barcode_metadata = data.obs
         self.barcode_metadata.index.name = "barcodekey"
-        
+
         self.feature_metadata = data.var
         self.feature_metadata.index.name = "featurekey"
         if "gene_ids" in self.feature_metadata:
@@ -425,13 +429,13 @@ class UnimodalData:
         elif "modality" not in self.metadata:
             if self.metadata.get("experiment_type", "none") in modalities:
                 self.metadata["modality"] = self.metadata.pop("experiment_type")
-            else:        
+            else:
                 self.metadata["modality"] = "rna"
 
         self._cur_matrix = "X"
         self._shape = data.shape
 
-    
+
     def to_anndata(self) -> anndata.AnnData:
         """ Convert to anndata
         """
@@ -443,7 +447,7 @@ class UnimodalData:
         for key, value in self.matrices.items():
             if key != "X" and key != "raw.X":
                 layers[key] = value
-        
+
         return anndata.AnnData(X = self.matrices.get("X", None),
             obs = self.barcode_metadata,
             var = self.feature_metadata,
@@ -455,12 +459,12 @@ class UnimodalData:
 
 
     def copy(self) -> "UnimodalData":
-        return UnimodalData(self.barcode_metadata.copy(), 
-                            self.feature_metadata.copy(), 
-                            deepcopy(self.matrices), 
-                            deepcopy(self.metadata), 
-                            deepcopy(self.barcode_multiarrays), 
-                            deepcopy(self.feature_multiarrays), 
+        return UnimodalData(self.barcode_metadata.copy(),
+                            self.feature_metadata.copy(),
+                            deepcopy(self.matrices),
+                            deepcopy(self.metadata),
+                            deepcopy(self.barcode_multiarrays),
+                            deepcopy(self.feature_multiarrays),
                             self._cur_matrix)
 
 
@@ -473,13 +477,13 @@ class UnimodalData:
         mats = viewobj._copy_matrices()
         bmarrs = viewobj.obsm[...]
         fmarrs = viewobj.varm[...]
-        
+
         if deep:
             mats = deepcopy(mats)
             bmarrs = deepcopy(bmarrs)
             fmarrs = deepcopy(fmarrs)
 
-        return UnimodalData(viewobj.obs.copy(), 
+        return UnimodalData(viewobj.obs.copy(),
                             viewobj.var.copy(),
                             mats,
                             deepcopy(viewobj.uns),
@@ -511,9 +515,8 @@ class UnimodalData:
 
         if "Channel" not in self.barcode_metadata:
             self.barcode_metadata["Channel"] = np.repeat(sample_name, nsample)
-            
+
         for attr in attributes:
             self.barcode_metadata[attr] = np.repeat(row[attr], nsample)
 
         self.metadata["_sample"] = sample_name # record sample_name for merging
-

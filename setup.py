@@ -1,4 +1,3 @@
-import versioneer
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from Cython.Build import cythonize
@@ -29,8 +28,6 @@ extensions = [
 
 setup(
     name="pegasusio",
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
     zip_safe=False,
     description="Pegasusio is a Python package for reading / writing single-cell genomics data",
     long_description=long_description,
@@ -55,7 +52,7 @@ setup(
     keywords="single cell/nucleus genomics data reading and writing",
     packages=find_packages(),
     ext_modules=cythonize(extensions),
-    setup_requires=["Cython"],
+    setup_requires=["Cython", "setuptools_scm"],
     install_requires=requires,
     python_requires="~=3.6",
     entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
