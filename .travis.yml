@@ -1,0 +1,16 @@
+language: python
+
+notifications:
+    email: false
+services:
+    - docker
+
+before_install:
+    - docker build -t cumulus/pegasusio .
+
+script:
+    - docker run --rm cumulus/pegasusio /bin/sh -c "python -m unittest;"
+
+branches:
+    only:
+    - master
