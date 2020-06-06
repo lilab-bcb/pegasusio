@@ -5,11 +5,11 @@ from typing import List, Dict, Union
 
 import anndata
 from pegasusio import UnimodalData
-from .views import INDEX, _parse_index, UnimodalDataView
+from .views import INDEX, CINDEX, _parse_index, UnimodalDataView
 
 
 class VDJDataView(UnimodalDataView):
-    def __init__(self, vdjdata: "VDJData", barcode_index: List[int], feature_index: List[int], cur_matrix: str):
+    def __init__(self, vdjdata: "VDJData", barcode_index: CINDEX, feature_index: CINDEX, cur_matrix: str):
         super().__init__(vdjdata, barcode_index, feature_index, cur_matrix, obj_name = "VDJData")
         for keyword in self.parent._uns_keywords:
             self.metadata[keyword] = self.parent.metadata[keyword]
