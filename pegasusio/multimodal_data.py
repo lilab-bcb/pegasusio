@@ -354,9 +354,9 @@ class MultimodalData:
         unselected = []
         for key, unidata in self.data.items():
             if (key in focus_set) and (unidata.get_modality() == "rna"):
-                mito_prefix = mito_dict.get(unidata.get_genome(), default_mito)
+                mito_pref = mito_dict.get(unidata.get_genome(), default_mito)
                 if "passed_qc" not in unidata.obs:
-                    calc_qc_filters(unidata, select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+                    calc_qc_filters(unidata, select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_pref, percent_mito = percent_mito)
                 apply_qc_filters(unidata)
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
             else:
