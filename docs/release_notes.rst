@@ -1,3 +1,3 @@
-Version 0.1.6 `June 4th, 2020`
-----------------------------------
-* Initial release
+Version 0.2.0 `June 7th, 2020`
+--------------------------------
+Initial release.
