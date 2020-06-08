@@ -62,6 +62,8 @@ def aggregate_matrices(
     default_ref: str = None,
     append_sample_name: bool = True,
     select_singlets: bool = False,
+    remap_string: str = None,
+    subset_string: str = None,
     min_genes: int = None,
     max_genes: int = None,
     min_umis: int = None,
@@ -90,6 +92,10 @@ def aggregate_matrices(
         By default, append sample_name to each channel. Turn this option off if each channel has distinct barcodes.
     select_singlets : `bool`, optional (default: False)
         If we have demultiplexed data, turning on this option will make pegasus only include barcodes that are predicted as singlets.
+    remap_string: ``str``, optional, default ``None``
+        Remap singlet names using <remap_string>, where <remap_string> takes the format "new_name_i:old_name_1,old_name_2;new_name_ii:old_name_3;...". For example, if we hashed 5 libraries from 3 samples sample1_lib1, sample1_lib2, sample2_lib1, sample2_lib2 and sample3, we can remap them to 3 samples using this string: "sample1:sample1_lib1,sample1_lib2;sample2:sample2_lib1,sample2_lib2". In this way, the new singlet names will be in metadata field with key 'assignment', while the old names will be kept in metadata field with key 'assignment.orig'.
+    subset_string: ``str``, optional, default ``None``
+        If select singlets, only select singlets in the <subset_string>, which takes the format "name1,name2,...". Note that if --remap-singlets is specified, subsetting happens after remapping. For example, we can only select singlets from sampe 1 and 3 using "sample1,sample3".
     min_genes: ``int``, optional, default: None
        Only keep cells with at least ``min_genes`` genes.
     max_genes: ``int``, optional, default: None
@@ -175,7 +181,7 @@ def aggregate_matrices(
         if row["Sample"] != curr_sample:
             if curr_data is not None:
                 curr_data._propogate_genome()
-                curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+                curr_data.filter_data(select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
                 curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
                 aggrData.add_data(curr_data)
             curr_data = data
@@ -188,7 +194,7 @@ def aggregate_matrices(
 
     if curr_data is not None:
         curr_data._propogate_genome()
-        curr_data.filter_data(select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+        curr_data.filter_data(select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
         curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
         aggrData.add_data(curr_data)
 
