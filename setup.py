@@ -30,6 +30,7 @@ extensions = [
 
 setup(
     name="pegasusio",
+    use_scm_version=True,
     zip_safe=False,
     description="Pegasusio is a Python package for reading / writing single-cell genomics data",
     long_description=long_description,
