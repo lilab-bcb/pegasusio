@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
-from pegasusio import apply_qc_filters
+from pegasusio import calc_qc_filters, apply_qc_filters
 from .views import INDEX, UnimodalDataView
 from .datadict import MultiDataDict
 from .vdj_data import VDJDataView
@@ -122,7 +122,7 @@ class MultimodalData:
     @property
     def shape(self) -> Tuple[int, int]:
         return self._unidata.shape if self._unidata is not None else None
-    
+
     @shape.setter
     def shape(self, _shape: Tuple[int, int]):
         assert self._unidata is not None
@@ -191,7 +191,7 @@ class MultimodalData:
             self._unidata.set_aside()
         else:
             self._unidata.set_aside(params)
-        
+
     def load_control_list(self, control_csv: str) -> None:
         """ Surrogate function for CITESeqData and CytoData """
         assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
@@ -261,7 +261,7 @@ class MultimodalData:
                 cur_genome = unidata.get_genome()
                 if ((not negation) and (cur_genome == genome)) or (negation and (cur_genome != genome)):
                     data_arr.append(unidata)
-            
+
             if len(data_arr) == 0 and not keep_list:
                 raise ValueError(f"No UnimodalData {'without' if negation else 'with'} genome '{genome}'!")
         else:
@@ -295,7 +295,7 @@ class MultimodalData:
         return self.data.pop(key)
 
 
-    def filter_data(self, 
+    def filter_data(self,
         select_singlets: bool = False,
         remap_string: str = None,
         subset_string: str = None,
