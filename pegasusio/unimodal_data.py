@@ -312,6 +312,8 @@ class UnimodalData:
         """ Subset barcode_metadata inplace """
         if isinstance(index, pd.Series):
             index = index.values
+        if index.sum() == self._shape[0]:
+            return None
         self.barcode_metadata = self.barcode_metadata.loc[index].copy(deep = False)
         for key in list(self.matrices):
             self.matrices[key] = self.matrices[key][index, :]
@@ -328,6 +330,8 @@ class UnimodalData:
         """ Subset feature_metadata inplace """
         if isinstance(index, pd.Series):
             index = index.values
+        if index.sum() == self._shape[1]:
+            return None
         self.feature_metadata = self.feature_metadata.loc[index].copy(deep = False)
         for key in list(self.matrices):
             self.matrices[key] = self.matrices[key][:, index]

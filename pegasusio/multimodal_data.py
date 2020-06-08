@@ -233,8 +233,12 @@ class MultimodalData:
         self._unidata = self.data[self._selected]
 
 
-    def current_data(self) -> str:
+    def current_key(self) -> str:
         return self._selected
+
+
+    def current_data(self) -> UnimodalData:
+        return self._unidata
 
 
     def get_data(self, key: str = None, genome: str = None, modality: str = None, keep_list: bool = False) -> Union[UnimodalData, List[UnimodalData]]:
@@ -291,34 +295,75 @@ class MultimodalData:
         return self.data.pop(key)
 
 
-    def filter_data(self, select_singlets: bool = False, min_genes: int = None, max_genes: int = None, min_umis: int = None, max_umis: int = None, mito_prefix: str = None, percent_mito: float = None) -> None:
+    def filter_data(self, 
+        select_singlets: bool = False,
+        remap_string: str = None,
+        subset_string: str = None,
+        min_genes: int = None,
+        max_genes: int = None,
+        min_umis: int = None,
+        max_umis: int = None,
+        mito_prefix: str = None,
+        percent_mito: float = None,
+        focus_list: List[str] = None
+    ) -> None:
         """
-        Filter all UnimodalData with modality == "rna". For all other modalities, select barcodes as Union of the selected "rna" barcodes.
+        Filter each "rna" modality UnimodalData with key in union list separately. Then for all other modalities, select only the union of selected barcodes in focus_list as barcodes.
+        If focus_list is None and self._selected's modality is "rna", focus_list = [self._selected]
 
         Parameters
         ----------
         select_singlets: ``bool``, optional, default ``False``
             If select only singlets.
+        remap_string: ``str``, optional, default ``None``
+            Remap singlet names using <remap_string>, where <remap_string> takes the format "new_name_i:old_name_1,old_name_2;new_name_ii:old_name_3;...". For example, if we hashed 5 libraries from 3 samples sample1_lib1, sample1_lib2, sample2_lib1, sample2_lib2 and sample3, we can remap them to 3 samples using this string: "sample1:sample1_lib1,sample1_lib2;sample2:sample2_lib1,sample2_lib2". In this way, the new singlet names will be in metadata field with key 'assignment', while the old names will be kept in metadata field with key 'assignment.orig'.
+        subset_string: ``str``, optional, default ``None``
+            If select singlets, only select singlets in the <subset_string>, which takes the format "name1,name2,...". Note that if --remap-singlets is specified, subsetting happens after remapping. For example, we can only select singlets from sampe 1 and 3 using "sample1,sample3".
         min_genes: ``int``, optional, default: None
-           Only keep cells with at least ``min_genes`` genes.
+            Only keep cells with at least ``min_genes`` genes.
         max_genes: ``int``, optional, default: None
-           Only keep cells with less than ``max_genes`` genes.
+            Only keep cells with less than ``max_genes`` genes.
         min_umis: ``int``, optional, default: None
-           Only keep cells with at least ``min_umis`` UMIs.
+            Only keep cells with at least ``min_umis`` UMIs.
         max_umis: ``int``, optional, default: None
-           Only keep cells with less than ``max_umis`` UMIs.
+            Only keep cells with less than ``max_umis`` UMIs.
         mito_prefix: ``str``, optional, default: None
-           Prefix for mitochondrial genes.
+            Prefix for mitochondrial genes. For example, GRCh38:MT-,mm10:mt-.
         percent_mito: ``float``, optional, default: None
-           Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
+            Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
+        focus_list: ``List[str]``, optional, default None
+            Filter each UnimodalData with key in focus_list separately using the filtration criteria.
         """
         selected_barcodes = None
-        for unidata in self.get_data(modality = "rna", keep_list = True):
-            apply_qc_filters(unidata, select_singlets = select_singlets, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
-            selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
-        
-        if selected_barcodes is not None:
-            for unidata in self.get_data(modality = "~rna", keep_list = True):
+
+        if focus_list is None:
+            focus_list = [self._selected]
+        focus_set = set(focus_list)
+
+        mito_dict = {}
+        default_mito = None
+        if mito_prefix is not None:
+            fields = mito_prefix.split(',')
+            if len(fields) == 1 and fields[0].find(':') < 0:
+                default_mito = fields[0]
+            else:
+                for field in fields:
+                    genome, mito_pref = field.split(':')
+                    mito_dict[genome] = mito_pref
+
+        unselected = []
+        for key, unidata in self.data.items():
+            if (key in focus_set) and (unidata.get_modality() == "rna"):
+                mito_prefix = mito_dict.get(unidata.get_genome(), default_mito)
+                if "passed_qc" not in unidata.obs:
+                    calc_qc_filters(unidata, select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
+                apply_qc_filters(unidata)
+                selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
+            else:
+                unselected.append(unidata)
+
+        if (selected_barcodes is not None) and len(unselected) > 0:
+            for unidata in unselected:
                 selected = unidata.obs_names.isin(selected_barcodes)
                 prior_n = unidata.shape[0]
                 unidata._inplace_subset_obs(selected)
