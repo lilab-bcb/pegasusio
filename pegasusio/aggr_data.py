@@ -27,7 +27,7 @@ class AggrData:
         for column in df:
             if df[column].dtype.kind == "b":
                 fillna_dict[column] = False
-            elif df[column].dtpye.kind in {"i", "u", "f", "c"}:
+            elif df[column].dtype.kind in {"i", "u", "f", "c"}:
                 fillna_dict[column] = 0
             elif df[column].dtype.kind == "S":
                 fillna_dict[column] = b""
