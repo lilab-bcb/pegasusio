@@ -157,7 +157,7 @@ def aggregate_matrices(
 
         if row["Location"].lower().startswith('gs://'): # if Google bucket
             base_name = os.path.basename(copy_path)
-            dest_path = idx_num + "_tmp_" + base_name # id_num will make sure dest_path is unique in the sample sheet
+            dest_path = f"{idx_num}_tmp_{base_name}" # id_num will make sure dest_path is unique in the sample sheet
             if not os.path.exists(dest_path):  # if dest_path exists, we may try to localize it once and may have the file cached
                 if copy_type == "directory":
                     check_call(["mkdir", "-p", dest_path])
