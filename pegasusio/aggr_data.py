@@ -25,7 +25,17 @@ class AggrData:
         """ Generate a fillna dict for columns in a df """
         fillna_dict = {}
         for column in df:
-            fillna_dict[column] = "" if df[column].dtype.kind in {"O", "S"} else 0
+            if df[column].dtype.kind == "b":
+                fillna_dict[column] = False
+            elif df[column].dtpye.kind in {"i", "u", "f", "c"}:
+                fillna_dict[column] = 0
+            elif df[column].dtype.kind == "S":
+                fillna_dict[column] = b""
+            elif df[column].dtype.kind in {"O", "U"}:
+                fillna_dict[column] = ""
+            else:
+                raise ValueError(f"{column} has unsupported dtype {df[column].dtype}!")
+            
         return fillna_dict
 
 

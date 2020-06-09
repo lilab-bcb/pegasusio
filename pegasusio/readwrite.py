@@ -93,7 +93,7 @@ def read_input(
     black_list: Set[str] = None,
     select_data: Set[str] = None,
     select_genome: Set[str] = None,
-    select_modality: Set[str] = None, 
+    select_modality: Set[str] = None,
 ) -> MultimodalData:
     """Load data into memory.
 
@@ -164,7 +164,7 @@ def read_input(
 
     data.subset_data(select_data, select_genome, select_modality)
     data.kick_start()
-    data.scan_black_list(black_list)    
+    data.scan_black_list(black_list)
 
     logger.info(f"{file_type} file '{input_file}' is loaded.")
 
