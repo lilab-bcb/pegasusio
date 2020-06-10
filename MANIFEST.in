@@ -1,3 +1,9 @@
-include LICENSE
-include ext_modules/fast_funcs.pyx
-include ext_modules/io_funcs.pyx
+exclude CODE_OF_CONDUCT.md
+exclude CONTRIBUTING.md
+exclude Dockerfile
+exclude pyproject.toml
+exclude requirements.txt
+exclude .*
+exclude tests/*
+exclude docs/**
+exclude notebooks/*
