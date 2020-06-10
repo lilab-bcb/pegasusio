@@ -11,6 +11,24 @@ from pegasusio import timer, run_gc
 from pegasusio import UnimodalData, CITESeqData, CytoData, VDJData, MultimodalData
 
 
+def _get_fillna_dict(df: pd.DataFrame) -> dict:
+    """ Generate a fillna dict for columns in a df """
+    fillna_dict = {}
+    for column in df:
+        if df[column].dtype.kind == "b":
+            fillna_dict[column] = False
+        elif df[column].dtype.kind in {"i", "u", "f", "c"}:
+            fillna_dict[column] = 0
+        elif df[column].dtype.kind == "S":
+            fillna_dict[column] = b""
+        elif df[column].dtype.kind in {"O", "U"}:
+            fillna_dict[column] = ""
+        else:
+            raise ValueError(f"{column} has unsupported dtype {df[column].dtype}!")
+        
+    return fillna_dict
+
+
 class AggrData:
     def __init__(self):
         self.aggr = defaultdict(list)
@@ -19,24 +37,6 @@ class AggrData:
     def add_data(self, data: MultimodalData) -> None:
         for key in data.list_data():
             self.aggr[key].append(data.get_data(key))
-
-
-    def _get_fillna_dict(self, df: pd.DataFrame) -> dict:
-        """ Generate a fillna dict for columns in a df """
-        fillna_dict = {}
-        for column in df:
-            if df[column].dtype.kind == "b":
-                fillna_dict[column] = False
-            elif df[column].dtype.kind in {"i", "u", "f", "c"}:
-                fillna_dict[column] = 0
-            elif df[column].dtype.kind == "S":
-                fillna_dict[column] = b""
-            elif df[column].dtype.kind in {"O", "U"}:
-                fillna_dict[column] = ""
-            else:
-                raise ValueError(f"{column} has unsupported dtype {df[column].dtype}!")
-            
-        return fillna_dict
 
 
     @run_gc
@@ -134,7 +134,7 @@ class AggrData:
 
         barcode_metadata_dfs = [unidata.barcode_metadata for unidata in unilist]
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
-        fillna_dict = self._get_fillna_dict(barcode_metadata)
+        fillna_dict = _get_fillna_dict(barcode_metadata)
         barcode_metadata.fillna(value=fillna_dict, inplace=True)
 
 
@@ -154,7 +154,7 @@ class AggrData:
         for other in unilist[1:]:
             keys = ["featurekey"] + feature_metadata.columns.intersection(other.feature_metadata.columns).values.tolist()
             feature_metadata = feature_metadata.merge(other.feature_metadata, on=keys, how="outer", sort=False, copy=False)  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
-        fillna_dict = self._get_fillna_dict(feature_metadata)
+        fillna_dict = _get_fillna_dict(feature_metadata)
         feature_metadata.fillna(value=fillna_dict, inplace=True)
 
 

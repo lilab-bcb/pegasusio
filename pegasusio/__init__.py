@@ -22,9 +22,9 @@ from .unimodal_data import UnimodalData
 from .vdj_data import VDJData
 from .citeseq_data import CITESeqData
 from .cyto_data import CytoData
-from .qc_utils import calc_qc_filters, apply_qc_filters
+from .qc_utils import calc_qc_filters, apply_qc_filters, DictWithDefault
 from .multimodal_data import MultimodalData
-from .aggr_data import AggrData
+from .aggr_data import AggrData, _get_fillna_dict
 from .readwrite import infer_file_type, read_input, write_output
 from .data_aggregation import aggregate_matrices
 

@@ -445,7 +445,10 @@ class UnimodalData:
         """
         raw = None
         if "raw.X" in self.matrices:
-            raw = anndata.AnnData(X = self.matrices["raw.X"])
+            var_cols = []
+            if "featureid" in self.feature_metadata:
+                var_cols.append("featureid")
+            raw = anndata.AnnData(X = self.matrices["raw.X"], var = self.feature_metadata[var_cols])
 
         layers = {}
         for key, value in self.matrices.items():

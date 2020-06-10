@@ -7,6 +7,26 @@ logger = logging.getLogger(__name__)
 
 
 
+class DictWithDefault:
+    ### Used for parsing mito prefix
+    def __init__(self, string: str):
+        self.mapping = {}
+        self.default = None
+
+        if string is not None:        
+            fields = string.split(',')
+            for field in fields:
+                if field.find(':') >= 0:
+                    key, value = field.split(':')
+                    self.mapping[key] = value
+                else:
+                    self.default = field
+
+    def get(self, key: str) -> str:
+        return self.mapping.get(key, self.default)
+
+
+
 def calc_qc_filters(
     unidata: UnimodalData,
     select_singlets: bool = False,

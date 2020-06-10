@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
-from pegasusio import calc_qc_filters, apply_qc_filters
+from pegasusio import calc_qc_filters, apply_qc_filters, DictWithDefault
 from .views import INDEX, UnimodalDataView
 from .datadict import MultiDataDict
 from .vdj_data import VDJDataView
@@ -340,23 +340,21 @@ class MultimodalData:
             focus_list = [self._selected]
         focus_set = set(focus_list)
 
-        mito_dict = {}
-        default_mito = None
-        if mito_prefix is not None:
-            fields = mito_prefix.split(',')
-            if len(fields) == 1 and fields[0].find(':') < 0:
-                default_mito = fields[0]
-            else:
-                for field in fields:
-                    genome, mito_pref = field.split(':')
-                    mito_dict[genome] = mito_pref
-
         unselected = []
+        mito_dict = DictWithDefault(mito_prefix)
         for key, unidata in self.data.items():
             if (key in focus_set) and (unidata.get_modality() == "rna"):
-                mito_pref = mito_dict.get(unidata.get_genome(), default_mito)
                 if "passed_qc" not in unidata.obs:
-                    calc_qc_filters(unidata, select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_pref, percent_mito = percent_mito)
+                    calc_qc_filters(unidata, 
+                        select_singlets = select_singlets, 
+                        remap_string = remap_string, 
+                        subset_string = subset_string, 
+                        min_genes = min_genes, 
+                        max_genes = max_genes, 
+                        min_umis = min_umis, 
+                        max_umis = max_umis, 
+                        mito_prefix = mito_dict.get(unidata.get_genome()), 
+                        percent_mito = percent_mito)
                 apply_qc_filters(unidata)
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
             else:
