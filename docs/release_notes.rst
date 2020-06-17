@@ -1,3 +1,7 @@
+Version 0.2.2 `June 16th, 2020`
+--------------------------------
+Fix bugs in data aggregation.
+
 Version 0.2.1 `June 8th, 2020`
 --------------------------------
 Fix bug in processing single ``h5`` file.
