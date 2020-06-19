@@ -2,26 +2,13 @@ from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from Cython.Build import cythonize
 from codecs import open
+from pathlib import Path
 import os
 
 
 here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, "README.rst"), encoding="utf-8") as f:
     long_description = f.read()
-
-requires = [
-    "Cython",
-    "anndata",
-    "loompy",
-    "docopt",
-    "natsort",
-    "numpy",
-    "pandas",
-    "scipy",
-    "setuptools",
-    "importlib-metadata",
-    "zarr"
-]
 
 extensions = [
     Extension("pegasusio.cylib.funcs", ["ext_modules/fast_funcs.pyx"]),
@@ -46,6 +33,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Framework :: Jupyter",
         "Natural Language :: English",
         "Operating System :: MacOS :: MacOS X",
@@ -56,7 +44,9 @@ setup(
     packages=find_packages(),
     ext_modules=cythonize(extensions),
     setup_requires=["Cython", "setuptools_scm"],
-    install_requires=requires,
+    install_requires=[
+        l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()
+    ],
     python_requires="~=3.6",
     entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )
