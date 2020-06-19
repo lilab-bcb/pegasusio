@@ -33,6 +33,8 @@ RUN apt-get -qq -y remove curl gnupg && \
 
 COPY . /pegasusio/
 WORKDIR /pegasusio/tests
-RUN git clone https://github.com/klarman-cell-observatory/pegasus-test-data.git
+RUN git clone https://github.com/klarman-cell-observatory/pegasusio-test-data.git
 WORKDIR /pegasusio/
 RUN pip3 install -e .
+
+WORKDIR /pegasusio/tests
