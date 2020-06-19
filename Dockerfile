@@ -36,3 +36,5 @@ WORKDIR /pegasusio/tests
 RUN git clone https://github.com/klarman-cell-observatory/pegasus-test-data.git
 WORKDIR /pegasusio/
 RUN pip3 install -e .
+
+WORKDIR /pegasusio/tests
