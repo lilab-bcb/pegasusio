@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 from subprocess import check_call
 from typing import List, Tuple, Dict, Set
@@ -43,7 +44,7 @@ def _parse_restriction_string(rstr: str) -> Tuple[str, bool, Set[str]]:
 
 def _parse_genome_string(genome_str: str) -> Tuple[str, Dict[str, str]]:
     genome = genome_dict = None
-    if genome_str is not None:        
+    if (genome_str is not None) and (not np.isnan(genome_str)):
         if genome_str.find(":") < 0:
             genome = genome_str
         else:
@@ -200,6 +201,8 @@ def aggregate_matrices(
 
     # Merge data
     aggregated_data = aggrData.aggregate()
+    if len(attributes) > 0:
+        aggregated_data._convert_attributes_to_categorical(attributes)
     logger.info(f"Aggregated {tot} files.")
 
     # Delete temporary file
