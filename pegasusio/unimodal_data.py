@@ -3,6 +3,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from collections.abc import MutableMapping
 from copy import deepcopy
+from natsort import natsorted
 from typing import List, Dict, Union, Set, Tuple
 
 import logging
@@ -527,3 +528,9 @@ class UnimodalData:
             self.barcode_metadata[attr] = np.repeat(row[attr], nsample)
 
         self.metadata["_sample"] = sample_name # record sample_name for merging
+
+
+    def _convert_attributes_to_categorical(self, attributes: Set[str]) -> None:
+        for attr in attributes:
+            values = self.barcode_metadata[attr].values
+            self.barcode_metadata[attr] = pd.Categorical(values, categories=natsorted(np.unique(values)))

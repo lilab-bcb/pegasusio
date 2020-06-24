@@ -510,3 +510,8 @@ class MultimodalData:
                 unidata = self.data.pop(key)
                 unidata.uns["genome"] = genome
                 self.data[unidata.get_uid()] = unidata
+
+
+    def _convert_attributes_to_categorical(self, attributes: Set[str]) -> None:
+        for unidata in self.data.values():
+            unidata._convert_attributes_to_categorical(attributes)
