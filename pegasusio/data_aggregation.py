@@ -43,15 +43,18 @@ def _parse_restriction_string(rstr: str) -> Tuple[str, bool, Set[str]]:
 
 
 def _parse_genome_string(genome_str: str) -> Tuple[str, Dict[str, str]]:
-    genome = genome_dict = None
-    if (genome_str is not None) and (not np.isnan(genome_str)):
-        if genome_str.find(":") < 0:
-            genome = genome_str
-        else:
-            genome_dict = {}
-            for item in genome_str.split(","):
-                key, value = item.split(":")
-                genome_dict[key] = value
+    genome = None
+    genome_dict = {}
+
+    if genome_str is not None:
+        fields = genome_str.split(",")
+        for field in fields:
+            items = field.split(":")
+            if len(items) == 1:
+                genome = items[0]
+            else:
+                genome_dict[items[0]] = items[1]
+
     return genome, genome_dict
 
 
@@ -76,8 +79,6 @@ def aggregate_matrices(
 
     This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
-    In the Reference column, you can replace genome names by using "hg19:GRCh38,mm9:mm10", which will replace all hg19 to GRCh38 and all mm9 to mm10. However, in this case, the genome passed to read_input will be None.
-
     Parameters
     ----------
 
@@ -88,7 +89,7 @@ def aggregate_matrices(
     attributes : `list[str]`, optional (default: [])
         A list of attributes need to be incorporated into the output count matrix.
     default_ref : `str`, optional (default: None)
-        Default reference name to use. If there is no Reference column in the csv_file, a Reference column will be added with default_ref as its value.
+        Default reference name to use. If there is no Reference column in the csv_file, a Reference column will be added with default_ref as its value. This argument can also be used for replacing genome names. For example, if default_ref is 'hg19:GRCh38,GRCh38', we will change any genome with name 'hg19' to 'GRCh38' and if no genome is provided, 'GRCh38' is the default.
     append_sample_name : `bool`, optional (default: True)
         By default, append sample_name to each channel. Turn this option off if each channel has distinct barcodes.
     select_singlets : `bool`, optional (default: False)
@@ -141,9 +142,8 @@ def aggregate_matrices(
 
     df = df.loc[idx].sort_values(by = "Sample") # sort by sample_name
 
-    # If Reference does not exist and default_ref is not None, add one Reference column
-    if ("Reference" not in df.columns) and (default_ref is not None):
-        df["Reference"] = default_ref
+    # parse default_ref
+    def_genome, genome_dict = _parse_genome_string(default_ref)
 
     # Load data
     tot = 0
@@ -173,10 +173,14 @@ def aggregate_matrices(
             else:
                 input_file = os.path.join(dest_path, os.path.basename(input_file)) 
 
-        genome, genome_dict = _parse_genome_string(row.get("Reference", None))
+        genome = row.get("Reference", None)
+        if (genome is not None) and (not instance(genome, str)): # to avoid NaN
+            genome = None
+        if genome is None:
+            genome = def_genome
         modality = row.get("Modality", None)
         data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
-        if (file_type in ["10x", "zarr"]) and (genome_dict is not None): # Process the case where some data are in hg19 and others in GRCh38 and people want to merge them. May need to remove in the future
+        if len(genome_dict) > 0:
             data._update_genome(genome_dict)
 
         if row["Sample"] != curr_sample:
