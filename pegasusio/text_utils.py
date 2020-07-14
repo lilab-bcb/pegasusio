@@ -174,6 +174,15 @@ def _locate_mtx_file(path: str) -> str:
     return file_names[0] if len(file_names) > 0 else None
 
 
+def _parse_dir_name(dirname: str, default_modality: str) -> Tuple[str, str]:
+    """ Parse directory name to see if we can separate genome and modality """
+    genome, sep, modality = dirname.rpartition('-')
+    if genome == "":
+        genome = dirname
+        modality = default_modality
+    return genome, modality
+
+
 def load_mtx_file(path: str, genome: str = None, modality: str = None) -> MultimodalData:
     """Load gene-count matrix from Market Matrix files (10x v2, v3 and HCA DCP formats)
 
@@ -230,7 +239,8 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None) -> Multim
                 file_name = _locate_mtx_file(dir_entry.path)
                 if file_name is None:
                     raise ValueError(f"Folder {dir_entry.path} does not contain a mtx file!")
-                data.add_data(load_one_mtx_file(dir_entry.path, file_name, dir_entry.name, modality))
+                dgenome, dmodality = _parse_dir_name(dir_entry.name, modality)
+                data.add_data(load_one_mtx_file(dir_entry.path, file_name, dgenome, dmodality))
 
     return data
 
