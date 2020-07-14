@@ -277,8 +277,8 @@ class MultimodalData:
                 if ((not negation) and (cur_modality == modality)) or (negation and (cur_modality != modality)):
                     data_arr.append(unidata)
 
-                if len(data_arr) == 0 and not keep_list:
-                    raise ValueError(f"No UnimodalData {'without' if negation else 'with'} modality '{modality}'!")
+            if len(data_arr) == 0 and not keep_list:
+                raise ValueError(f"No UnimodalData {'without' if negation else 'with'} modality '{modality}'!")
 
         results = None
         if len(data_arr) == 1 and not keep_list:
@@ -345,15 +345,15 @@ class MultimodalData:
         for key, unidata in self.data.items():
             if (key in focus_set) and (unidata.get_modality() == "rna"):
                 if "passed_qc" not in unidata.obs:
-                    calc_qc_filters(unidata, 
-                        select_singlets = select_singlets, 
-                        remap_string = remap_string, 
-                        subset_string = subset_string, 
-                        min_genes = min_genes, 
-                        max_genes = max_genes, 
-                        min_umis = min_umis, 
-                        max_umis = max_umis, 
-                        mito_prefix = mito_dict.get(unidata.get_genome()), 
+                    calc_qc_filters(unidata,
+                        select_singlets = select_singlets,
+                        remap_string = remap_string,
+                        subset_string = subset_string,
+                        min_genes = min_genes,
+                        max_genes = max_genes,
+                        min_umis = min_umis,
+                        max_umis = max_umis,
+                        mito_prefix = mito_dict.get(unidata.get_genome()),
                         percent_mito = percent_mito)
                 apply_qc_filters(unidata)
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
