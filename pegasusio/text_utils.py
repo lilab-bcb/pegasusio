@@ -1,5 +1,6 @@
 import os
 import re
+from shlex import quote
 import numpy as np
 import pandas as pd
 from scipy.io import mmread, mmwrite
@@ -140,7 +141,7 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> 
         if os.path.exists(mtx_fifo):
             os.unlink(mtx_fifo)
         os.mkfifo(mtx_fifo)
-        subprocess.Popen(f"gunzip -c {mtx_file} > {mtx_fifo}", shell = True)
+        subprocess.Popen(f"gzip -dc {quote(mtx_file)} > {quote(mtx_fifo)}", shell = True)
         row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
         os.unlink(mtx_fifo)
     else:
@@ -253,7 +254,7 @@ def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
         if os.path.exists(fifo_file):
             os.unlink(fifo_file)
         os.mkfifo(fifo_file)
-        pobj = subprocess.Popen(f"cat {fifo_file} | gzip -c - > {mtx_file}", shell = True)
+        pobj = subprocess.Popen(f"gzip < {quote(fifo_file)} > {quote(mtx_file)}", shell = True)
         write_mtx(fifo_file, matrix.data, matrix.indices, matrix.indptr, matrix.shape[0], matrix.shape[1], precision = precision) # matrix is cell x gene csr_matrix, will write as gene x cell
         assert pobj.wait() == 0
         os.unlink(fifo_file)
@@ -342,7 +343,7 @@ def load_csv_file(
         if os.path.exists(csv_fifo):
             os.unlink(csv_fifo)
         os.mkfifo(csv_fifo)
-        subprocess.Popen(f"gunzip -c {input_csv} > {csv_fifo}", shell = True)
+        subprocess.Popen(f"gzip -dc {quote(input_csv)} > {quote(csv_fifo)}", shell = True)
         row_ind, col_ind, data, shape, rowkey, rownames, colnames = read_csv(csv_fifo, sep)
         os.unlink(csv_fifo)
     else:
