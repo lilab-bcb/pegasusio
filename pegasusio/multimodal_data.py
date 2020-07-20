@@ -139,6 +139,9 @@ class MultimodalData:
         assert self._unidata is not None
         return self._unidata.list_keys(key_type)
 
+    def current_matrix(self) -> str:
+        return self._unidata.current_matrix()
+
     def add_matrix(self, key: str, mat: csr_matrix) -> None:
         """ Surrogate function for UnimodalData, add a new matrix
         """
