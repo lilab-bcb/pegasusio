@@ -1,3 +1,7 @@
+Version 0.2.4 `July 21st, 2020`
+--------------------------------
+Adjustment for Pegasus command usage.
+
 Version 0.2.2 `June 16th, 2020`
 --------------------------------
 Fix bugs in data aggregation.
