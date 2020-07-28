@@ -171,10 +171,10 @@ def aggregate_matrices(
             if input_file == copy_path:
                 input_file = dest_path
             else:
-                input_file = os.path.join(dest_path, os.path.basename(input_file)) 
+                input_file = os.path.join(dest_path, os.path.basename(input_file))
 
         genome = row.get("Reference", None)
-        if (genome is not None) and (not instance(genome, str)): # to avoid NaN
+        if (genome is not None) and (not isinstance(genome, str)): # to avoid NaN
             genome = None
         if genome is None:
             genome = def_genome
