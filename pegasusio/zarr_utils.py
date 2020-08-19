@@ -294,6 +294,8 @@ class ZarrFile:
 
         def _write_one_pair(key, value):
             if is_scalar(value):
+                if type(value).__module__ == 'numpy':
+                    value = value.item()
                 scalar_dict[key] = value
             elif isinstance(value, np.ndarray):
                 self.write_array(sub_group, key, value)

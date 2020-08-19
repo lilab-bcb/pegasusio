@@ -66,14 +66,20 @@ class CytoData(UnimodalData):
         self._inplace_subset_var(idx)
 
 
-    def load_control_list(self, control_csv: str) -> None:
-        """ Load control csv and move control from matrix to obsm
+    def load_control_list(self, control_info: Union[str, dict]) -> None:
+        """ Load control info ((a CSV file if type is str otherwise a dictionary of parameter -> control pairs) and move control from matrix to obsm
         """
         assert "raw.data" in self.matrices
         assert self.metadata["_control_names"].size == 1
 
         ctrls = {"None": 0}
-        series = pd.read_csv(control_csv, header=0, index_col=0, squeeze=True)
+
+        series = None
+        if isinstance(control_info, str):
+            series = pd.read_csv(control_info, header=0, index_col=0, squeeze=True)
+        else:
+            series = pd.Series(control_info)
+
         for parameter, control in series.iteritems():
             if parameter not in self.feature_metadata.index:
                 continue

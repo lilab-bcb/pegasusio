@@ -12,8 +12,8 @@ from .views import INDEX, _parse_index, UnimodalDataView
 
 
 class CITESeqData(UnimodalData):
-    _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
-    _uns_keywords = ["_control_names", "_control_counts", "_other_names", "_other_counts"] # '_other' are antibodies that set aside
+    _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter", "arcsinh.signal"] # 'arcsinh.jitter' is in dense format, np.ndarray
+    _uns_keywords = ["_control_names", "_control_counts", "_control_arcsinh", "_other_names", "_other_counts"] # '_other' are antibodies that set aside
     _var_keywords = ["_control_id"]
 
     def __init__(
@@ -72,12 +72,20 @@ class CITESeqData(UnimodalData):
         self._inplace_subset_var(idx)
 
 
-    def load_control_list(self, control_csv: str) -> None:
+    def load_control_list(self, control_info: Union[str, dict]) -> None:
+        """ Load control info (a CSV file if type is str otherwise a dictionary of antibody -> control pairs) and move control from matrix to obsm
+        """
         assert "raw.count" in self.matrices
         assert self.metadata["_control_names"].size == 1
 
         ctrls = {"None": 0}
-        series = pd.read_csv(control_csv, header=0, index_col=0, squeeze=True)
+
+        series = None
+        if isinstance(control_info, str):
+            series = pd.read_csv(control_info, header=0, index_col=0, squeeze=True)
+        else:
+            series = pd.Series(control_info)
+
         for antibody, control in series.iteritems():
             if antibody not in self.feature_metadata.index:
                 continue
@@ -165,7 +173,7 @@ class CITESeqData(UnimodalData):
         idx = ctrl_ids > 0
 
         signal = self.matrices["raw.count"].toarray()
-        control = self.metadata["_control_counts"].toarray()[:, ctrl_ids]
+        control = self.metadata["_control_counts"].toarray()
 
         if jitter:
             np.random.seed(random_state)
@@ -174,7 +182,10 @@ class CITESeqData(UnimodalData):
 
         signal = np.arcsinh(signal / cofactor, dtype = np.float32)
         control = np.arcsinh(control / cofactor, dtype = np.float32)
-        arcsinh_mat = signal - control
+        self.matrices["arcsinh.signal"] = csr_matrix(signal)
+        self.metadata["_control_arcsinh"] = csr_matrix(control)
+
+        arcsinh_mat = signal - control[:, ctrl_ids]
         arcsinh_mat[:, idx] = np.maximum(arcsinh_mat[:, idx], 0.0)
 
         if jitter:
