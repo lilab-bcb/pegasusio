@@ -140,6 +140,8 @@ class MultimodalData:
         return self._unidata.list_keys(key_type)
 
     def current_matrix(self) -> str:
+        """ Surrogate function for UnimodalData, return current matrix in current unimodal data
+        """
         return self._unidata.current_matrix()
 
     def add_matrix(self, key: str, mat: csr_matrix) -> None:
@@ -195,10 +197,12 @@ class MultimodalData:
         else:
             self._unidata.set_aside(params)
 
-    def load_control_list(self, control_csv: str) -> None:
-        """ Surrogate function for CITESeqData and CytoData """
+    def load_control_list(self, control_info: Union[str, dict]) -> None:
+        """ Surrogate function for CITESeqData and CytoData 
+            control_info: a CSV file if type is str otherwise a dictionary of antibody/parameter -> control pairs)
+        """
         assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
-        self._unidata.load_control_list(control_csv)
+        self._unidata.load_control_list(control_info)
 
     def log_transform(self) -> None:
         """ Surrogate function for CITESeqData """
