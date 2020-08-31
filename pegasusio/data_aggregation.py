@@ -114,10 +114,11 @@ def aggregate_matrices(
     Returns
     -------
     `MultimodalData` object.
+        The aggregated count matrix as an MultimodalData object.
 
     Examples
     --------
-    >>> pio.aggregate_matrix('example.csv', 'example_10x.h5', ['Source:pbmc', 'Donor:1'], ['Source', 'Platform', 'Donor'])
+    >>> data = aggregate_matrix('example.csv', restrictions=['Source:pbmc', 'Donor:1'], attributes=['Source', 'Platform', 'Donor'])
     """
 
     df = pd.read_csv(csv_file, header=0, index_col=False) # load sample sheet
