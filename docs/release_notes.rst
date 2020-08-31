@@ -1,4 +1,4 @@
-Version 0.2.4 `July 21st, 2020`
+Version 0.2.5 `August 19, 2020`
 --------------------------------
 Adjustment for Pegasus command usage.
 
