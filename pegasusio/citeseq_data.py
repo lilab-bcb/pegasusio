@@ -11,10 +11,11 @@ from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
 
 
+# According to communications with Biolegend, isotype control as background is not recommended.
+
 class CITESeqData(UnimodalData):
-    _matrix_keywords = ["arcsinh.transformed", "log.transformed", "raw.count", "arcsinh.jitter", "arcsinh.signal"] # 'arcsinh.jitter' is in dense format, np.ndarray
-    _uns_keywords = ["_control_names", "_control_counts", "_control_arcsinh", "_other_names", "_other_counts"] # '_other' are antibodies that set aside
-    _var_keywords = ["_control_id"]
+    _matrix_keywords = ["arcsinh.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
+    _uns_keywords = ["_other_names", "_other_counts"] # '_other' are antibodies that set aside
 
     def __init__(
         self,
@@ -29,14 +30,6 @@ class CITESeqData(UnimodalData):
         assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
         
-        # Prepare for the control antibody list if not loaded from Zarr
-        if "_control_names" not in self.metadata:
-            assert len(self.matrices) == 1 and "raw.count" in self.matrices
-            self.metadata["_control_names"] = np.array(["None"], dtype = object)
-            self.metadata["_control_counts"] = csr_matrix((self._shape[0], 1), dtype = np.int32)
-            self.metadata["_obs_keys"] = ["_control_counts"]
-            self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
-
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a CITESeqData object!")
@@ -70,69 +63,6 @@ class CITESeqData(UnimodalData):
         idx = np.ones(self._shape[1], dtype = bool)
         idx[locs] = False
         self._inplace_subset_var(idx)
-
-
-    def load_control_list(self, control_info: Union[str, dict]) -> None:
-        """ Load control info (a CSV file if type is str otherwise a dictionary of antibody -> control pairs) and move control from matrix to obsm
-        """
-        assert "raw.count" in self.matrices
-        assert self.metadata["_control_names"].size == 1
-
-        ctrls = {"None": 0}
-
-        series = None
-        if isinstance(control_info, str):
-            series = pd.read_csv(control_info, header=0, index_col=0, squeeze=True)
-        else:
-            series = pd.Series(control_info)
-
-        for antibody, control in series.iteritems():
-            if antibody not in self.feature_metadata.index:
-                continue
-
-            pos = ctrls.get(control, None)
-            if pos is None:
-                if control in self.feature_metadata.index:
-                    pos = len(ctrls)
-                    ctrls[control] = pos
-                else:
-                    logger.warning(f"Detected and ignored unknown control antibody '{control}'!")
-                    pos = 0
-
-            self.feature_metadata.loc[antibody, "_control_id"] = pos
-
-        ctrl_names = np.empty(len(ctrls), dtype = object)
-        for ctrl_name, pos in ctrls.items():
-            ctrl_names[pos] = ctrl_name
-            
-        locs = self.feature_metadata.index.get_indexer(pd.Index(ctrl_names[1:], copy = False))
-        idx = np.ones(self._shape[1], dtype = bool)
-        idx[locs] = False
-
-        self.metadata["_control_names"] = ctrl_names
-        self.metadata["_control_counts"] = hstack([self.metadata["_control_counts"], 
-                                                   self.matrices["raw.count"][:, locs]], 
-                                                   format = "csr")
-        self._inplace_subset_var(idx)
-
-        # Delete all other matrices in case users do transform before loading the controls
-        for keyword in list(self.matrices):
-            if keyword != "raw.count":
-                del self.matrices[keyword]
-        self._cur_matrix = "raw.count"
-
-
-    def log_transform(self, select: bool = True) -> None:
-        """ ln(x+1)"""
-        if "raw.count" not in self.matrices:
-            raise ValueError("raw.count matrix must exist in order to calculate the log transformed matrix!")
-
-        log_mat = np.maximum(np.log1p(self.matrices["raw.count"].toarray(), dtype = np.float32) \
-                             - np.log1p(self.metadata["_control_counts"].toarray()[:, self.feature_metadata["_control_id"].values], dtype = np.float32),
-                             0.0)
-        self.matrices["log.transformed"] = csr_matrix(log_mat)
-        if select:
-            self._cur_matrix = "log.transformed"
 
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
@@ -169,29 +99,16 @@ class CITESeqData(UnimodalData):
         if "raw.count" not in self.matrices:
             raise ValueError("raw.count matrix must exist in order to calculate the arcsinh transformed matrix!")
 
-        ctrl_ids = self.feature_metadata["_control_id"].values
-        idx = ctrl_ids > 0
-
-        signal = self.matrices["raw.count"].toarray()
-        control = self.metadata["_control_counts"].toarray()
+        signal = self.matrices["raw.count"].copy()
 
         if jitter:
             np.random.seed(random_state)
             jitters = np.random.uniform(low = -0.5, high = 0.5, size = signal.shape)
-            signal = np.add(signal, jitters, dtype = np.float32)
-
-        signal = np.arcsinh(signal / cofactor, dtype = np.float32)
-        control = np.arcsinh(control / cofactor, dtype = np.float32)
-        self.matrices["arcsinh.signal"] = csr_matrix(signal)
-        self.metadata["_control_arcsinh"] = csr_matrix(control)
-
-        arcsinh_mat = signal - control[:, ctrl_ids]
-        arcsinh_mat[:, idx] = np.maximum(arcsinh_mat[:, idx], 0.0)
-
-        if jitter:
-            self.matrices["arcsinh.jitter"] = arcsinh_mat
+            signal = np.add(signal.toarray(), jitters, dtype = np.float32)
+            self.matrices["arcsinh.jitter"] = np.arcsinh(signal / cofactor, dtype = np.float32)
         else:
-            self.matrices["arcsinh.transformed"] = csr_matrix(arcsinh_mat)
+            signal.data = np.arcsinh(signal.data / cofactor, dtype = np.float32)
+            self.matrices["arcsinh.transformed"] = signal
 
         if select:
             self._cur_matrix = "arcsinh.jitter" if jitter else "arcsinh.transformed"

@@ -7,6 +7,7 @@ dist/
 pegasusio.egg-info/
 pegasusio/cylib/*.so
 .ipynb_checkpoints
+pegasusio/version.py
 
 # docs
 docs/_build
