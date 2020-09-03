@@ -12,9 +12,8 @@ from .views import INDEX, _parse_index, UnimodalDataView
 
 class CytoData(UnimodalData):
     _matrix_keywords = ["arcsinh.transformed", "raw.data", "arcsinh.jitter"] # all in dense format, np.ndarray
-    _obsm_keywords = ["_parameters", "_controls"] # _parameters store parameters that are not used, e.g. Time
-    _uns_keywords = ["_parameter_names", "_control_names"]
-    _var_keywords = ["_control_id"]
+    _obsm_keywords = ["_parameters"] # _parameters store parameters that are not used, e.g. Time
+    _uns_keywords = ["_parameter_names"]
 
     def __init__(
         self,
@@ -28,13 +27,6 @@ class CytoData(UnimodalData):
     ) -> None:
         assert metadata["modality"] == "cyto"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
-
-        # Prepare for the control list if not loaded from Zarr
-        if "_control_names" not in self.metadata:
-            assert len(self.matrices) == 1 and "raw.data" in self.matrices
-            self.metadata["_control_names"] = np.array(["None"], dtype = object)
-            self.barcode_multiarrays["_controls"] = np.zeros((self._shape[0], 1), dtype = np.int32)
-            self.feature_metadata["_control_id"] = np.zeros(self._shape[1], dtype = np.int32)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
@@ -64,54 +56,6 @@ class CytoData(UnimodalData):
         idx = np.ones(self._shape[1], dtype = bool)
         idx[locs] = False
         self._inplace_subset_var(idx)
-
-
-    def load_control_list(self, control_info: Union[str, dict]) -> None:
-        """ Load control info ((a CSV file if type is str otherwise a dictionary of parameter -> control pairs) and move control from matrix to obsm
-        """
-        assert "raw.data" in self.matrices
-        assert self.metadata["_control_names"].size == 1
-
-        ctrls = {"None": 0}
-
-        series = None
-        if isinstance(control_info, str):
-            series = pd.read_csv(control_info, header=0, index_col=0, squeeze=True)
-        else:
-            series = pd.Series(control_info)
-
-        for parameter, control in series.iteritems():
-            if parameter not in self.feature_metadata.index:
-                continue
-
-            pos = ctrls.get(control, None)
-            if pos is None:
-                if control in self.feature_metadata.index:
-                    pos = len(ctrls)
-                    ctrls[control] = pos
-                else:
-                    logger.warning(f"Detected and ignored unknown control parameter '{control}'!")
-                    pos = 0
-
-            self.feature_metadata.loc[parameter, "_control_id"] = pos
-
-        ctrl_names = np.empty(len(ctrls), dtype = object)
-        for ctrl_name, pos in ctrls.items():
-            ctrl_names[pos] = ctrl_name
-
-        locs = self.feature_metadata.index.get_indexer(pd.Index(ctrl_names[1:], copy = False))
-        idx = np.ones(self._shape[1], dtype = bool)
-        idx[locs] = False
-
-        self.metadata["_control_names"] = ctrl_names
-        self.barcode_multiarrays["_controls"] = np.hstack((self.barcode_multiarrays["_controls"], self.matrices["raw.data"][:, locs]))
-        self._inplace_subset_var(idx)
-
-        # Delete all other matrices in case users do transform before loading the controls
-        for keyword in list(self.matrices):
-            if keyword != "raw.data":
-                del self.matrices[keyword]
-        self._cur_matrix = "raw.data"
 
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
@@ -148,11 +92,7 @@ class CytoData(UnimodalData):
         if "raw.data" not in self.matrices:
             raise ValueError("raw.data matrix must exist in order to calculate the arcsinh transformed matrix!")
 
-        ctrl_ids = self.feature_metadata["_control_id"].values
-        idx = ctrl_ids > 0
-
         signal = self.matrices["raw.data"]
-        control = self.barcode_multiarrays["_controls"][:, ctrl_ids]
 
         if jitter:
             np.random.seed(random_state)
@@ -160,14 +100,10 @@ class CytoData(UnimodalData):
             signal = np.add(signal, jitters, dtype = np.float32)
 
         signal = np.arcsinh(signal / cofactor, dtype = np.float32)
-        control = np.arcsinh(control / cofactor, dtype = np.float32)
-        arcsinh_mat = signal - control
-        arcsinh_mat[:, idx] = np.maximum(arcsinh_mat[:, idx], 0.0)
-
         if jitter:
-            self.matrices["arcsinh.jitter"] = arcsinh_mat
+            self.matrices["arcsinh.jitter"] = signal
         else:
-            self.matrices["arcsinh.transformed"] = arcsinh_mat
+            self.matrices["arcsinh.transformed"] = signal
 
         if select:
             self._cur_matrix = "arcsinh.jitter" if jitter else "arcsinh.transformed"

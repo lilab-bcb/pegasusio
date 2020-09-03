@@ -197,18 +197,6 @@ class MultimodalData:
         else:
             self._unidata.set_aside(params)
 
-    def load_control_list(self, control_info: Union[str, dict]) -> None:
-        """ Surrogate function for CITESeqData and CytoData 
-            control_info: a CSV file if type is str otherwise a dictionary of antibody/parameter -> control pairs)
-        """
-        assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
-        self._unidata.load_control_list(control_info)
-
-    def log_transform(self) -> None:
-        """ Surrogate function for CITESeqData """
-        assert self._unidata is not None and isinstance(self._unidata, CITESeqData)
-        self._unidata.log_transform()
-
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """ Surrogate function for CITESeqData and CytoData"""
         assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))

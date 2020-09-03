@@ -140,11 +140,6 @@ class AggrData:
 
         var_dict = {}
         for unidata in unilist:
-            if modality == "citeseq":
-                unidata.feature_metadata.drop(columns = CITESeqData._var_keywords, inplace = True)
-            elif modality == "cyto":
-                unidata.feature_metadata.drop(columns = CytoData._var_keywords, inplace = True)
-
             idx = unidata.feature_metadata.columns.difference(["featureid"])
             if idx.size > 0:
                 var_dict[unidata.metadata["_sample"]] = unidata.feature_metadata[idx]
@@ -169,7 +164,7 @@ class AggrData:
             if modality == "citeseq":
                 for key in CITESeqData._uns_keywords:
                     unidata.metadata.pop(key, None)
-                del unidata.metadata["_obs_keys"]
+                unidata.metadata.pop("_obs_keys", None)
             elif modality == "cyto":
                 for key in CytoData._uns_keywords:
                     unidata.metadata.pop(key, None)
