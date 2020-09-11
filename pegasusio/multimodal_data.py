@@ -2,7 +2,7 @@ import gc
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack, vstack
-from typing import List, Dict, Union, Set, Tuple
+from typing import List, Dict, Union, Set, Tuple, Optional
 
 import logging
 logger = logging.getLogger(__name__)
@@ -291,20 +291,21 @@ class MultimodalData:
 
 
     def filter_data(self,
-        select_singlets: bool = False,
-        remap_string: str = None,
-        subset_string: str = None,
-        min_genes: int = None,
-        max_genes: int = None,
-        min_umis: int = None,
-        max_umis: int = None,
-        mito_prefix: str = None,
-        percent_mito: float = None,
-        focus_list: List[str] = None
+        select_singlets: Optional[bool] = False,
+        remap_string: Optional[str] = None,
+        subset_string: Optional[str] = None,
+        min_genes: Optional[int] = None,
+        max_genes: Optional[int] = None,
+        min_umis: Optional[int] = None,
+        max_umis: Optional[int] = None,
+        mito_prefix: Optional[str] = None,
+        percent_mito: Optional[float] = None,
+        focus_list: Optional[Union[List[str], str]] = None,
+        cache_passqc: Optional[bool] = False,
     ) -> None:
         """
-        Filter each "rna" modality UnimodalData with key in union list separately. Then for all other modalities, select only the union of selected barcodes in focus_list as barcodes.
-        If focus_list is None and self._selected's modality is "rna", focus_list = [self._selected]
+        Filter each "rna" modality UnimodalData in the focus_list separately using the set filtration parameters. Then for all other UnimodalData objects, select only barcodes that are in the union of selected barcodes from previously filtered UnimodalData objects.
+        If focus_list is None, focus_list = [self._selected]
 
         Parameters
         ----------
@@ -326,20 +327,24 @@ class MultimodalData:
             Prefix for mitochondrial genes. For example, GRCh38:MT-,mm10:mt-.
         percent_mito: ``float``, optional, default: None
             Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
-        focus_list: ``List[str]``, optional, default None
-            Filter each UnimodalData with key in focus_list separately using the filtration criteria.
+        focus_list: ``List[str]`` or ``str``, optional, default None
+            Filter each UnimodalData with key in focus_list (and modality is 'rna') separately using the filtration criteria. If only one focus is provided, focus_list can be a string instead of a list.
+        cache_passqc: ``bool``, optional, default: False
+            If True and "passed_qc" is in a UnimodalData object's obs field, use the cached "passed_qc" instead of recalculating it using 'calc_qc_filters'.
         """
         selected_barcodes = None
 
         if focus_list is None:
             focus_list = [self._selected]
+        elif isinstance(focus_list, str):
+            focus_list = [focus_list]
         focus_set = set(focus_list)
 
         unselected = []
         mito_dict = DictWithDefault(mito_prefix)
         for key, unidata in self.data.items():
             if (key in focus_set) and (unidata.get_modality() == "rna"):
-                if "passed_qc" not in unidata.obs:
+                if ("passed_qc" not in unidata.obs) or (not cache_passqc):
                     calc_qc_filters(unidata,
                         select_singlets = select_singlets,
                         remap_string = remap_string,
