@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from subprocess import check_call
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Union, Optional
 
 from pegasusio import timer
 from pegasusio import MultimodalData, AggrData
@@ -60,20 +60,20 @@ def _parse_genome_string(genome_str: str) -> Tuple[str, Dict[str, str]]:
 
 @timer(logger=logger)
 def aggregate_matrices(
-    csv_file: str,
-    restrictions: List[str] = [],
-    attributes: List[str] = [],
-    default_ref: str = None,
-    append_sample_name: bool = True,
-    select_singlets: bool = False,
-    remap_string: str = None,
-    subset_string: str = None,
-    min_genes: int = None,
-    max_genes: int = None,
-    min_umis: int = None,
-    max_umis: int = None,
-    mito_prefix: str = None,
-    percent_mito: float = None,
+    csv_file: Union[str, Dict[str, np.ndarray], pd.DataFrame],
+    restrictions: Optional[Union[List[str], str]] = [],
+    attributes: Optional[Union[List[str], str]] = [],
+    default_ref: Optional[str] = None,
+    append_sample_name: Optional[bool] = True,
+    select_singlets: Optional[bool] = False,
+    remap_string: Optional[str] = None,
+    subset_string: Optional[str] = None,
+    min_genes: Optional[int] = None,
+    max_genes: Optional[int] = None,
+    min_umis: Optional[int] = None,
+    max_umis: Optional[int] = None,
+    mito_prefix: Optional[str] = None,
+    percent_mito: Optional[float] = None,
 ) -> MultimodalData:
     """Aggregate channel-specific count matrices into one big count matrix.
 
@@ -83,11 +83,11 @@ def aggregate_matrices(
     ----------
 
     csv_file : `str`
-        The CSV file containing information about each channel.
-    restrictions : `list[str]`, optional (default: [])
-        A list of restrictions used to select channels, each restriction takes the format of name:value,…,value or name:~value,..,value, where ~ refers to not.
-    attributes : `list[str]`, optional (default: [])
-        A list of attributes need to be incorporated into the output count matrix.
+        The CSV file containing information about each channel. Alternatively, a dictionary or pd.Dataframe can be passed.
+    restrictions : `list[str]` or `str`, optional (default: [])
+        A list of restrictions used to select channels, each restriction takes the format of name:value,…,value or name:~value,..,value, where ~ refers to not. If only one restriction is provided, it can be provided as a string instead of a list.
+    attributes : `list[str]` or `str`, optional (default: [])
+        A list of attributes need to be incorporated into the output count matrix. If only one attribute is provided, this attribute can be provided as a string instead of a list.
     default_ref : `str`, optional (default: None)
         Default reference name to use. If there is no Reference column in the csv_file, a Reference column will be added with default_ref as its value. This argument can also be used for replacing genome names. For example, if default_ref is 'hg19:GRCh38,GRCh38', we will change any genome with name 'hg19' to 'GRCh38' and if no genome is provided, 'GRCh38' is the default.
     append_sample_name : `bool`, optional (default: True)
@@ -120,11 +120,19 @@ def aggregate_matrices(
     --------
     >>> data = aggregate_matrix('example.csv', restrictions=['Source:pbmc', 'Donor:1'], attributes=['Source', 'Platform', 'Donor'])
     """
-
-    df = pd.read_csv(csv_file, header=0, index_col=False) # load sample sheet
+    if isinstance(csv_file, str):
+        df = pd.read_csv(csv_file, header=0, index_col=False) # load sample sheet
+    elif isinstance(csv_file, dict):
+        df = pd.DataFrame(csv_file)
+    else:
+        df = csv_file
 
     # Remove duplicated items
+    if isinstance(restrictions, str):
+        restrictions = [restrictions]
     restrictions = set(restrictions)
+    if isinstance(attributes, str):
+        attributes = [attributes]
     attributes = set(attributes)
 
     # Select data
@@ -206,8 +214,8 @@ def aggregate_matrices(
 
     # Merge data
     aggregated_data = aggrData.aggregate()
-    if len(attributes) > 0:
-        aggregated_data._convert_attributes_to_categorical(attributes)
+    attributes.add("Channel")
+    aggregated_data._convert_attributes_to_categorical(attributes)
     logger.info(f"Aggregated {tot} files.")
 
     # Delete temporary file
