@@ -1,3 +1,8 @@
+Version 0.2.6 `September 28, 2020`
+-----------------------------------
+
+Fix bug in SCP compatible output generation.
+
 Version 0.2.5 `August 19, 2020`
 --------------------------------
 Adjustment for Pegasus command usage.
