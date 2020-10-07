@@ -1,7 +1,8 @@
 import os
 import gzip
 import anndata
-from typing import Tuple, Set, Union
+from typing import Tuple, Set, Union, List
+from pandas.api.types import is_list_like
 
 import logging
 logger = logging.getLogger(__name__)
@@ -9,14 +10,16 @@ logger = logging.getLogger(__name__)
 from pegasusio import timer
 from pegasusio import UnimodalData, MultimodalData
 
+
 from .hdf5_utils import load_10x_h5_file, load_loom_file, write_loom_file
 from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
 from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
 from .cyto_utils import load_fcs_file
+from .nanostring_utils import load_nanostring_files
 
 
-def infer_file_type(input_file: str) -> Tuple[str, str, str]:
+def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
     """ Infer file format from input_file name
 
     This function infer file type by inspecting the file name.
@@ -24,13 +27,13 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     Parameters
     ----------
 
-    input_file : `str`
+    input_file : `str` or `List[str]`
         Input file name.
 
     Returns
     -------
     `str`
-        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs'.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' or 'nanostring'.
     `str`
         The path covering all input files. Most time this is the same as input_file. But for HCA mtx and csv, this should be parent directory.
     `str`
@@ -41,6 +44,11 @@ def infer_file_type(input_file: str) -> Tuple[str, str, str]:
     file_type = None
     copy_path = input_file
     copy_type = "file"
+
+    if is_list_like(input_file):
+        # now it can only be nanostring
+        file_type = "nanostring"
+        return file_type, copy_path, copy_type
 
     if input_file.endswith(".zarr") or input_file.endswith(".zarr.zip"):
         file_type = "zarr"
@@ -97,7 +105,7 @@ def read_input(
 ) -> MultimodalData:
     """Load data into memory.
 
-    This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data) formats.
+    This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring' (Nanostring GeoMx spatial data) formats.
 
     Parameters
     ----------
@@ -105,13 +113,13 @@ def read_input(
     input_file : `str`
         Input file name.
     file_type : `str`, optional (default: None)
-        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv' or 'fcs' (for flow/mass cytometry data). If None, inferred from input_file.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring'. If None, inferred from input_file.
     mode: `str`, optional (default: 'r')
         File open mode, options are 'r' or 'a'. If mode == 'a', file_type must be zarr and ngene/select_singlets cannot be set.
     genome : `str`, optional (default: None)
         For formats like loom, mtx, dge, csv and tsv, genome is used to provide genome name. In this case if genome is None, except mtx format, "unknown" is used as the genome name instead.
     modality : `str`, optional (default: None)
-        Default modality, choosing from 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto' (flow cytometry / mass cytometry). If None, use 'rna' as default.
+        Default modality, choosing from 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq', 'cyto' (flow cytometry / mass cytometry) or 'nanostring'. If None, use 'rna' as default.
     black_list : `Set[str]`, optional (default: None)
         Attributes in black list will be poped out.
     select_data: `Set[str]`, optional (default: None)
@@ -132,7 +140,12 @@ def read_input(
     >>> data = io.read_input('example.h5ad')
     >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
-    input_file = os.path.expanduser(os.path.expandvars(input_file))
+    
+    if is_list_like(input_file):
+        input_file = [os.path.expanduser(os.path.expandvars(x)) for x in input_file]
+    else:
+        input_file = os.path.expanduser(os.path.expandvars(input_file))
+
     if file_type is None:
         file_type, _, _ = infer_file_type(input_file)
 
@@ -153,6 +166,11 @@ def read_input(
             data = load_10x_h5_file(input_file)
         elif file_type == "fcs":
             data = load_fcs_file(input_file, genome = genome)
+        elif file_type == "nanostring":
+            input_matrix = input_file[0]
+            segment_file = input_file[1]
+            annotation_file = input_file[2] if len(input_file) > 2 else None
+            data = load_nanostring_files(input_matrix, segment_file, annotation_file = annotation_file, genome = genome)
         elif file_type == "mtx":
             data = load_mtx_file(input_file, genome = genome, modality = modality)
         else:

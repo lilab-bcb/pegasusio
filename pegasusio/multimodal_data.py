@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 import anndata
 
-from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData
+from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, NanostringData
 from pegasusio import calc_qc_filters, apply_qc_filters, DictWithDefault
 from .views import INDEX, UnimodalDataView
 from .datadict import MultiDataDict
@@ -196,6 +196,11 @@ class MultimodalData:
             self._unidata.set_aside()
         else:
             self._unidata.set_aside(params)
+
+    def log_norm(self) -> None:
+        """ Surrogate function for NanostringData"""
+        assert self._unidata is not None and isinstance(self._unidata, NanostringData)
+        self._unidata.log_norm()
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """ Surrogate function for CITESeqData and CytoData"""
