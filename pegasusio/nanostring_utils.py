@@ -4,6 +4,10 @@ import pandas as pd
 
 from pegasusio import NanostringData, MultimodalData
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file: str = None, genome: str = None) -> MultimodalData:
     """Load Cyto data from a FCS file, support v2.0, v3.0 and v3.1.
@@ -33,7 +37,8 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
         raise FileNotFoundError(f"File {input_matrix} does not exist!")
     df = pd.read_csv(input_matrix, sep = '\t', header = 0, index_col = 0)
 
-    barcode_metadata = {"barcodekey": np.array([x.replace('.', '-') for x in df.columns.values], dtype = object)} # I guess the original matrix is processed in R because '-' -> '.'.
+    barcodekey = pd.Index([x.replace('.', '-') for x in df.columns.values])
+    barcode_metadata = {"barcodekey": barcodekey.values} # I guess the original matrix is processed in R because '-' -> '.'.
     feature_metadata = {"featurekey": df.index.values}
     matrix = np.transpose(df.values) # float64, do we need to convert it to float32?
 
@@ -41,7 +46,16 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
         raise FileNotFoundError(f"File {segment_file} does not exist!")
     df = pd.read_csv(segment_file, sep = '\t', header = 0, index_col = 0)
 
-    assert (barcode_metadata["barcodekey"] != df.index).sum() == 0
+    idx = barcodekey.isin(df.index)
+    if idx.sum() < barcodekey.size:
+        logger.warning(f"Cannot find {barcodekey[~idx]} from the segment property file! Number of AOIs reduces to {idx.sum()}.")
+        barcodekey = barcodekey[idx]
+        barcode_metadata["barcodekey"] = barcodekey.values
+        matrix = matrix[idx]
+    if idx.sum() < df.shape[0]:
+        logger.warning(f"Sample IDs {','.join(x for x in df.index[~df.index.isin(barcodekey)])} from the segment property file are not located in the matrix file!")
+    df = df.reindex(barcodekey)
+
     for key in ["primer plate well", "slide name", "scan name", "panel", "segment", "aoi"]:
         if key in df.columns:
             df.loc[df[key].isna(), key] = "None"
@@ -65,7 +79,8 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
         if not os.path.isfile(annotation_file):
             raise FileNotFoundError(f"File {annotation_file} does not exist!")
         df = pd.read_csv(annotation_file, sep = '\t', header = 0, index_col = 0)
-        assert (barcode_metadata["barcodekey"] != df.index).sum() == 0
+        assert barcodekey.isin(df.index).sum() == barcodekey.size
+        df = df.reindex(barcodekey)
         for key in df.columns:
             barcode_metadata[key] = df[key].values
 
