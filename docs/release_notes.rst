@@ -1,3 +1,9 @@
+Version 0.2.7 `October 13, 2020`
+-----------------------------------
+
+- Add support for Nanostring GeoMx data format.
+- Fix bugs.
+
 Version 0.2.6 `September 28, 2020`
 -----------------------------------
 
