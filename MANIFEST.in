@@ -1,8 +1,6 @@
 exclude CODE_OF_CONDUCT.md
 exclude CONTRIBUTING.md
 exclude Dockerfile
-exclude pyproject.toml
-exclude requirements.txt
 exclude .*
 exclude tests/*
 exclude docs/**
