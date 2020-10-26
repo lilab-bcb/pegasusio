@@ -225,6 +225,7 @@ def write_output(
     """
     if isinstance(data, UnimodalData):
         data = MultimodalData(data)
+    data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp'
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 

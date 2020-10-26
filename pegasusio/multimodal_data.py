@@ -197,10 +197,15 @@ class MultimodalData:
         else:
             self._unidata.set_aside(params)
 
-    def log_norm(self) -> None:
+    def norm_hk(self, select: bool = True) -> None:
         """ Surrogate function for NanostringData"""
         assert self._unidata is not None and isinstance(self._unidata, NanostringData)
-        self._unidata.log_norm()
+        self._unidata.norm_hk(select = select)
+
+    def log_transform(self, select: bool = True) -> None:
+        """ Surrogate function for NanostringData"""
+        assert self._unidata is not None and isinstance(self._unidata, NanostringData)
+        self._unidata.log_transform(select = select)
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """ Surrogate function for CITESeqData and CytoData"""
@@ -520,3 +525,8 @@ class MultimodalData:
     def _convert_attributes_to_categorical(self, attributes: Set[str]) -> None:
         for unidata in self.data.values():
             unidata._convert_attributes_to_categorical(attributes)
+
+
+    def _clean_tmp(self) -> None:
+        for unidata in self.data.values():
+            unidata._clean_tmp()
