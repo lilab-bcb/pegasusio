@@ -198,7 +198,7 @@ cpdef void write_dense(char* output_file, str[:] barcodes, str[:] features, obje
     cdef float[:] data_float
 
     if data.dtype.kind == 'f':
-        fmt_str = f"\t%.{precision}f\n"
+        fmt_str = f"\t%.{precision}f"
         is_real = 1
         data_float = data
     elif data.dtype.kind == 'i':
@@ -249,7 +249,7 @@ cdef swapbytes(uchar* bytes_buffer, int s):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef tuple read_fcs(char* fcs_file): 
+cpdef tuple read_fcs(char* fcs_file):
     """ This function is inspired by the python package fcsparser (https://github.com/eyurtsev/fcsparser)
     """
     cdef FILE* fi = fopen(fcs_file, "rb")
@@ -278,7 +278,7 @@ cpdef tuple read_fcs(char* fcs_file):
     analysis_start = atoi(header_field)
     assert fread(<void*>header_field, 1, 8, fi) == 8
     analysis_end = atoi(header_field)
-    
+
     if text_start < 58 or text_start >= text_end:
         fclose(fi)
         raise ValueError(f"Detected invalid TEXT segment start and end offsets: [{text_start}, {text_end}]!")
@@ -287,7 +287,7 @@ cpdef tuple read_fcs(char* fcs_file):
         text_end -= 1
 
     # parse TEXT segment
-    cdef char delim 
+    cdef char delim
     cdef size_t text_bytes, pos
     cdef uchar* text_segment
 
@@ -343,7 +343,7 @@ cpdef tuple read_fcs(char* fcs_file):
         else:
             sview[s_pos] = text_segment[pos]
             s_pos += 1
-        
+
         pos += 1
 
         if s_pos >= 100000:
@@ -384,7 +384,7 @@ cpdef tuple read_fcs(char* fcs_file):
 
     if "$BEGINSTEXT" in metadata:
         if metadata.pop("$BEGINSTEXT") != "0":
-            print("Warning: Detected a supplemental TEXT segment. This segment will be ignored under current implementation.") 
+            print("Warning: Detected a supplemental TEXT segment. This segment will be ignored under current implementation.")
     if "$ENDSTEXT" in metadata:
         del metadata["$ENDSTEXT"]
 
@@ -425,7 +425,7 @@ cpdef tuple read_fcs(char* fcs_file):
 
     cdef str[:] fkview = feature_metadata["featurekey"]
     cdef str[:] fiview = feature_metadata["featureid"]
-    
+
     PBs = np.zeros(M, dtype = np.intc)
     PRs = np.zeros(M, dtype = np.intc)
     PEs = np.empty(M, dtype = object)
@@ -493,7 +493,7 @@ cpdef tuple read_fcs(char* fcs_file):
             PBsview[pos] = PBsview[pos] // 8
             if ldview[pos] > 0.0 or lvview[pos] > 0.0:
                 fclose(fi)
-                raise ValueError(f"$DATATYPE '{datatype}' must have $P{i}E = 0,0 ($P{i}E = {PEsview[pos]})!")        
+                raise ValueError(f"$DATATYPE '{datatype}' must have $P{i}E = 0,0 ($P{i}E = {PEsview[pos]})!")
         else:
             if datatype == b'I':
                 if PBsview[pos] % 8 != 0:
@@ -509,7 +509,7 @@ cpdef tuple read_fcs(char* fcs_file):
                 if PBsview[pos] > 9:
                     fclose(fi)
                     raise NotImplementedError(f"Current implementation does not support {keyword} > 9 for $DATATYPE '{datatype}'!")
-            
+
             if ldview[pos] > 0.0 or lvview[pos] > 0.0:
                 if ldview[pos] == 0.0:
                     fclose(fi)
@@ -563,7 +563,7 @@ cpdef tuple read_fcs(char* fcs_file):
                     value_int = 0
                     for k in range(PBsview[j]):
                         value_int = value_int * 10 + ((<char>buf[k]) - b'0')
-                    
+
                 if ldview[j] == 0.0 and lvview[j] == 0.0:
                     data_view[i, j] = <float>value_int
                 else:
