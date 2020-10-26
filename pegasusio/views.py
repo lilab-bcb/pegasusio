@@ -306,6 +306,9 @@ class UnimodalDataView:
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape for UnimodalDataView object!")
 
+    def current_matrix(self) -> str:
+        return self._cur_matrix
+
     def select_matrix(self, key: str) -> None:
         if key not in self.parent.matrices:
             raise ValueError(f"Matrix key '{key}' does not exist!")
