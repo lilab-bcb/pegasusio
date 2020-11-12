@@ -168,6 +168,12 @@ class MultimodalData:
         assert self._unidata is not None
         return self._unidata.get_modality()
 
+    def get_genome(self) -> str:
+        """ Surrogate function for UnimodalData, returngenome
+        """
+        assert self._unidata is not None
+        return self._unidata.get_genome()
+
     def _inplace_subset_obs(self, index: List[bool]) -> None:
         """ Surrogate function for UnimodalData, subset barcode_metadata inplace """
         assert self._unidata is not None
