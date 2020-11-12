@@ -224,7 +224,7 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None) -> Multim
 
     if file_name is not None:
         if genome is None:
-            genome = os.path.basename(path)
+            genome = "unknown"
         data.add_data(
             load_one_mtx_file(
                 path,
