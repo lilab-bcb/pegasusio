@@ -47,9 +47,9 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
         names = group["gene_names"][...].astype(str)
 
         unidata = UnimodalData({"barcodekey": barcodes}, 
-        	{"featurekey": names, "featureid": ids}, 
-        	{"X": mat}, 
-        	{"modality": "rna", "genome": genome}
+            {"featurekey": names, "featureid": ids},
+            {"X": mat},
+            {"modality": "rna", "genome": genome}
         )
         unidata.separate_channels()
 
