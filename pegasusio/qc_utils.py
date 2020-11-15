@@ -116,7 +116,8 @@ def calc_qc_filters(
     min_cond = min_genes is not None
     max_cond = max_genes is not None
     if min_cond or max_cond:
-        unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
+        if "n_genes" not in unidata.obs:
+            unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
         if min_cond:
             filters.append(unidata.obs["n_genes"] >= min_genes)
         if max_cond:
@@ -126,7 +127,8 @@ def calc_qc_filters(
     max_cond = max_umis is not None
     calc_mito = (mito_prefix is not None) and (percent_mito is not None)
     if min_cond or max_cond or calc_mito:
-        unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
+        if "n_counts" not in unidata.obs:
+            unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
         if min_cond:
             filters.append(unidata.obs["n_counts"] >= min_umis)
         if max_cond:
@@ -134,10 +136,11 @@ def calc_qc_filters(
         if calc_mito:
             mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
 
-            unidata.obs["percent_mito"] = (
-                unidata.X[:, mito_genes].sum(axis=1).A1
-                / np.maximum(unidata.obs["n_counts"].values, 1.0)
-            ) * 100
+            if "percent_mito" not in unidata.obs:
+                unidata.obs["percent_mito"] = (
+                    unidata.X[:, mito_genes].sum(axis=1).A1
+                    / np.maximum(unidata.obs["n_counts"].values, 1.0)
+                ) * 100
 
             filters.append(unidata.obs["percent_mito"] < percent_mito)
 
@@ -155,7 +158,14 @@ def apply_qc_filters(unidata: UnimodalData):
         cols = ["passed_qc"]
         if unidata.uns.get("__del_demux_type", False):
             cols.append("demux_type")
-            del unidata.uns["__del_demux_type"]
+            # del unidata.uns["__del_demux_type"]
 
         unidata.obs.drop(columns=cols, inplace=True)
+        if len(unidata.obsm) > 0:
+            unidata.obsm.clear()
+        if len(unidata.varm) > 0:
+            unidata.varm.clear()
+        for key in list(unidata.uns):
+            if key not in {'genome', 'modality', 'norm_count'}:
+                del unidata.uns[key]
         logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")

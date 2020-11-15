@@ -533,6 +533,16 @@ class MultimodalData:
             unidata._convert_attributes_to_categorical(attributes)
 
 
-    def _clean_tmp(self) -> None:
-        for unidata in self.data.values():
-            unidata._clean_tmp()
+    def _clean_tmp(self) -> dict:
+        _tmp_multi = {}
+        for key, unidata in self.data.items():
+            _tmp_dict = unidata._clean_tmp()
+            if _tmp_dict is not None:
+                _tmp_multi[key] = _tmp_dict
+        return _tmp_multi
+
+    def _addback_tmp(self, _tmp_multi) -> None:
+        for key, _tmp_dict in _tmp_multi.items():
+            self.data[key]._addback_tmp(_tmp_dict)
+
+
