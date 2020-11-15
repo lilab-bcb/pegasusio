@@ -536,7 +536,13 @@ class UnimodalData:
             self.barcode_metadata[attr] = pd.Categorical(values, categories=natsorted(np.unique(values)))
 
 
-    def _clean_tmp(self) -> None:
+    def _clean_tmp(self) -> dict:
+        _tmp_dict = {}
         for key in list(self.metadata):
             if key.startswith("_tmp"):
-                del self.metadata[key]
+                _tmp_dict[key] = self.metadata.pop(key)
+        return _tmp_dict if len(_tmp_dict) > 0 else None
+
+    def _addback_tmp(self, _tmp_dict: dict) -> None:
+        self.metadata.update(_tmp_dict)
+

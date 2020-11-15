@@ -225,7 +225,7 @@ def write_output(
     """
     if isinstance(data, UnimodalData):
         data = MultimodalData(data)
-    data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp'
+    _tmp_multi = data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 
@@ -258,4 +258,5 @@ def write_output(
     else:
         raise ValueError(f"Unknown file type '{file_type}'!")
 
+    data._addback_tmp(_tmp_multi)
     logger.info(f"{file_type} file '{output_file}' is written.")
