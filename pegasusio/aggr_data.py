@@ -25,7 +25,7 @@ def _get_fillna_dict(df: pd.DataFrame) -> dict:
             fillna_dict[column] = ""
         else:
             raise ValueError(f"{column} has unsupported dtype {df[column].dtype}!")
-        
+
     return fillna_dict
 
 
@@ -98,7 +98,7 @@ class AggrData:
                     data = np.concatenate(data_list)
                     row = np.concatenate(row_list)
                     col = np.concatenate(col_list)
-                    matrices[mat_key] = coo_matrix((data, (row, col))).tocsr(copy = False)
+                    matrices[mat_key] = coo_matrix((data, (row, col)), shape=(row_base, feature_metadata.shape[0])).tocsr(copy = False)
 
         return matrices
 
@@ -154,7 +154,7 @@ class AggrData:
 
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
-        
+
 
         uns_dict = {}
         metadata = {"genome": unilist[0].metadata["genome"], "modality": unilist[0].metadata["modality"]}
