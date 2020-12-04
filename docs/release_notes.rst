@@ -1,3 +1,10 @@
+Version 0.2.8 `December 4, 2020`
+-----------------------------------
+
+- Add support on loading ```loom`` file with Seurat-style cell barcode and feature key names.
+- Bug fix: resolve an issue on count matrix dimension inconsistency with feature metadata on data aggregation, when last feature has ``0`` count across all cell barcodes. Thanks to `Mikhail Alperovich <misha.alperovich1@gmail.com>`_ for reporting this issue.
+- Other bug fix and performance improvements.
+
 Version 0.2.7 `October 13, 2020`
 -----------------------------------
 
