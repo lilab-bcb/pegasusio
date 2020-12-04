@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from pegasusio import UnimodalData
 
@@ -158,6 +159,10 @@ def apply_qc_filters(unidata: UnimodalData):
         cols = ["passed_qc"]
         if unidata.uns.get("__del_demux_type", False):
             cols.append("demux_type")
+            if "assignment" in unidata.obs:
+                # remove categories that contain no elements
+                series = unidata.obs["assignment"].value_counts(sort = False)
+                unidata.obs["assignment"] = pd.Categorical(unidata.obs["assignment"], categories = series[series > 0].index.astype(str))
             # del unidata.uns["__del_demux_type"]
 
         unidata.obs.drop(columns=cols, inplace=True)

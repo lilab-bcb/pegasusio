@@ -20,8 +20,7 @@ cpdef tuple split_barcode_channel(str[:] arr):
     for i in range(size):
         res = arr[i].rsplit(sep = '-', maxsplit = 1)
         bview[i] = res[0]
-        if len(res) > 1:
-            cview[i] = res[1]
+        cview[i] = res[1]
 
     return (barcodes, channels)
 
