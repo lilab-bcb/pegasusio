@@ -46,7 +46,7 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
         ids = group["genes"][...].astype(str)
         names = group["gene_names"][...].astype(str)
 
-        unidata = UnimodalData({"barcodekey": barcodes}, 
+        unidata = UnimodalData({"barcodekey": barcodes},
             {"featurekey": names, "featureid": ids},
             {"X": mat},
             {"modality": "rna", "genome": genome}
@@ -171,8 +171,11 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
     --------
     >>> io.load_loom_file('example.loom', genome = 'GRCh38')
     """
-    col_trans = {"CellID": "barcodekey", "obs_names": "barcodekey"}
-    row_trans = {"Gene": "featurekey", "var_names": "featurekey", "Accession": "featureid",  "gene_ids": "featureid"}
+    col_trans = {"CellID": "barcodekey", "obs_names": "barcodekey", "cell_names": "barcodekey"}
+    row_trans = {
+        "Gene": "featurekey", "var_names": "featurekey", "gene_names": "featurekey",
+        "Accession": "featureid",  "gene_ids": "featureid", "ensembl_ids": "featureid",
+    }
 
     import loompy
     with loompy.connect(input_loom) as ds:
@@ -216,8 +219,9 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
                 metadata["modality"] = metadata.pop("experiment_type")
             else:
                 metadata["modality"] = "rna"
-            
+
         unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays)
+        unidata.separate_channels()
 
     data = MultimodalData(unidata)
     return data
