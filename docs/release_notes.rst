@@ -1,4 +1,4 @@
-Version 0.2.8 `December 4, 2020`
+Version 0.2.8 `December 7, 2020`
 -----------------------------------
 
 - Add support on loading ```loom`` file with Seurat-style cell barcode and feature key names.
