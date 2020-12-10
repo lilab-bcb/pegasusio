@@ -14,7 +14,7 @@ class DictWithDefault:
         self.mapping = {}
         self.default = None
 
-        if string is not None:        
+        if string is not None:
             fields = string.split(',')
             for field in fields:
                 if field.find(':') >= 0:
@@ -98,7 +98,7 @@ def calc_qc_filters(
                 old_keys = old_str.split(",")
                 for key in old_keys:
                     remap[key] = new_key
-            
+
             unidata.obs["assignment"] = pd.Categorical(unidata.obs["assignment"].apply(lambda x: remap[x] if x in remap else x))
             logger.info("Singlets are remapped.")
 
@@ -108,7 +108,7 @@ def calc_qc_filters(
         else:
             if "assignment" not in data.obs:
                 raise ValueError("No assignment field detected!")
-            
+
             subset = np.array(subset_string.split(","))
             filters.append(np.isin(data.obs["assignment"], subset))
 
@@ -171,6 +171,6 @@ def apply_qc_filters(unidata: UnimodalData):
         if len(unidata.varm) > 0:
             unidata.varm.clear()
         for key in list(unidata.uns):
-            if key not in {'genome', 'modality', 'norm_count'}:
+            if key not in {'genome', 'modality', 'norm_count', 'df_qcplot'}:
                 del unidata.uns[key]
         logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")
