@@ -29,7 +29,10 @@ from .aggr_data import AggrData, _get_fillna_dict
 from .readwrite import infer_file_type, read_input, write_output, write_scp_file
 from .data_aggregation import aggregate_matrices
 
-from importlib_metadata import version, PackageNotFoundError
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:  # < Python 3.8: Use backport module
+    from importlib_metadata import version, PackageNotFoundError
 
 try:
     __version__ = version(__name__)
