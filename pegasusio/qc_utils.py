@@ -136,13 +136,10 @@ def calc_qc_filters(
             filters.append(unidata.obs["n_counts"] < max_umis)
         if calc_mito:
             mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
-
-            if "percent_mito" not in unidata.obs:
-                unidata.obs["percent_mito"] = (
-                    unidata.X[:, mito_genes].sum(axis=1).A1
-                    / np.maximum(unidata.obs["n_counts"].values, 1.0)
-                ) * 100
-
+            unidata.obs["percent_mito"] = (
+                unidata.X[:, mito_genes].sum(axis=1).A1
+                / np.maximum(unidata.obs["n_counts"].values, 1.0)
+            ) * 100
             filters.append(unidata.obs["percent_mito"] < percent_mito)
 
     if len(filters) > 0:
