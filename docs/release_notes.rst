@@ -1,3 +1,9 @@
+Version 0.2.9 `December 25, 2020`
+-----------------------------------
+
+- Fix a bug for caching percent mito rate.
+- Improve `write_mtx` function.
+
 Version 0.2.8 `December 7, 2020`
 -----------------------------------
 
