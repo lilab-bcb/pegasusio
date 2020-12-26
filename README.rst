@@ -2,7 +2,7 @@
 PegasusIO for reading / writing single-cell genomics data
 =========================================================
 
-|PyPI| |PyPIDownload| |Docs| |Build|
+|PyPI| |PyPIDownload| |Anaconda| |Docs| |Build|
 
 .. |PyPI| image:: https://img.shields.io/pypi/v/pegasusio.svg
    :target: https://pypi.org/project/pegasusio
