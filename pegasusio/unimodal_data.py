@@ -92,7 +92,8 @@ class UnimodalData:
     def __repr__(self) -> str:
         repr_str = f"{self.__class__.__name__} object with n_obs x n_vars = {self.barcode_metadata.shape[0]} x {self.feature_metadata.shape[0]}"
         repr_str += f"\n    Genome: {self.get_genome()}; Modality: {self.get_modality()}"
-        repr_str += f"\n    It contains {len(self.matrices)} matrices: {str(list(self.matrices))[1:-1]}"
+        mat_word = 'matrices' if len(self.matrices) > 1 else 'matrix'
+        repr_str += f"\n    It contains {len(self.matrices)} {mat_word}: {str(list(self.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
             repr_str += f"\n    {key}: {str(list(getattr(self, key).keys()))[1:-1]}"
