@@ -51,6 +51,8 @@ class UnimodalData:
         if modality is not None:
             self.metadata['modality'] = modality
 
+        if cur_matrix not in matrices.keys():
+            raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
         self._cur_matrix = cur_matrix # cur_matrix
 
         if len(self.barcode_metadata) > 0:
