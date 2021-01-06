@@ -44,7 +44,13 @@ class UnimodalData:
         self.matrices = DataDict(matrices) # a dictionary of scipy csr matrix
         self.barcode_multiarrays = DataDict(barcode_multiarrays)
         self.feature_multiarrays = DataDict(feature_multiarrays)
+
         self.metadata = DataDict(metadata)  # other metadata, a dictionary
+        if genome is not None:
+            self.metadata.__setitem__('genome', genome)
+        if modality is not None:
+            self.metadata.__setitem__('modality', modality)
+
         self._cur_matrix = cur_matrix # cur_matrix
 
         if len(self.barcode_metadata) > 0:
