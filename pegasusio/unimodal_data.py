@@ -47,9 +47,9 @@ class UnimodalData:
 
         self.metadata = DataDict(metadata)  # other metadata, a dictionary
         if genome is not None:
-            self.metadata.__setitem__('genome', genome)
+            self.metadata['genome'] = genome
         if modality is not None:
-            self.metadata.__setitem__('modality', modality)
+            self.metadata['modality'] = modality
 
         self._cur_matrix = cur_matrix # cur_matrix
 
