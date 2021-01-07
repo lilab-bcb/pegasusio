@@ -47,10 +47,12 @@ class UnimodalData:
 
         self.metadata = DataDict(metadata)  # other metadata, a dictionary
         if genome is not None:
-            self.metadata.__setitem__('genome', genome)
+            self.metadata['genome'] = genome
         if modality is not None:
-            self.metadata.__setitem__('modality', modality)
+            self.metadata['modality'] = modality
 
+        if cur_matrix not in matrices.keys():
+            raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
         self._cur_matrix = cur_matrix # cur_matrix
 
         if len(self.barcode_metadata) > 0:
@@ -90,7 +92,8 @@ class UnimodalData:
     def __repr__(self) -> str:
         repr_str = f"{self.__class__.__name__} object with n_obs x n_vars = {self.barcode_metadata.shape[0]} x {self.feature_metadata.shape[0]}"
         repr_str += f"\n    Genome: {self.get_genome()}; Modality: {self.get_modality()}"
-        repr_str += f"\n    It contains {len(self.matrices)} matrices: {str(list(self.matrices))[1:-1]}"
+        mat_word = 'matrices' if len(self.matrices) > 1 else 'matrix'
+        repr_str += f"\n    It contains {len(self.matrices)} {mat_word}: {str(list(self.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
             repr_str += f"\n    {key}: {str(list(getattr(self, key).keys()))[1:-1]}"
