@@ -225,7 +225,6 @@ def write_output(
     """
     if isinstance(data, UnimodalData):
         data = MultimodalData(data)
-    _tmp_multi = data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
 
     output_file = os.path.expanduser(os.path.expandvars(output_file))
 
@@ -239,9 +238,14 @@ def write_output(
         elif output_file.endswith(".loom"):
             return "loom"
         else:
-            return "mtx"
+            name, sep, suf = output_file.rpartition(".")
+            return "mtx" if sep == "" else suf
 
     file_type = _infer_output_file_type(output_file) if file_type is None else file_type
+    if file_type not in {"zarr", "zarr.zip", "h5ad", "loom", "mtx", "scp"}:
+        raise ValueError(f"Unsupported output file type '{file_type}'!")
+
+    _tmp_multi = data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
 
     if file_type.startswith("zarr"):
         zf = ZarrFile(output_file, mode = "w", storage_type = "ZipStore" if file_type == "zarr.zip" else None)
@@ -253,10 +257,9 @@ def write_output(
         write_loom_file(data, output_file)
     elif file_type == "mtx":
         write_mtx_file(data, output_file, precision = precision)
-    elif file_type == "scp":
-        write_scp_file(data, output_file, is_sparse = is_sparse, precision = precision)
     else:
-        raise ValueError(f"Unknown file type '{file_type}'!")
+        assert file_type == "scp"
+        write_scp_file(data, output_file, is_sparse = is_sparse, precision = precision)
 
     data._addback_tmp(_tmp_multi)
     logger.info(f"{file_type} file '{output_file}' is written.")
