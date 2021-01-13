@@ -6,8 +6,6 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get -qq update && \
     apt-get -qq -y install --no-install-recommends \
         build-essential \
-        gnupg \
-        curl \
         git \
         python3 \
         python3-dev \
@@ -15,12 +13,10 @@ RUN apt-get -qq update && \
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
-RUN python -m pip install --upgrade pip --no-cache-dir && \
-    python -m pip install setuptools --no-cache-dir && \
-    python -m pip install cython --no-cache-dir
+RUN python -m pip install --upgrade pip && \
+    python -m pip install setuptools wheel
 
-RUN apt-get -qq -y remove curl gnupg && \
-    apt-get -qq -y autoremove && \
+RUN apt-get -qq -y autoremove && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/log/dpkg.log
 
