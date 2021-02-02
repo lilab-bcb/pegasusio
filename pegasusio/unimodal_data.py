@@ -46,10 +46,8 @@ class UnimodalData:
         self.feature_multiarrays = DataDict(feature_multiarrays)
 
         self.metadata = DataDict(metadata)  # other metadata, a dictionary
-        if genome is not None:
-            self.metadata['genome'] = genome
-        if modality is not None:
-            self.metadata['modality'] = modality
+        self._set_genome(genome)
+        self._set_modality(modality)
 
         if cur_matrix not in matrices.keys():
             raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
@@ -427,6 +425,13 @@ class UnimodalData:
 
         self.metadata = DataDict(dict(data.uns))
 
+        self._set_genome(genome)
+        self._set_modality(modality)
+
+        self._cur_matrix = "X"
+        self._shape = data.shape
+
+    def _set_genome(self, genome):
         if genome is not None:
             self.metadata["genome"] = genome
         elif "genome" not in self.metadata:
@@ -435,6 +440,7 @@ class UnimodalData:
             assert self.metadata["genome"].ndim == 1
             self.metadata["genome"] = self.metadata["genome"][0]
 
+    def _set_modality(self, modality):
         if modality is not None:
             self.metadata["modality"] = modality
         elif "modality" not in self.metadata:
@@ -442,10 +448,6 @@ class UnimodalData:
                 self.metadata["modality"] = self.metadata.pop("experiment_type")
             else:
                 self.metadata["modality"] = "rna"
-
-        self._cur_matrix = "X"
-        self._shape = data.shape
-
 
     def to_anndata(self) -> anndata.AnnData:
         """ Convert to anndata
