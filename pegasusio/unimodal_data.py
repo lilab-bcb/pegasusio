@@ -428,14 +428,6 @@ class UnimodalData:
         self._set_genome(genome)
         self._set_modality(modality)
 
-        if modality is not None:
-            self.metadata["modality"] = modality
-        elif "modality" not in self.metadata:
-            if self.metadata.get("experiment_type", "none") in modalities:
-                self.metadata["modality"] = self.metadata.pop("experiment_type")
-            else:
-                self.metadata["modality"] = "rna"
-
         self._cur_matrix = "X"
         self._shape = data.shape
 
