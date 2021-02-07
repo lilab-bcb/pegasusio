@@ -151,6 +151,7 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
                     raise ValueError(f"Detect values exceeding the largest valid position {base_idx.size - 1} in {index_name} index!")
                 if np.unique(index_1d).size < index_1d.size:
                     raise ValueError(f"{index_name} index values are not unique!")
+                indexer = index_1d
         else:
             if not isinstance(index_1d, pd.Index):
                 assert isinstance(index_1d, np.ndarray) and index_1d.ndim == 1
