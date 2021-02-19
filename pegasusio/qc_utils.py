@@ -114,11 +114,15 @@ def calc_qc_filters(
 
         unidata.uns["__del_demux_type"] = True
 
+    if "n_genes" not in unidata.obs:
+        unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
+
+    if "n_counts" not in unidata.obs:
+        unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
+
     min_cond = min_genes is not None
     max_cond = max_genes is not None
     if min_cond or max_cond:
-        if "n_genes" not in unidata.obs:
-            unidata.obs["n_genes"] = unidata.X.getnnz(axis=1)
         if min_cond:
             filters.append(unidata.obs["n_genes"] >= min_genes)
         if max_cond:
@@ -128,8 +132,6 @@ def calc_qc_filters(
     max_cond = max_umis is not None
     calc_mito = (mito_prefix is not None) and (percent_mito is not None)
     if min_cond or max_cond or calc_mito:
-        if "n_counts" not in unidata.obs:
-            unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
         if min_cond:
             filters.append(unidata.obs["n_counts"] >= min_umis)
         if max_cond:
@@ -145,6 +147,8 @@ def calc_qc_filters(
     if len(filters) > 0:
         selected = np.logical_and.reduce(filters)
         unidata.obs["passed_qc"] = selected
+    else:
+        unidata.obs["passed_qc"] = True
 
 
 def apply_qc_filters(unidata: UnimodalData):
