@@ -4,7 +4,7 @@ loompy
 docopt
 natsort
 numpy
-pandas
+pandas>=1.2.0
 scipy
 setuptools
 importlib_metadata>=0.7; python_version < '3.8'
