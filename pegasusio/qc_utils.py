@@ -120,29 +120,22 @@ def calc_qc_filters(
     if "n_counts" not in unidata.obs:
         unidata.obs["n_counts"] = unidata.X.sum(axis=1).A1
 
-    min_cond = min_genes is not None
-    max_cond = max_genes is not None
-    if min_cond or max_cond:
-        if min_cond:
-            filters.append(unidata.obs["n_genes"] >= min_genes)
-        if max_cond:
-            filters.append(unidata.obs["n_genes"] < max_genes)
+    if min_genes is not None:
+        filters.append(unidata.obs["n_genes"] >= min_genes)
+    if max_genes is not None:
+        filters.append(unidata.obs["n_genes"] < max_genes)
+    if min_umis is not None:
+        filters.append(unidata.obs["n_counts"] >= min_umis)
+    if max_umis is not None:
+        filters.append(unidata.obs["n_counts"] < max_umis)
 
-    min_cond = min_umis is not None
-    max_cond = max_umis is not None
-    calc_mito = (mito_prefix is not None) and (percent_mito is not None)
-    if min_cond or max_cond or calc_mito:
-        if min_cond:
-            filters.append(unidata.obs["n_counts"] >= min_umis)
-        if max_cond:
-            filters.append(unidata.obs["n_counts"] < max_umis)
-        if calc_mito:
-            mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
-            unidata.obs["percent_mito"] = (
-                unidata.X[:, mito_genes].sum(axis=1).A1
-                / np.maximum(unidata.obs["n_counts"].values, 1.0)
-            ) * 100
-            filters.append(unidata.obs["percent_mito"] < percent_mito)
+    if (mito_prefix is not None) and (percent_mito is not None):
+        mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
+        unidata.obs["percent_mito"] = (
+            unidata.X[:, mito_genes].sum(axis=1).A1
+            / np.maximum(unidata.obs["n_counts"].values, 1.0)
+        ) * 100
+        filters.append(unidata.obs["percent_mito"] < percent_mito)
 
     if len(filters) > 0:
         selected = np.logical_and.reduce(filters)
