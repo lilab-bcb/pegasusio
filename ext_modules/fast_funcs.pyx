@@ -47,7 +47,7 @@ cpdef tuple convert_10x_vdj_to_vdjdata(str[:] tokens, int[:, :] mats_int, str[:,
 
 
     for i in range(nstr - 1):
-        tracing.append({"None": 0})
+        tracing.append({"None": 0, "": 0})
 
     for i in range(tokens.size):
         if bpos < 0 or bview[bpos] != tokens[i]:
@@ -69,12 +69,13 @@ cpdef tuple convert_10x_vdj_to_vdjdata(str[:] tokens, int[:, :] mats_int, str[:,
             strval = mats_str[i, j]
             value = strmap.get(strval, -1)
             if value < 0:
-                value = len(strmap)
+                value = len(strmap) - 1
                 strmap[strval] = value
             matview[j + delta, bpos, fpos] = value
         fmap[chain] = num + 1
 
     for i in range(nstr - 1):
+        del tracing[i]["None"]
         strmap = tracing[i]
         strarr = np.empty(len(strmap), dtype = np.object)
         strview = strarr
