@@ -33,10 +33,10 @@ def load_10x_vdj_file(input_csv: str, genome: str = None, modality: str = None) 
     except ModuleNotFoundError:
         print("No module named 'pegasusio.cylib.funcs'")
         
-    df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv, na_filter = False) # Otherwise, '' will be converted to NaN
     idx = df["productive"] == (True if df["productive"].dtype.kind == "b" else "True")
     df = df[idx]
-    df.sort_values(by = "barcode", inplace = True, kind = "mergesort") # sort barcode and make sure it is stable
+    df.sort_values(by = ["barcode", "umis"], ascending = [True, False], inplace = True, kind = "mergesort") # sort barcode and make sure it is stable
 
     feature_name = [x for x in df["chain"].value_counts().index if x != "Multi"][0]
     modal = None

@@ -195,6 +195,11 @@ class MultimodalData:
         assert self._unidata is not None and isinstance(self._unidata, VDJData)
         return self._unidata.get_chain(chain)
 
+    def construct_clonotype(self, min_umis: int = 2) -> None:
+        """ Surrogate function for VDJData """
+        assert self._unidata is not None and isinstance(self._unidata, VDJData)
+        self._unidata.construct_clonotype(min_umis=min_umis)
+
     def set_aside(self, params: List[str] = None) -> None:
         """ Surrogate function for CITESeqData and CytoData """
         assert self._unidata is not None and (isinstance(self._unidata, CITESeqData) or isinstance(self._unidata, CytoData))
