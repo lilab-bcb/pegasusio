@@ -24,7 +24,7 @@ import pegasusio
 # -- Project information -----------------------------------------------------
 
 project = "PegasusIO"
-copyright = "2020 The Broad Institute, Inc. and The General Hospital Corporation. All rights reserved."
+copyright = "2021 The Broad Institute, Inc. and The General Hospital Corporation. All rights reserved."
 author = (
     "Bo Li, Yiming Yang"
 )
@@ -32,7 +32,7 @@ author = (
 # The short X.Y version
 version = "0.2"
 # The full version, including alpha/beta/rc tags
-release = "0.2.9"
+release = "0.2.11"
 
 
 # -- General configuration ---------------------------------------------------
@@ -145,7 +145,7 @@ htmlhelp_basename = "pegasusio_doc"
 
 
 def setup(app):
-    app.add_stylesheet("css/custom.css")
+    app.add_css_file("css/custom.css")
 
 
 # -- Options for LaTeX output ------------------------------------------------
