@@ -106,11 +106,11 @@ def calc_qc_filters(
         if subset_string is None:
             filters.append(unidata.obs["demux_type"] == "singlet")
         else:
-            if "assignment" not in data.obs:
+            if "assignment" not in unidata.obs:
                 raise ValueError("No assignment field detected!")
 
             subset = np.array(subset_string.split(","))
-            filters.append(np.isin(data.obs["assignment"], subset))
+            filters.append(np.isin(unidata.obs["assignment"], subset))
 
         unidata.uns["__del_demux_type"] = True
 
