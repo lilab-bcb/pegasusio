@@ -1,4 +1,9 @@
-Version 0.2.10 `February 2, 2020`
+Version 0.2.11 `May 17, 2021`
+-------------------------------
+
+- Bug fix.
+
+Version 0.2.10 `February 2, 2021`
 ----------------------------------
 
 - Feature enhancement.
