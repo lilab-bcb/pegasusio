@@ -18,7 +18,7 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
     input_matrix : `str`
         Input Q3 normalized data matrix.
     segment_file: `str`
-        Segment file containing segmentation information for each ROI. If segment_file == 'protein', load GeoMx protein results from nCounter. 
+        Segment file containing segmentation information for each ROI. If segment_file == 'protein', load GeoMx protein results from nCounter.
     annotation_file: `str`, optional (default None)
         An optional annotation file providing tissue type information etc.
     genome : `str`, optional (default None)
@@ -60,7 +60,6 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
             logger.warning(f"Cannot find {barcodekey[~idx]} from the segment property file! Number of AOIs reduces to {idx.sum()}.")
             barcodekey = barcodekey[idx]
             barcode_metadata["barcodekey"] = barcodekey.values
-            matrix = matrix[idx]
         if idx.sum() < df.shape[0]:
             logger.warning(f"Sample IDs {','.join(x for x in df.index[~df.index.isin(barcodekey)])} from the segment property file are not located in the matrix file!")
         df = df.reindex(barcodekey)
@@ -87,9 +86,9 @@ def load_nanostring_files(input_matrix: str, segment_file: str, annotation_file:
         df = pd.read_csv(input_matrix, sep = ',', header = None, index_col = 0)
 
         barcodekey = pd.Index(df.loc["Segment displayed name", 4:].values)
-        barcode_metadata = {"barcodekey": barcodekey.values, 
-                            "segment": pd.Categorical(df.loc["Segment (Name/ Label)", 4:].values), 
-                            "AOI surface area": df.loc["AOI surface area", 4:].values.astype(np.float64), 
+        barcode_metadata = {"barcodekey": barcodekey.values,
+                            "segment": pd.Categorical(df.loc["Segment (Name/ Label)", 4:].values),
+                            "AOI surface area": df.loc["AOI surface area", 4:].values.astype(np.float64),
                             "AOI nuclei count": df.loc["AOI nuclei count", 4:].values.astype(np.int32)
                            }
         probe_pos = df.index.get_loc("#Probe Group") + 1

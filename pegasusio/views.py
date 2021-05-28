@@ -28,7 +28,7 @@ class MultiArrayView(MutableMapping):
                 self.multiarrays[key] = self.parent[key][self.index]
             else:
                 raise ValueError(f"Key '{key}' does not exist!")
-        return self.multiarrays[key]    
+        return self.multiarrays[key]
 
     def __setitem__(self, key: str, value: object):
         raise ValueError("Cannot set key for MultiArrayView object!")
@@ -113,7 +113,7 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
 
         if isinstance(index_1d, slice):
             step = 1 if index_1d.step is None else index_1d.step
-            
+
             start = index_1d.start
             if isinstance(start, str):
                 if start not in base_idx:
@@ -302,7 +302,7 @@ class UnimodalDataView:
     @property
     def shape(self) -> Tuple[int, int]:
         return self._shape
-    
+
     @shape.setter
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape for UnimodalDataView object!")

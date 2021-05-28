@@ -436,6 +436,13 @@ class MultimodalData:
                 if self.data[key].get_modality() not in modality_subset:
                     del self.data[key]
 
+        if len(self.list_data()) > 0:
+            self._selected = self.list_data()[0]
+            self._unidata = self.data[self._selected]
+        else:
+            self._selected = None
+            self._unidata = None
+
 
     def scan_black_list(self, black_list: Set[str] = None):
         """ Remove unwanted keys in the black list
@@ -549,5 +556,3 @@ class MultimodalData:
     def _addback_tmp(self, _tmp_multi) -> None:
         for key, _tmp_dict in _tmp_multi.items():
             self.data[key]._addback_tmp(_tmp_dict)
-
-
