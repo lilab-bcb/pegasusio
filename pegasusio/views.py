@@ -71,7 +71,7 @@ class MetadataView(MutableMapping):
 
 
 
-def _parse_index(parent: Union[UnimodalData, UnimodalDataView], index: INDEX) -> Tuple[CINDEX, CINDEX]:
+def _parse_index(parent: Union[UnimodalData, "UnimodalDataView"], index: INDEX) -> Tuple[CINDEX, CINDEX]:
 
     def _extract_indices_from_parent(parent: Union[UnimodalData, UnimodalDataView]) -> Tuple[pd.Index, pd.Index, CINDEX, CINDEX]:
         if hasattr(parent, "barcode_index"):
@@ -316,7 +316,7 @@ class UnimodalDataView:
             raise ValueError(f"Matrix key '{key}' does not exist!")
         self._cur_matrix = key
 
-    def __getitem__(self, index: INDEX) -> UnimodalDataView:
+    def __getitem__(self, index: INDEX) -> "UnimodalDataView":
         barcode_index, feature_index = _parse_index(self, index)
         return UnimodalDataView(self.parent, barcode_index, feature_index, self._cur_matrix, obj_name = self._obj_name)
 
