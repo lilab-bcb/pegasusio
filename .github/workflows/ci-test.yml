@@ -35,7 +35,7 @@ jobs:
       run: |
         sudo apt -q update
         sudo apt install -y git
-        git clone https://github.com/klarman-cell-observatory/pegasusio-test-data.git ./tests/pegasusio-test-data
+        git clone https://github.com/klarman-cell-observatory/pegasusio-test-data.git ./pegasusio-test-data
     - name: IO test
       run: |
         pytest tests/test_io.py
