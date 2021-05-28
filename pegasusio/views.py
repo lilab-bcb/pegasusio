@@ -5,7 +5,6 @@ from collections.abc import MutableMapping
 from typing import List, Dict, Union, Tuple
 from pandas.api.types import is_list_like
 
-from .unimodal_data import UnimodalData
 
 INDEX1D = Union[pd.Index, List[str], List[bool], List[int], slice]
 INDEX = Union[INDEX1D, Tuple[INDEX1D, INDEX1D]]
@@ -71,9 +70,9 @@ class MetadataView(MutableMapping):
 
 
 
-def _parse_index(parent: Union[UnimodalData, "UnimodalDataView"], index: INDEX) -> Tuple[CINDEX, CINDEX]:
+def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX) -> Tuple[CINDEX, CINDEX]:
 
-    def _extract_indices_from_parent(parent: Union[UnimodalData, UnimodalDataView]) -> Tuple[pd.Index, pd.Index, CINDEX, CINDEX]:
+    def _extract_indices_from_parent(parent: Union["UnimodalData", "UnimodalDataView"]) -> Tuple[pd.Index, pd.Index, CINDEX, CINDEX]:
         if hasattr(parent, "barcode_index"):
             return parent.parent.obs_names, parent.parent.var_names, parent.barcode_index, parent.feature_index
         else:
@@ -190,7 +189,7 @@ def _parse_index(parent: Union[UnimodalData, "UnimodalDataView"], index: INDEX) 
 
 
 class UnimodalDataView:
-    def __init__(self, unidata: UnimodalData, barcode_index: CINDEX, feature_index: CINDEX, cur_matrix: str, obj_name: str = "UnimodalData"):
+    def __init__(self, unidata: "UnimodalData", barcode_index: CINDEX, feature_index: CINDEX, cur_matrix: str, obj_name: str = "UnimodalData"):
         self.parent = unidata
         self.barcode_index = barcode_index
         self.feature_index = feature_index
@@ -327,6 +326,6 @@ class UnimodalDataView:
                 self.matrices[key] = X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
         return self.matrices
 
-    def copy(self, deep: bool = True) -> UnimodalData:
+    def copy(self, deep: bool = True) -> "UnimodalData":
         """ If not deep, copy shallowly, which means that if contents of obsm, varm and matrices of the copied object is modified, the view object is also modified """
         return self.parent._copy_view(self, deep)
