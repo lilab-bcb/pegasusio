@@ -436,12 +436,12 @@ class MultimodalData:
                 if self.data[key].get_modality() not in modality_subset:
                     del self.data[key]
 
-        if len(self.list_data()) > 0:
-            self._selected = self.list_data()[0]
-            self._unidata = self.data[self._selected]
-        else:
+        if len(self.list_data()) == 0:
             self._selected = None
             self._unidata = None
+        elif self._selected not in self.list_data():
+            self._selected = self.list_data()[0]
+            self._unidata = self.data[self._selected]
 
 
     def scan_black_list(self, black_list: Set[str] = None):
