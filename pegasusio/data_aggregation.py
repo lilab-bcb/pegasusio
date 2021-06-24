@@ -79,6 +79,8 @@ def aggregate_matrices(
 
     This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
+    If csv_file is a dictionary, it can contains an alternative 2 columns - Sample, sample name; Object, Multimodal data object. In this case, the objects will be merged into one data object.
+
     Parameters
     ----------
 
@@ -162,33 +164,39 @@ def aggregate_matrices(
     aggrData = AggrData()
 
     for idx_num, row in df.iterrows():
-        input_file = os.path.expanduser(os.path.expandvars(row["Location"].rstrip(os.sep))) # extend all user variables
-        file_type, copy_path, copy_type = infer_file_type(input_file) # infer file type
+        if "Object" in row:
+            data = row["Object"]
+        else:
+            assert "Location" in row
 
-        if row["Location"].lower().startswith('gs://'): # if Google bucket
-            base_name = os.path.basename(copy_path)
-            dest_path = f"{idx_num}_tmp_{base_name}" # id_num will make sure dest_path is unique in the sample sheet
-            if not os.path.exists(dest_path):  # if dest_path exists, we may try to localize it once and may have the file cached
-                if copy_type == "directory":
-                    check_call(["mkdir", "-p", dest_path])
-                    call_args = ["gsutil", "-m", "rsync", "-r", copy_path, dest_path]
+            input_file = os.path.expanduser(os.path.expandvars(row["Location"].rstrip(os.sep))) # extend all user variables
+            file_type, copy_path, copy_type = infer_file_type(input_file) # infer file type
+
+            if row["Location"].lower().startswith('gs://'): # if Google bucket
+                base_name = os.path.basename(copy_path)
+                dest_path = f"{idx_num}_tmp_{base_name}" # id_num will make sure dest_path is unique in the sample sheet
+                if not os.path.exists(dest_path):  # if dest_path exists, we may try to localize it once and may have the file cached
+                    if copy_type == "directory":
+                        check_call(["mkdir", "-p", dest_path])
+                        call_args = ["gsutil", "-m", "rsync", "-r", copy_path, dest_path]
+                    else:
+                        call_args = ["gsutil", "-m", "cp", copy_path, dest_path]
+                    check_call(call_args)
+                dest_paths.append(dest_path)
+
+                if input_file == copy_path:
+                    input_file = dest_path
                 else:
-                    call_args = ["gsutil", "-m", "cp", copy_path, dest_path]
-                check_call(call_args)
-            dest_paths.append(dest_path)
+                    input_file = os.path.join(dest_path, os.path.basename(input_file))
 
-            if input_file == copy_path:
-                input_file = dest_path
-            else:
-                input_file = os.path.join(dest_path, os.path.basename(input_file))
-
-        genome = row.get("Reference", None)
-        if (genome is not None) and (not isinstance(genome, str)): # to avoid NaN
-            genome = None
-        if genome is None:
-            genome = def_genome
-        modality = row.get("Modality", None)
-        data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
+            genome = row.get("Reference", None)
+            if (genome is not None) and (not isinstance(genome, str)): # to avoid NaN
+                genome = None
+            if genome is None:
+                genome = def_genome
+            modality = row.get("Modality", None)
+            data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
+        
         if len(genome_dict) > 0:
             data._update_genome(genome_dict)
 
