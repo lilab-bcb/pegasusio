@@ -144,7 +144,7 @@ def calc_qc_filters(
         unidata.obs["passed_qc"] = True
 
 
-def apply_qc_filters(unidata: UnimodalData):
+def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
     """ Apply QC filters to filter out low quality cells """
     if "passed_qc" in unidata.obs:
         prior_n = unidata.shape[0]
@@ -164,7 +164,9 @@ def apply_qc_filters(unidata: UnimodalData):
             unidata.obsm.clear()
         if len(unidata.varm) > 0:
             unidata.varm.clear()
-        for key in list(unidata.uns):
-            if key not in {'genome', 'modality', 'norm_count', 'df_qcplot'}:
-                del unidata.uns[key]
+        if uns_white_list is not None:
+            white_list = set(uns_white_list.split(',') + ['genome', 'modality'])
+            for key in list(unidata.uns):
+                if key not in white_list:
+                    del unidata.uns[key]
         logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")

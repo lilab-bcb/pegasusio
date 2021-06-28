@@ -165,7 +165,6 @@ class AggrData:
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
 
-
         uns_dict = {}
         metadata = {"genome": unilist[0].metadata["genome"], "modality": unilist[0].metadata["modality"]}
         for unidata in unilist:
