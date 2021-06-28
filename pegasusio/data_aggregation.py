@@ -79,7 +79,7 @@ def aggregate_matrices(
 
     This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
-    If csv_file is a dictionary, it can contains an alternative 2 columns - Sample, sample name; Object, Multimodal data object. In this case, the objects will be merged into one data object.
+    If csv_file is a dictionary, it can contains an alternative 2 columns - Sample, sample name; Object, Multimodal data object. In this case, the objects will be merged into one data object. In addition, aggregate_matrices will make copies instead of editing the objects.
 
     Parameters
     ----------
@@ -165,7 +165,7 @@ def aggregate_matrices(
 
     for idx_num, row in df.iterrows():
         if "Object" in row:
-            data = row["Object"]
+            data = row["Object"].copy()
         else:
             assert "Location" in row
 
