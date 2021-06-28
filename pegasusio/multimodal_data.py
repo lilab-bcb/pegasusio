@@ -323,6 +323,7 @@ class MultimodalData:
         percent_mito: Optional[float] = None,
         focus_list: Optional[Union[List[str], str]] = None,
         cache_passqc: Optional[bool] = False,
+        uns_white_list: Optional[str] = None,
     ) -> None:
         """
         Filter each "rna" modality UnimodalData in the focus_list separately using the set filtration parameters. Then for all other UnimodalData objects, select only barcodes that are in the union of selected barcodes from previously filtered UnimodalData objects.
@@ -350,8 +351,10 @@ class MultimodalData:
             Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
         focus_list: ``List[str]`` or ``str``, optional, default None
             Filter each UnimodalData with key in focus_list (and modality is 'rna') separately using the filtration criteria. If only one focus is provided, focus_list can be a string instead of a list.
-        cache_passqc: ``bool``, optional, default: False
+        cache_passqc: ``bool``, optional, default: ``False``
             If True and "passed_qc" is in a UnimodalData object's obs field, use the cached "passed_qc" instead of recalculating it using 'calc_qc_filters'.
+        uns_white_list: ``str``, optional, default: ``None``
+            If not None, this is string representing a comma-separated list of uns keywords that should not be removed. In addition, 'genome' and 'modality' will not be removed. All other keys in uns will be removed. If None, do not remove any keyword from uns.
         """
         selected_barcodes = None
 
@@ -376,7 +379,7 @@ class MultimodalData:
                         max_umis = max_umis,
                         mito_prefix = mito_dict.get(unidata.get_genome()),
                         percent_mito = percent_mito)
-                apply_qc_filters(unidata)
+                apply_qc_filters(unidata, uns_white_list=uns_white_list)
                 selected_barcodes = unidata.obs_names if selected_barcodes is None else selected_barcodes.union(unidata.obs_names)
             else:
                 unselected.append(unidata)
