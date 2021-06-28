@@ -3,6 +3,8 @@ import pandas as pd
 from scipy.sparse import csr_matrix, vstack, coo_matrix
 from typing import List, Dict, Union
 from collections import defaultdict
+from pandas.api.types import is_categorical_dtype, is_string_dtype
+from natsort import natsorted
 
 import logging
 logger = logging.getLogger(__name__)
@@ -124,6 +126,14 @@ class AggrData:
             matrices[mat_key] = vstack(mat_list)
 
 
+    def _check_categorical(df:pd.DataFrame) -> None:
+        for col in df.columns:
+            if not is_categorical_dtype(df[col]) and is_string_dtype(df[col]):
+                keywords = set(df[col])
+                if len(keywords) <= df.shape[0] / 10.0: # at least 10x reduction
+                    df[col] = pd.Categorical(df[col], categories = natsorted(keywords))
+
+
     @run_gc
     def _aggregate_unidata(self, unilist: List[UnimodalData]) -> UnimodalData:
         if len(unilist) == 1:
@@ -136,7 +146,7 @@ class AggrData:
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
         fillna_dict = _get_fillna_dict(barcode_metadata)
         barcode_metadata.fillna(value=fillna_dict, inplace=True)
-
+        _check_categorical(barcode_metadata)
 
         var_dict = {}
         for unidata in unilist:
@@ -151,7 +161,7 @@ class AggrData:
             feature_metadata = feature_metadata.merge(other.feature_metadata, on=keys, how="outer", sort=False, copy=False)  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
         fillna_dict = _get_fillna_dict(feature_metadata)
         feature_metadata.fillna(value=fillna_dict, inplace=True)
-
+        _check_categorical(feature_metadata)
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
 
