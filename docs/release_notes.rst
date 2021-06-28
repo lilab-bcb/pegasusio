@@ -1,3 +1,8 @@
+Version 0.2.14 `Jun 28, 2021`
+-------------------------------
+
+- Add parameter ``uns_white_list`` in ``filter_data`` function to keep QC statistics if needed.
+
 Version 0.2.13 `Jun 24, 2021`
 -------------------------------
 
