@@ -31,6 +31,14 @@ def _get_fillna_dict(df: pd.DataFrame) -> dict:
     return fillna_dict
 
 
+def _check_categorical(df:pd.DataFrame) -> None:
+    for col in df.columns:
+        if not is_categorical_dtype(df[col]) and is_string_dtype(df[col]):
+            keywords = set(df[col])
+            if len(keywords) <= df.shape[0] / 10.0: # at least 10x reduction
+                df[col] = pd.Categorical(df[col], categories = natsorted(keywords))
+
+
 class AggrData:
     def __init__(self):
         self.aggr = defaultdict(list)
@@ -124,14 +132,6 @@ class AggrData:
                 mat.data = old2new[mat.data]
                 mat_list.append(mat)
             matrices[mat_key] = vstack(mat_list)
-
-
-    def _check_categorical(df:pd.DataFrame) -> None:
-        for col in df.columns:
-            if not is_categorical_dtype(df[col]) and is_string_dtype(df[col]):
-                keywords = set(df[col])
-                if len(keywords) <= df.shape[0] / 10.0: # at least 10x reduction
-                    df[col] = pd.Categorical(df[col], categories = natsorted(keywords))
 
 
     @run_gc
