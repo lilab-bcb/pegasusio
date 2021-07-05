@@ -1,3 +1,8 @@
+Version 0.3 `Jul 5, 2021`
+-------------------------------
+
+- Add support for composite list (e.g. [0, pd.DataFrame, np.ndarray]) in ``data.uns`` field for Zarr read/write.
+
 Version 0.2.14 `Jun 28, 2021`
 -------------------------------
 
