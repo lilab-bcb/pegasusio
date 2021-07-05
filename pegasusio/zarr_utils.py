@@ -45,12 +45,12 @@ def calc_chunk(shape: tuple) -> tuple:
 def check_and_remove_existing_path(path: str) -> None:
     if os.path.exists(path):
         if os.path.isdir(path):
-            logger.warning(f"Detected and removed pre-existing directory {path}.")
             shutil.rmtree(path)
+            logger.warning(f"Detected and removed pre-existing directory {path}.")
         else:
             assert os.path.isfile(path)
-            logger.warning(f"Detected and removed pre-existing file {path}.")
             os.unlink(path)
+            logger.warning(f"Detected and removed pre-existing file {path}.")
 
 
 class ZarrFile:
@@ -124,7 +124,7 @@ class ZarrFile:
         return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
 
 
-    def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.recarray]:
+    def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.ndarray]:
         if 'ordered' in group[name].attrs:
             # categorical column
             return pd.Categorical.from_codes(group[name][...], categories = group[f'_categories/{name}'][...], ordered = group[name].attrs['ordered'])
@@ -132,28 +132,61 @@ class ZarrFile:
             return group[name][...]
 
 
-    def read_dataframe(self, group: zarr.Group) -> Union[pd.DataFrame, np.ndarray]:
+    def read_dataframe(self, group: zarr.Group) -> pd.DataFrame:
         columns = group.attrs.get('columns', None)
         if columns is None:
             columns = [col for col in group.array_keys() if col != '_index']
 
-        if group.attrs['data_type'] == 'data_frame':
-            data = {col: self.read_series(group, col) for col in columns}
-            _index = self.read_series(group, '_index')
-            index = pd.Index(_index, name = group.attrs['index_name'], dtype = _index.dtype)
-            df = pd.DataFrame(data = data, index = index) # if add columns = columns, the generation will be slow
-            return df
-        else:
-            array = np.rec.fromarrays([self.read_series(group, col) for col in columns],
-                names = columns)
-            return array
+        data = {col: self.read_series(group, col) for col in columns}
+        _index = self.read_series(group, '_index')
+        index = pd.Index(_index, name = group.attrs['index_name'], dtype = _index.dtype)
+        df = pd.DataFrame(data = data, index = index) # if add columns = columns, the generation will be slow
+        return df
 
 
-    def read_array(self, group: zarr.Group, name: str) -> Union[np.ndarray, np.recarray]:
-        if name in group.group_keys():
-            return self.read_dataframe(group[name])
-        else:
-            return group[name][...]
+    def read_array(self, group: zarr.Group, name: str) -> np.ndarray:
+        return group[name][...]
+
+
+    def read_record_array(self, group: zarr.Group) -> np.recarray:
+        columns = group.attrs.get('columns', None)
+        if columns is None:
+            columns = [col for col in group.array_keys()]
+
+        array = np.rec.fromarrays([group[col][...] for col in columns], names = columns)
+        return array
+
+
+    def read_composite_list(self, group: zarr.Group) -> list:
+        assert '_size' in group.attrs
+        res_list = [None] * group.attrs['_size']
+
+        if 'scalar' in group.attrs:
+            scalar_dict = group.attrs['scalar']
+            for i, value in scalar_dict.items():
+                res_list[int(i)] = value
+
+        for key in group. array_keys():
+            res_list[int(key)] = self.read_array(group, key)
+
+        for key in group.group_keys():
+            sub_group = group[key]
+            data_type = sub_group.attrs['data_type']
+            value = None
+            if data_type == 'data_frame':
+                value = self.read_dataframe(sub_group)
+            elif data_type == 'record_array':
+                value = self.read_record_array(sub_group)
+            elif data_type == 'csr_matrix':
+                value = self.read_csr(sub_group)
+            elif data_type == 'dict':
+                value = self.read_mapping(sub_group)
+            else:
+                assert data_type == 'composite_list'
+                value = self.read_composite_list(sub_group)
+            res_list[int(key)] = value
+
+        return res_list
 
 
     def read_mapping(self, group: zarr.Group) -> dict:
@@ -169,13 +202,17 @@ class ZarrFile:
             sub_group = group[key]
             data_type = sub_group.attrs['data_type']
             value = None
-            if data_type == 'data_frame' or data_type == 'record_array':
+            if data_type == 'data_frame':
                 value = self.read_dataframe(sub_group)
+            elif data_type == 'record_array':
+                value = self.read_record_array(sub_group)
             elif data_type == 'csr_matrix':
                 value = self.read_csr(sub_group)
-            else:
-                assert data_type == 'dict'
+            elif data_type == 'dict':
                 value = self.read_mapping(sub_group)
+            else:
+                assert data_type == 'composite_list'
+                value = self.read_composite_list(sub_group)
             res_dict[key] = value
 
         return res_dict
@@ -229,68 +266,102 @@ class ZarrFile:
         return data
 
 
-    def write_csr(self, group: zarr.Group, name: str, matrix: csr_matrix) -> None:
-        sub_group = group.create_group(name, overwrite = True)
-        sub_group.attrs.update(data_type = 'csr_matrix', shape = matrix.shape)
-        sub_group.create_dataset('data', data = matrix.data, shape = matrix.data.shape, chunks = calc_chunk(matrix.data.shape), dtype = matrix.data.dtype, compressor = COMPRESSOR, overwrite = True)
-        sub_group.create_dataset('indices', data = matrix.indices, shape = matrix.indices.shape, chunks = calc_chunk(matrix.indices.shape), dtype = matrix.indices.dtype, compressor = COMPRESSOR, overwrite = True)
-        sub_group.create_dataset('indptr', data = matrix.indptr, shape = matrix.indptr.shape, chunks = calc_chunk(matrix.indptr.shape), dtype = matrix.indptr.dtype, compressor = COMPRESSOR, overwrite = True)
+    def write_csr(self, parent: zarr.Group, name: str, matrix: csr_matrix) -> None:
+        group = parent.create_group(name, overwrite = True)
+        group.attrs.update(data_type = 'csr_matrix', shape = matrix.shape)
+        group.create_dataset('data', data = matrix.data, shape = matrix.data.shape, chunks = calc_chunk(matrix.data.shape), dtype = matrix.data.dtype, compressor = COMPRESSOR, overwrite = True)
+        group.create_dataset('indices', data = matrix.indices, shape = matrix.indices.shape, chunks = calc_chunk(matrix.indices.shape), dtype = matrix.indices.dtype, compressor = COMPRESSOR, overwrite = True)
+        group.create_dataset('indptr', data = matrix.indptr, shape = matrix.indptr.shape, chunks = calc_chunk(matrix.indptr.shape), dtype = matrix.indptr.dtype, compressor = COMPRESSOR, overwrite = True)
 
 
-    def write_series(self, group: zarr.Group, name: str, array: np.ndarray, data_type: str) -> None:
-        if data_type == 'data_frame':
-            if not is_categorical_dtype(array) and name != '_index' and is_string_dtype(array):
-                keywords = set(array)
-                if len(keywords) <= array.size / 10.0: # at least 10x reduction
-                    array = pd.Categorical(array, categories = natsorted(keywords))
+    def write_series(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
+        if not is_categorical_dtype(array) and name != '_index' and is_string_dtype(array):
+            keywords = set(array)
+            if len(keywords) <= array.size / 10.0: # at least 10x reduction
+                array = pd.Categorical(array, categories = natsorted(keywords))
 
-            if is_categorical_dtype(array):
-                # write category keys
-                categories = group.require_group('_categories')
-                values = array.categories.values
-                if isinstance(values[0], bytes):
-                    values = np.array([x.decode() for x in values], dtype = object)
-                dtype = str if values.dtype.kind == 'O' else values.dtype
-                categories.create_dataset(name, data = values, shape = values.shape, chunks = calc_chunk(values.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
-                # write codes
-                codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True)
-                codes_arr.attrs['ordered'] = array.ordered
+        if is_categorical_dtype(array):
+            # write category keys
+            categories = group.require_group('_categories', overwrite = False)
+            values = array.categories.values
+            if isinstance(values[0], bytes):
+                values = np.array([x.decode() for x in values], dtype = object)
+            self.write_array(categories, name, values)
+            # write codes
+            codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True)
+            codes_arr.attrs['ordered'] = array.ordered
+        else:
+            self.write_array(group, name, array)
 
-                return None
 
+    def write_dataframe(self, parent: zarr.Group, name: str, df: pd.DataFrame) -> None:
+        group = parent.create_group(name, overwrite = True)
+        attrs_dict = {'data_type' : 'data_frame', 'columns' : list(df.columns)}
+        attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
+        self.write_series(group, '_index', df.index.values)
+        for col in df.columns:
+            self.write_series(group, col, df[col].values)
+        group.attrs.update(**attrs_dict)
+
+
+    def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
         dtype = str if array.dtype.kind == 'O' else array.dtype
         group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
 
 
-    def write_dataframe(self, group: zarr.Group, name: str, df: Union[pd.DataFrame, np.recarray]) -> None:
-        data_type = 'data_frame' if isinstance(df, pd.DataFrame) else 'record_array'
-
-        sub_group = group.create_group(name, overwrite = True) 
-        attrs_dict = {'data_type' : data_type}
-        cols = list(df.columns if data_type == 'data_frame' else df.dtype.names)
-        attrs_dict['columns'] = cols
-        if data_type == 'data_frame':
-            attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
-            sub_group.create_group('_categories', overwrite = True) # create a group to store category keys for catigorical columns
-            self.write_series(sub_group, '_index', df.index.values, data_type)
-
-        for col in cols:
-            self.write_series(sub_group, col, (df[col].values if data_type == 'data_frame' else df[col]), data_type)
-
-        sub_group.attrs.update(**attrs_dict)
+    def write_record_array(self, parent: zarr.Group, name: str, array: np.recarray) -> None:
+        group = parent.create_group(name, overwrite = True) 
+        attrs_dict = {'data_type' : 'record_array', 'columns' : list(array.dtype.names)}
+        for col in array.dtype.names:
+            self.write_array(group, col, array[col])
+        group.attrs.update(**attrs_dict)
 
 
-    def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
-        if array.dtype.kind == 'V':
-            self.write_dataframe(group, name, array)
+    def write_composite_list(self, parent: zarr.Group, name: str, values: Union[list, tuple]) -> None:
+        group = parent.create_group(name, overwrite = True)
+        scalar_dict = {}
+
+        for i, value in enumerate(values):
+            if is_scalar(value):
+                if type(value).__module__ == 'numpy':
+                    value = value.item()
+                scalar_dict[str(i)] = value
+            elif isinstance(value, np.ndarray):
+                if value.dtype.kind == 'V':
+                    self.write_record_array(group, str(i), value)
+                else:
+                    self.write_array(group, str(i), value)
+            elif isinstance(value, pd.DataFrame):
+                self.write_dataframe(group, str(i), value)
+            elif is_dict_like(value):
+                self.write_mapping(group, str(i), value)
+            elif issparse(value):
+                assert isinstance(value, csr_matrix)
+                self.write_csr(group, str(i), value)
+            else:
+                # assume value is either list or tuple
+                assert type(value) in {list, tuple}
+                is_comp_list = sum([is_scalar(x) for x in value]) < len(value)
+                if is_comp_list:
+                    self.write_composite_list(group, str(i), value)
+                else:
+                    # converting it to np.ndarray
+                    self.write_array(group, str(i), value.astype(str) if is_categorical_dtype(value) else np.array(value))
+
+        attrs_dict = {'data_type': 'composite_list', '_size': len(values)}
+        if len(scalar_dict) > 0:
+            attrs_dict['scalar'] = scalar_dict
+        group.attrs.update(**attrs_dict)
+
+
+    def write_mapping(self, parent: zarr.Group, name: str, mapping: dict, overwrite = True) -> None:
+        group = None
+        if overwrite:
+            group = parent.create_group(name, overwrite = True)
         else:
-            dtype = str if array.dtype.kind == 'O' else array.dtype
-            group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
+            group = parent.require_group(name, overwrite = False) # throw an error if name in array_keys()
 
-
-    def write_mapping(self, group: zarr.Group, name: str, mapping: dict, overwrite = True) -> None:
-        sub_group = group.require_group(name, overwrite = overwrite)
-        scalar_dict = sub_group.attrs.pop('scalar', {}) # if overwrite == True, there should be no 'scalar'
+        scalar_dict = group.attrs.pop('scalar', {})
 
         def _write_one_pair(key, value):
             if is_scalar(value):
@@ -298,17 +369,26 @@ class ZarrFile:
                     value = value.item()
                 scalar_dict[key] = value
             elif isinstance(value, np.ndarray):
-                self.write_array(sub_group, key, value)
+                if value.dtype.kind == 'V':
+                    self.write_record_array(group, key, value)
+                else:
+                    self.write_array(group, key, value)
             elif isinstance(value, pd.DataFrame):
-                self.write_dataframe(sub_group, key, value)
+                self.write_dataframe(group, key, value)
             elif is_dict_like(value):
-                self.write_mapping(sub_group, key, value)
+                self.write_mapping(group, key, value)
             elif issparse(value):
                 assert isinstance(value, csr_matrix)
-                self.write_csr(sub_group, key, value)
+                self.write_csr(group, key, value)
             else:
-                # assume value is either list or tuple, converting it to np.ndarray
-                self.write_array(sub_group, key, value.astype(str) if is_categorical_dtype(value) else np.array(value))
+                # assume value is either list or tuple
+                assert type(value) in {list, tuple}
+                is_comp_list = sum([is_scalar(x) for x in value]) < len(value)
+                if is_comp_list:
+                    self.write_composite_list(group, key, value)
+                else:
+                    # converting it to np.ndarray
+                    self.write_array(group, key, value.astype(str) if is_categorical_dtype(value) else np.array(value))
 
         if overwrite:
             for key, value in mapping.items():
@@ -318,34 +398,40 @@ class ZarrFile:
                 if key in scalar_dict:
                     del scalar_dict[key]
                 else:
-                    del sub_group[key]
+                    del group[key]
             for key in mapping.modified:
                 _write_one_pair(key, mapping[key])
 
         attrs_dict = {'data_type' : 'dict'}
         if len(scalar_dict) > 0:
             attrs_dict['scalar'] = scalar_dict
-        sub_group.attrs.update(**attrs_dict)
+        group.attrs.update(**attrs_dict)
 
 
-    def write_unimodal_data(self, group: zarr.Group, name: str, data: UnimodalData, overwrite: bool = True) -> None:
+    def write_unimodal_data(self, parent: zarr.Group, name: str, data: UnimodalData, overwrite: bool = True) -> None:
         """ Write UnimodalData
+            overwrite means if overwrite the whole unimodal data; meaning is different from require_group overwrite --- if the name in array_keys(), take it and make it as a group
         """
-        sub_group = group.require_group(name, overwrite = overwrite)
-        attrs_dict = {'data_type': 'UnimodalData', '_cur_matrix': data.current_matrix()}
-        sub_group.attrs.update(**attrs_dict)
+        group = None
+        if overwrite:
+            group = parent.create_group(name, overwrite = True)
+        else:
+            group = parent.require_group(name, overwrite = False) # throw an error if name in array_keys()
 
-        self.write_dataframe(sub_group, 'barcode_metadata', data.barcode_metadata)
-        self.write_dataframe(sub_group, 'feature_metadata', data.feature_metadata)
+        attrs_dict = {'data_type': 'UnimodalData', '_cur_matrix': data.current_matrix()}
+        group.attrs.update(**attrs_dict)
+
+        self.write_dataframe(group, 'barcode_metadata', data.barcode_metadata)
+        self.write_dataframe(group, 'feature_metadata', data.feature_metadata)
 
         if overwrite or data.matrices.is_dirty():
-            self.write_mapping(sub_group, 'matrices', data.matrices, overwrite = overwrite)
+            self.write_mapping(group, 'matrices', data.matrices, overwrite = overwrite)
         if overwrite or data.metadata.is_dirty():
-            self.write_mapping(sub_group, 'metadata', data.metadata, overwrite = overwrite)
+            self.write_mapping(group, 'metadata', data.metadata, overwrite = overwrite)
         if overwrite or data.barcode_multiarrays.is_dirty():
-            self.write_mapping(sub_group, 'barcode_multiarrays', data.barcode_multiarrays, overwrite = overwrite)
+            self.write_mapping(group, 'barcode_multiarrays', data.barcode_multiarrays, overwrite = overwrite)
         if overwrite or data.feature_multiarrays.is_dirty():
-            self.write_mapping(sub_group, 'feature_multiarrays', data.feature_multiarrays, overwrite = overwrite)
+            self.write_mapping(group, 'feature_multiarrays', data.feature_multiarrays, overwrite = overwrite)
 
 
     def write_multimodal_data(self, data: MultimodalData, overwrite: bool = True) -> None:
@@ -353,7 +439,7 @@ class ZarrFile:
         """
         if overwrite:
             for key in data.list_data():
-                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = overwrite)
+                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = True)
         else:
             for key in data.data.deleted:
                 del self.root[key]
