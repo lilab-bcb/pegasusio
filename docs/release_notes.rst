@@ -1,14 +1,19 @@
-Version 0.3.0 `Jul 6, 2021`
+Version 0.3.1 `July 16, 2021`
+-------------------------------
+
+- For ``aggregate_matrices`` function, allow sample-specific filtration on minimum number of UMIs (``nUMI`` column in sample sheet) and minimum number of genes (``nGene`` column in sample sheet), which would overwrite the corresponding parameters of the function for these samples.
+
+Version 0.3.0 `July 6, 2021`
 -------------------------------
 
 - Add support for composite list (e.g. ``[0, pd.DataFrame, np.ndarray]``) in ``data.uns`` field for Zarr read/write.
 
-Version 0.2.14 `Jun 28, 2021`
+Version 0.2.14 `June 28, 2021`
 -------------------------------
 
 - Add parameter ``uns_white_list`` in ``filter_data`` function to keep QC statistics if needed.
 
-Version 0.2.13 `Jun 24, 2021`
+Version 0.2.13 `June 24, 2021`
 -------------------------------
 
 - The ``aggregate_matrices`` function now accepts sample sheet in Python dictionary format besides a CSV file path string. See details in its description in API panel.
