@@ -39,3 +39,7 @@ jobs:
     - name: IO test
       run: |
         pytest tests/test_io.py
+    - name: Data aggregation test
+      run: |
+        bash tests/run_aggregate_matrix.sh
+        pytest tests/test_aggr.py

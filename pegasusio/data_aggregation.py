@@ -169,7 +169,8 @@ def aggregate_matrices(
         if "Object" in row:
             data = row["Object"].copy()
         else:
-            assert "Location" in row
+            assert "Location" in row, f"Row of sample '{row['Sample']}' must contain a 'Location' column!"
+            assert not row.isnull().values.any(), f"Row of sample '{row['Sample']}' has one or more NaN/NA values!"
 
             input_file = os.path.expanduser(os.path.expandvars(row["Location"].rstrip(os.sep))) # extend all user variables
             file_type, copy_path, copy_type = infer_file_type(input_file) # infer file type
@@ -198,7 +199,7 @@ def aggregate_matrices(
                 genome = def_genome
             modality = row.get("Modality", None)
             data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
-        
+
         if len(genome_dict) > 0:
             data._update_genome(genome_dict)
 
