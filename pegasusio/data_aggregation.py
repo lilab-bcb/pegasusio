@@ -81,6 +81,8 @@ def aggregate_matrices(
 
     If csv_file is a dictionary, it can contains an alternative 2 columns - Sample, sample name; Object, Multimodal data object. In this case, the objects will be merged into one data object. In addition, aggregate_matrices will make copies instead of editing the objects.
 
+    The csv_file can optionally contain two columns - nUMI and nGene. These two columns define minimum number of UMIs and genes for cell selection for each sample. The values in these two columns overwrite the min_genes and min_umis arguments.
+
     Parameters
     ----------
 
@@ -209,6 +211,10 @@ def aggregate_matrices(
             curr_data = data
             curr_row = row
             curr_sample = row["Sample"]
+            if "nUMI" in row:
+                min_umis = row["nUMI"]
+            if "nGene" in row:
+                min_genes = row["nGene"]
         else:
             curr_data.update(data)
 
