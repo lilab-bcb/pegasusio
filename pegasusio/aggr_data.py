@@ -16,7 +16,10 @@ from pegasusio import UnimodalData, CITESeqData, CytoData, VDJData, MultimodalDa
 def _get_fillna_dict(df: pd.DataFrame) -> dict:
     """ Generate a fillna dict for columns in a df """
     fillna_dict = {}
-    for column in df:
+    hasna = df.isna().sum(axis=0)
+    for column in hasna.index[hasna > 0]:
+        if is_categorical_dtype(df[column]):
+            df[column] = df[column].astype(str)
         if df[column].dtype.kind == "b":
             fillna_dict[column] = False
         elif df[column].dtype.kind in {"i", "u", "f", "c"}:
@@ -145,7 +148,8 @@ class AggrData:
         barcode_metadata_dfs = [unidata.barcode_metadata for unidata in unilist]
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
         fillna_dict = _get_fillna_dict(barcode_metadata)
-        barcode_metadata.fillna(value=fillna_dict, inplace=True)
+        if len(fillna_dict) > 0:
+            barcode_metadata.fillna(value=fillna_dict, inplace=True)
         _check_categorical(barcode_metadata)
 
         var_dict = {}
@@ -160,7 +164,8 @@ class AggrData:
             keys = ["featurekey"] + feature_metadata.columns.intersection(other.feature_metadata.columns).values.tolist()
             feature_metadata = feature_metadata.merge(other.feature_metadata, on=keys, how="outer", sort=False, copy=False)  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
         fillna_dict = _get_fillna_dict(feature_metadata)
-        feature_metadata.fillna(value=fillna_dict, inplace=True)
+        if len(fillna_dict) > 0:
+            feature_metadata.fillna(value=fillna_dict, inplace=True)
         _check_categorical(feature_metadata)
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
