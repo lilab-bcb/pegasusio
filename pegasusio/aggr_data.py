@@ -13,25 +13,37 @@ from pegasusio import timer, run_gc
 from pegasusio import UnimodalData, CITESeqData, CytoData, VDJData, MultimodalData
 
 
-def _get_fillna_dict(df: pd.DataFrame) -> dict:
-    """ Generate a fillna dict for columns in a df """
-    fillna_dict = {}
-    hasna = df.isna().sum(axis=0)
+def _fillna(df: pd.DataFrame) -> None:
+    """ Fill NA with default values """
+    isna = df.isna()
+    hasna = isna.sum(axis=0)
     for column in hasna.index[hasna > 0]:
         if is_categorical_dtype(df[column]):
             df[column] = df[column].astype(str)
-        if df[column].dtype.kind == "b":
-            fillna_dict[column] = False
+
+        default_value = None
+        if df[column].dtype.kind == "O" and type(df[column].unique()[0]) == bool:
+            default_value = False
         elif df[column].dtype.kind in {"i", "u", "f", "c"}:
-            fillna_dict[column] = 0
+            default_value = 0
         elif df[column].dtype.kind == "S":
-            fillna_dict[column] = b""
+            default_value = b""
         elif df[column].dtype.kind in {"O", "U"}:
-            fillna_dict[column] = ""
+            default_value = ""
         else:
             raise ValueError(f"{column} has unsupported dtype {df[column].dtype}!")
 
-    return fillna_dict
+        df.loc[isna[column], column] = default_value
+
+        if type(default_value) == bool:
+            df[column] = df[column].astype(bool)
+
+        if df[column].dtype.kind == "f":
+            int_type = getattr(np, df[column].dtype.name.replace('float', 'int'))
+            values = df[column].values
+            int_values = values.astype(int_type)
+            if np.array_equal(values, int_values):
+                df[column] = int_values
 
 
 def _check_categorical(df:pd.DataFrame) -> None:
@@ -147,9 +159,7 @@ class AggrData:
 
         barcode_metadata_dfs = [unidata.barcode_metadata for unidata in unilist]
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
-        fillna_dict = _get_fillna_dict(barcode_metadata)
-        if len(fillna_dict) > 0:
-            barcode_metadata.fillna(value=fillna_dict, inplace=True)
+        _fillna(barcode_metadata)
         _check_categorical(barcode_metadata)
 
         var_dict = {}
@@ -163,9 +173,7 @@ class AggrData:
         for other in unilist[1:]:
             keys = ["featurekey"] + feature_metadata.columns.intersection(other.feature_metadata.columns).values.tolist()
             feature_metadata = feature_metadata.merge(other.feature_metadata, on=keys, how="outer", sort=False, copy=False)  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
-        fillna_dict = _get_fillna_dict(feature_metadata)
-        if len(fillna_dict) > 0:
-            feature_metadata.fillna(value=fillna_dict, inplace=True)
+        _fillna(feature_metadata)
         _check_categorical(feature_metadata)
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
