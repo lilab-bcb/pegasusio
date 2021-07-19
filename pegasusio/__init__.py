@@ -25,7 +25,7 @@ from .cyto_data import CytoData
 from .nanostring_data import NanostringData
 from .qc_utils import calc_qc_filters, apply_qc_filters, DictWithDefault
 from .multimodal_data import MultimodalData
-from .aggr_data import AggrData, _get_fillna_dict
+from .aggr_data import AggrData, _fillna
 from .readwrite import infer_file_type, read_input, write_output, write_scp_file
 from .data_aggregation import aggregate_matrices
 
