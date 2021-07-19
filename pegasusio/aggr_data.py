@@ -20,7 +20,7 @@ def _get_fillna_dict(df: pd.DataFrame) -> dict:
     for column in hasna.index[hasna > 0]:
         if is_categorical_dtype(df[column]):
             df[column] = df[column].astype(str)
-        if df[column].dtype.kind == "b":
+        if df[column].dtype.kind == "O" and type(df[column].unique()[0]) == bool:
             fillna_dict[column] = False
         elif df[column].dtype.kind in {"i", "u", "f", "c"}:
             fillna_dict[column] = 0
@@ -149,7 +149,7 @@ class AggrData:
         barcode_metadata = pd.concat(barcode_metadata_dfs, axis=0, sort=False, copy=False)
         fillna_dict = _get_fillna_dict(barcode_metadata)
         if len(fillna_dict) > 0:
-            barcode_metadata.fillna(value=fillna_dict, inplace=True)
+            barcode_metadata.fillna(value=fillna_dict, inplace=True, downcast="infer")
         _check_categorical(barcode_metadata)
 
         var_dict = {}
@@ -165,7 +165,7 @@ class AggrData:
             feature_metadata = feature_metadata.merge(other.feature_metadata, on=keys, how="outer", sort=False, copy=False)  # If sort is True, feature keys will be changed even if all channels share the same feature keys.
         fillna_dict = _get_fillna_dict(feature_metadata)
         if len(fillna_dict) > 0:
-            feature_metadata.fillna(value=fillna_dict, inplace=True)
+            feature_metadata.fillna(value=fillna_dict, inplace=True, downcast="infer")
         _check_categorical(feature_metadata)
 
         matrices = self._merge_matrices(feature_metadata, unilist, modality)
