@@ -128,6 +128,18 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.shape = _shape
 
+    def register_attr(self, attr: str, attr_type: str = None) -> None:
+        """ Surrogate function to register an attribute (either in obs or obsm) with an attr_type (e.g. signature, cluster, basis)
+        """
+        assert self._unidata is not None
+        self._unidata.register_attr(attr, attr_type)
+
+    def get_attr_type(self, attr:str) -> str:
+        """ Surrogate function to return registered type for an attribute
+        """
+        assert self._unidata is not None
+        self._unidata.get_attr_type(attr)
+
     def as_float(self, matkey: str = None) -> None:
         """ Surrogate function to convert matrix to float """
         assert self._unidata is not None

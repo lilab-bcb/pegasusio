@@ -87,6 +87,16 @@ class UnimodalData:
                 raise ValueError(f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features.")
 
 
+    def _gen_repr_str_for_attrs(self, key: str) -> str:
+        if key == "obs" or key == "obsm":
+            attr_str = ""
+            for attr in getattr(self, key):
+                attr_type = self.get_attr_type(attr)
+                attr_str += f"{attr}," if attr_type is None else f"{attr}:{attr_type},"
+            return attr_str[:-1]
+        else:
+            return str(list(getattr(self, key).keys()))[1:-1]
+
     def __repr__(self) -> str:
         repr_str = f"{self.__class__.__name__} object with n_obs x n_vars = {self.barcode_metadata.shape[0]} x {self.feature_metadata.shape[0]}"
         repr_str += f"\n    Genome: {self.get_genome()}; Modality: {self.get_modality()}"
@@ -94,7 +104,7 @@ class UnimodalData:
         repr_str += f"\n    It contains {len(self.matrices)} {mat_word}: {str(list(self.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm", "uns"]:
-            repr_str += f"\n    {key}: {str(list(getattr(self, key).keys()))[1:-1]}"
+            rep_str += f"\n    {key}: {self._gen_repr_str_for_attrs(key)}"
         return repr_str
 
 
@@ -193,6 +203,26 @@ class UnimodalData:
     @shape.setter
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape attribute!")
+
+
+    def register_attr(self, attr: str, attr_type: str = None) -> None:
+        """ Register an attribute (either in obs or obsm) with an attr_type (e.g. signature, cluster, basis). Default is None (no attr_type)
+        """
+        if attr_type is None:
+            if "_attr2type" in self.metadata:
+                self.metadata["_attr2type"].pop(attr, None)
+        else:
+            if "_attr2type" not in self.metadata:
+                self.metadata["_attr2type"] = dict()
+            self.metadata["_attr2type"][attr] = attr_type
+
+
+    def get_attr_type(self, attr:str) -> str:
+        """ Return registered type for an attribute. If not registered, return None
+        """
+        if ("_attr2type" not in self.metadata) or (attr not in self.metadata["_attr2type"]):
+            return None
+        return self.metadata["_attr2type"][attr]
 
 
     def polish_featurekey(self, feature_metadata: pd.DataFrame, genome: str) -> None:

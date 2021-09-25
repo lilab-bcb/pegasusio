@@ -222,7 +222,7 @@ class UnimodalDataView:
         repr_str += f"\n    It contains {len(self.parent.matrices)} matrices: {str(list(self.parent.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
         for key in ["obs", "var", "obsm", "varm"]:
-            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else str(list(getattr(self.parent, key).keys()))[1:-1]
+            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else self.parent._gen_repr_str_for_attrs(key)
             repr_str += f"\n    {key}: {str_out}"
         repr_str += f"\n    uns: {str(list(self.metadata))[1:-1]}"
         return repr_str
