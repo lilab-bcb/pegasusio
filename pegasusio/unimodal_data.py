@@ -399,7 +399,7 @@ class UnimodalData:
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
-        """ Initialize from an anndata object
+        """ Initialize from an anndata object, try best not to copy
             If genome/modality is not None, set 'genome'/'modality' as genome/modality
         """
         self.barcode_metadata = data.obs
@@ -410,20 +410,28 @@ class UnimodalData:
         if "gene_ids" in self.feature_metadata:
             self.feature_metadata.rename(columns = {"gene_ids": "featureid"}, inplace = True)
 
-        def _to_csr(X):
-            return X if isinstance(X, csr_matrix) else csr_matrix(X)
-
-        self.matrices = DataDict({"X": _to_csr(data.X)})
+        self.matrices = DataDict({"X": csr_matrix(data.X)}) # csr_matrix will not copy X.data
         if data.raw is not None:
-            self.matrices["raw.X"] = _to_csr(data.raw.X)
+            self.matrices["raw.X"] = csr_matrix(data.raw.X)
         for key, value in data.layers.items():
-            self.matrices[key] = _to_csr(value)
+            self.matrices[key] = csr_matrix(value)
 
-        self.barcode_multiarrays = DataDict(dict(data.obsm))
+        def _create_data_dict(old_dict: dict) -> DataDict:
+            new_dict = dict()
+            for key, value in old_dict.items():
+                if str(type(value)).find("anndata") >= 0:
+                    # This is anndata defined type
+                    if isinstance(value, dict):
+                        new_dict[key] = dict(value)
+                    else:
+                        logger.warning(f"{key} is in anndata-defined data type {type(value)} and thus skipped!")
+                else:
+                    new_dict[key] = value
+            return DataDict(new_dict)
 
-        self.feature_multiarrays = DataDict(dict(data.varm))
-
-        self.metadata = DataDict(dict(data.uns))
+        self.barcode_multiarrays = _create_data_dict(data.obsm)
+        self.feature_multiarrays = _create_data_dict(data.varm)
+        self.metadata = _create_data_dict(data.uns)
 
         self._set_genome(genome)
         self._set_modality(modality)
