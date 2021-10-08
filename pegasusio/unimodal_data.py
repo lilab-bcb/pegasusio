@@ -402,6 +402,9 @@ class UnimodalData:
         """ Initialize from an anndata object, try best not to copy
             If genome/modality is not None, set 'genome'/'modality' as genome/modality
         """
+        if data.is_view:
+            data = data.copy()
+
         self.barcode_metadata = data.obs
         self.barcode_metadata.index.name = "barcodekey"
 
