@@ -420,11 +420,12 @@ class UnimodalData:
             self.matrices[key] = csr_matrix(value)
 
         def _create_data_dict(old_dict: dict) -> DataDict:
+            from pandas.api.types import is_dict_like
             new_dict = dict()
             for key, value in old_dict.items():
                 if str(type(value)).find("anndata") >= 0:
                     # This is anndata defined type
-                    if isinstance(value, dict):
+                    if is_dict_like(value):
                         new_dict[key] = dict(value)
                     else:
                         logger.warning(f"{key} is in anndata-defined data type {type(value)} and thus skipped!")
