@@ -241,7 +241,10 @@ class ZarrFile:
                             matrices = self.read_mapping(group['matrices']),
                             metadata = metadata,
                             barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
-                            feature_multiarrays = self.read_mapping(group['feature_multiarrays']))
+                            feature_multiarrays = self.read_mapping(group['feature_multiarrays']),
+                            barcode_multigraphs = self.read_mapping(group['barcode_multigraphs']) if 'barcode_multigraphs' in group else dict(), # for backward-compatibility
+                            feature_multigraphs = self.read_mapping(group['feature_multigraphs']) if 'feature_multigraphs' in group else dict(), # for backward-compatibility
+                            )
 
         if group.attrs.get('_cur_matrix', None) is not None:
             unidata.select_matrix(group.attrs['_cur_matrix'])
@@ -432,6 +435,10 @@ class ZarrFile:
             self.write_mapping(group, 'barcode_multiarrays', data.barcode_multiarrays, overwrite = overwrite)
         if overwrite or data.feature_multiarrays.is_dirty():
             self.write_mapping(group, 'feature_multiarrays', data.feature_multiarrays, overwrite = overwrite)
+        if overwrite or data.barcode_multigraphs.is_dirty():
+            self.write_mapping(group, 'barcode_multigraphs', data.barcode_multigraphs, overwrite = overwrite)
+        if overwrite or data.feature_multigraphs.is_dirty():
+            self.write_mapping(group, 'feature_multigraphs', data.feature_multigraphs, overwrite = overwrite)
 
 
     def write_multimodal_data(self, data: MultimodalData, overwrite: bool = True) -> None:
