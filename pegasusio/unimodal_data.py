@@ -18,6 +18,22 @@ from .datadict import DataDict
 
 
 
+def _set_genome(metadata: dict, genome: str):
+    if genome is not None:
+        metadata["genome"] = genome
+    elif "genome" not in metadata:
+        metadata["genome"] = "unknown"
+    elif isinstance(metadata["genome"], np.ndarray):
+        assert metadata["genome"].ndim == 1
+        metadata["genome"] = metadata["genome"][0]
+
+def _set_modality(metadata: dict, modality: str):
+    if modality is not None:
+        metadata["modality"] = modality
+    elif "modality" not in metadata:
+        metadata["modality"] = "rna"
+
+
 class UnimodalData:
     def __init__(
         self,
@@ -43,6 +59,9 @@ class UnimodalData:
             return value if value is not None else pd.DataFrame()
 
 
+        _set_genome(metadata, genome)
+        _set_modality(metadata, modality)
+
         self.barcode_metadata = replace_none_df(barcode_metadata) # barcode metadata
         self.feature_metadata = replace_none_df(feature_metadata) # feature metadata
 
@@ -66,7 +85,7 @@ class UnimodalData:
             if not isinstance(self.feature_metadata, pd.DataFrame):
                 raise ValueError(f"Unknown feature_metadata type: {type(self.feature_metadata)}!")
             if "featurekey" in self.feature_metadata:
-                self.polish_featurekey(self.feature_metadata, self.metadata.get('genome', None))
+                self._polish_featurekey(self.feature_metadata, metadata["genome"])
                 self.feature_metadata.set_index("featurekey", inplace=True)
             elif self.feature_metadata.index.name != "featurekey":
                 raise ValueError("Cannot locate feature index featurekey!")
@@ -102,8 +121,6 @@ class UnimodalData:
                     feature_multigraphs[key] = metadata.pop(key)
 
         self.metadata = DataDict(metadata) # other metadata, a dictionary
-        self._set_genome(genome)
-        self._set_modality(modality)
 
         self.barcode_multiarrays = DataDict(barcode_multiarrays)
         self.feature_multiarrays = DataDict(feature_multiarrays)
@@ -268,10 +285,10 @@ class UnimodalData:
             self.metadata["_attr2type"][attr] = attr_type
 
 
-    def polish_featurekey(self, feature_metadata: pd.DataFrame, genome: str) -> None:
+    def _polish_featurekey(self, feature_metadata: pd.DataFrame, genome: str) -> None:
         """    Remove prefixing genome strings and deduplicate feature keys
         """
-        if genome is not None:
+        if genome != "unknown":
             # remove genome strings for 10x chemistry if > 1 genomes exist
             import re
             prefix = re.compile(f"^{genome}_+")
@@ -504,30 +521,11 @@ class UnimodalData:
         self.feature_multigraphs = DataDict(dict(data.varp)) # Note that we do not check if data.obsp contains sparse matrix
 
         self.metadata = DataDict(dict(data.uns))
-
-        self._set_genome(genome)
-        self._set_modality(modality)
+        _set_genome(self.metadata, genome)
+        _set_modality(self.metadata, modality)
 
         self._cur_matrix = "X"
         self._shape = data.shape
-
-    def _set_genome(self, genome):
-        if genome is not None:
-            self.metadata["genome"] = genome
-        elif "genome" not in self.metadata:
-            self.metadata["genome"] = "unknown"
-        elif isinstance(self.metadata["genome"], np.ndarray):
-            assert self.metadata["genome"].ndim == 1
-            self.metadata["genome"] = self.metadata["genome"][0]
-
-    def _set_modality(self, modality):
-        if modality is not None:
-            self.metadata["modality"] = modality
-        elif "modality" not in self.metadata:
-            if self.metadata.get("experiment_type", "none") in modalities:
-                self.metadata["modality"] = self.metadata.pop("experiment_type")
-            else:
-                self.metadata["modality"] = "rna"
 
     def to_anndata(self) -> anndata.AnnData:
         """ Convert to anndata
