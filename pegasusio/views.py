@@ -18,10 +18,12 @@ class MetadataView(MutableMapping):
     def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[object, Dict[str, object]]:
         if key is Ellipsis:
             # Do not return any sparse matrix or multi dimentional arrays
+            from copy import deepcopy
+
             res = {}
             for key, value in self.metadata.items():
                 if (not issparse(value)) and (not (isinstance(value, np.ndarray) and value.ndim > 1)):
-                    res[key] = value
+                    res[key] = deepcopy(value)
             return res
 
         return self.metadata[key]

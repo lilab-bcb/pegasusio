@@ -274,7 +274,7 @@ class UnimodalData:
         return self.metadata["_attr2type"][attr]
 
     def register_attr(self, attr: str, attr_type: str = None) -> None:
-        """ Register an attribute (either in obs or obsm) with an attr_type (e.g. signature, cluster, basis, knn). Default is None (no attr_type)
+        """ Register an attribute (either in obs or obsm) with an attr_type (e.g. signature, cluster, basis, knn). Default is None (no attr_type or pop up)
         """
         if attr_type is None:
             if "_attr2type" in self.metadata:
