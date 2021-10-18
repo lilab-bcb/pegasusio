@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, issparse
 from collections.abc import MutableMapping
 from typing import List, Dict, Union, Tuple
 from pandas.api.types import is_list_like
@@ -9,6 +9,40 @@ from pandas.api.types import is_list_like
 INDEX1D = Union[pd.Index, List[str], List[bool], List[int], slice]
 INDEX = Union[INDEX1D, Tuple[INDEX1D, INDEX1D]]
 CINDEX = Union[slice, List[int]] # CINDEX: Converted Index
+
+
+class MetadataView(MutableMapping):
+    def __init__(self, metadata: dict = None):
+        self.metadata = metadata if metadata is not None else dict()
+
+    def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[object, Dict[str, object]]:
+        if key is Ellipsis:
+            # Do not return any sparse matrix or multi dimentional arrays
+            from copy import deepcopy
+
+            res = {}
+            for key, value in self.metadata.items():
+                if (not issparse(value)) and (not (isinstance(value, np.ndarray) and value.ndim > 1)):
+                    res[key] = deepcopy(value)
+            return res
+
+        return self.metadata[key]
+
+    def __setitem__(self, key: str, value: object):
+        raise ValueError("Cannot set key for MetadataView object!")
+
+    def __delitem__(self, key: str):
+        raise ValueError("Cannot delete key for MetadataView object!")
+
+    def __iter__(self):
+        return iter(self.metadata)
+
+    def __len__(self):
+        return len(self.metadata)
+
+    def __repr__(self) -> str:
+        return f"View of metadata with keys: {str(list(self.metadata))[1:-1]}"
+
 
 class MultiArrayView(MutableMapping):
     def __init__(self, multiarrays: Dict[str, np.ndarray], index: CINDEX):
@@ -46,27 +80,40 @@ class MultiArrayView(MutableMapping):
         return f"View of multiarrays with keys: {str(list(self.parent))[1:-1]}"
 
 
-class MetadataView(MutableMapping):
-    def __init__(self, metadata: dict = None):
-        self.metadata = metadata if metadata is not None else dict()
+class MultiGraphView(MutableMapping):
+    def __init__(self, multigraphs: Dict[str, csr_matrix], index: CINDEX):
+        self.parent = multigraphs
+        self.index = index
+        self.multigraphs = {}
 
-    def __getitem__(self, key: str) -> Union[str, np.ndarray]:
-        return self.metadata[key]
+    def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[csr_matrix, Dict[str, csr_matrix]]:
+        if key is Ellipsis:
+            for key in self.parent:
+                if key not in self.multigraphs:
+                    self.multigraphs[key] = self.parent[key][self.index][:,self.index] 
+            return self.multigraphs
+
+        if key not in self.multigraphs:
+            if key in self.parent:
+                self.multigraphs[key] = self.parent[key][self.index][:,self.index]
+            else:
+                raise ValueError(f"Key '{key}' does not exist!")
+        return self.multigraphs[key]
 
     def __setitem__(self, key: str, value: object):
-        self.metadata[key] = value
+        raise ValueError("Cannot set key for MultiGraphView object!")
 
     def __delitem__(self, key: str):
-        del self.metadata[key]
+        raise ValueError("Cannot delete key for MultiGraphView object!")
 
     def __iter__(self):
-        return iter(self.metadata)
+        return iter(self.parent)
 
     def __len__(self):
-        return len(self.metadata)
+        return len(self.parent)
 
     def __repr__(self) -> str:
-        return f"View of metadata with keys: {str(list(self.metadata))[1:-1]}"
+        return f"View of multigraphs with keys: {str(list(self.parent))[1:-1]}"
 
 
 
@@ -193,19 +240,15 @@ class UnimodalDataView:
         self.parent = unidata
         self.barcode_index = barcode_index
         self.feature_index = feature_index
-        self._all_arrays = isinstance(barcode_index, np.ndarray) and isinstance(feature_index, np.ndarray)
 
         self.barcode_metadata = None
         self.feature_metadata = None
         self.matrices = {}
+        self.metadata = MetadataView(unidata.metadata)
         self.barcode_multiarrays = MultiArrayView(unidata.barcode_multiarrays, barcode_index)
         self.feature_multiarrays = MultiArrayView(unidata.feature_multiarrays, feature_index)
-
-        self.metadata = MetadataView()
-        for key, value in unidata.metadata.items():
-            # For views, only copy string objects
-            if isinstance(value, str):
-                self.metadata[key] = value
+        self.barcode_multigraphs = MultiGraphView(unidata.barcode_multigraphs, barcode_index)
+        self.feature_multigraphs = MultiGraphView(unidata.feature_multigraphs, feature_index)
 
         def _get_size(index: CINDEX) -> int:
             if isinstance(index, slice):
@@ -217,14 +260,17 @@ class UnimodalDataView:
         self._obj_name = obj_name
 
     def __repr__(self, repr_dict: Dict[str, str] = None) -> str:
+        if self.parent is None:
+            return "Invalid View"
+
         repr_str = f"View of {self._obj_name} object with n_obs x n_vars = {self._shape[0]} x {self._shape[1]}"
         repr_str += f"\n    Genome: {self.parent.get_genome()}; Modality: {self.parent.get_modality()}"
         repr_str += f"\n    It contains {len(self.parent.matrices)} matrices: {str(list(self.parent.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
-        for key in ["obs", "var", "obsm", "varm"]:
-            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else str(list(getattr(self.parent, key).keys()))[1:-1]
-            repr_str += f"\n    {key}: {str_out}"
-        repr_str += f"\n    uns: {str(list(self.metadata))[1:-1]}"
+        for key in ["obs", "var", "obsm", "varm", "obsp", "varp", "uns"]:
+            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else self.parent._gen_repr_str_for_attrs(key)
+            if str_out != '':
+                repr_str += f"\n    {key}: {str_out}"
         return repr_str
 
     @property
@@ -268,7 +314,7 @@ class UnimodalDataView:
         if self._cur_matrix not in self.matrices:
             X = self.parent.matrices.get(self._cur_matrix, None)
             if X is not None:
-                self.matrices[self._cur_matrix] = X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
+                self.matrices[self._cur_matrix] = X[self.barcode_index][:,self.feature_index] # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]; basic test suggest X[idx][:,idxy] is as fast. May change if needed.
         return self.matrices.get(self._cur_matrix, None)
 
     @X.setter
@@ -292,6 +338,22 @@ class UnimodalDataView:
         raise ValueError("Cannot set varm for UnimodalDataView object!")
 
     @property
+    def obsp(self) -> Dict[str, csr_matrix]:
+        return self.barcode_multigraphs
+
+    @obsp.setter
+    def obsp(self, obsp: Dict[str, csr_matrix]):
+        raise ValueError("Cannot set obsp for UnimodalDataView object!")
+
+    @property
+    def varp(self) -> Dict[str, csr_matrix]:
+        return self.feature_multigraphs
+
+    @varp.setter
+    def varp(self, varp: Dict[str, csr_matrix]):
+        raise ValueError("Cannot set varp for UnimodalDataView object!")
+
+    @property
     def uns(self) -> MetadataView:
         return self.metadata
 
@@ -306,6 +368,12 @@ class UnimodalDataView:
     @shape.setter
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape for UnimodalDataView object!")
+
+    def get_attr_type(self, attr:str) -> str:
+        return self.parent.get_attr_type(attr)
+
+    def register_attr(self, attr: str, attr_type: str = None) -> None:
+        raise ValueError("Cannot register attribute types for UnimodalDataView object!")
 
     def current_matrix(self) -> str:
         return self._cur_matrix
@@ -323,9 +391,16 @@ class UnimodalDataView:
         for key in self.parent.matrices:
             if key not in self.matrices:
                 X = self.parent.matrices[key]
-                self.matrices[key] = X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
+                self.matrices[key] = X[self.barcode_index][:,self.feature_index] # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
         return self.matrices
 
-    def copy(self, deep: bool = True) -> "UnimodalData":
-        """ If not deep, copy shallowly, which means that if contents of obsm, varm and matrices of the copied object is modified, the view object is also modified """
-        return self.parent._copy_view(self, deep)
+    def copy(self) -> "UnimodalData":
+        """ After copy, this View object becomes invalid """
+        data = self.parent._copy_view(self)
+
+        self.parent = None
+        self.barcode_index = self.feature_index = None
+        self.barcode_metadata = self.feature_metadata = self.matrices = self.metadata = self.barcode_multiarrays = self.feature_multiarrays = self.barcode_multigraphs = self.feature_multigraphs = None
+        self._cur_matrix = self._shape = self._obj_name = None
+
+        return data

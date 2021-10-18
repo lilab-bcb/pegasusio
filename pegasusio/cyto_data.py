@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 from typing import List, Dict, Union
 
 import logging
@@ -23,10 +24,12 @@ class CytoData(UnimodalData):
         metadata: dict,
         barcode_multiarrays: Dict[str, np.ndarray] = None,
         feature_multiarrays: Dict[str, np.ndarray] = None,
+        barcode_multigraphs: Dict[str, csr_matrix] = None,
+        feature_multigraphs: Dict[str, csr_matrix] = None,
         cur_matrix: str = "raw.data",
     ) -> None:
         assert metadata["modality"] == "cyto"
-        super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, cur_matrix)
+        super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs, cur_matrix)
 
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:

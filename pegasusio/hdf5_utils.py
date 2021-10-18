@@ -201,6 +201,13 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
             else:
                 raise ValueError(f"Detected row attribute '{key}' has ndim = {arr.ndim}!")
 
+        barcode_multigraphs = {}
+        for key, graph in ds.col_graphs.items():
+            barcode_multigraphs[key] = csr_matrix(graph)
+        feature_multigraphs = {}
+        for key, graph in ds.row_graphs.items():
+            feature_multigraphs[key] = csr_matrix(graph)
+
         matrices = {}
         for key, mat in ds.layers.items():
             key = "X" if key == "" else key
@@ -220,7 +227,7 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
             else:
                 metadata["modality"] = "rna"
 
-        unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays)
+        unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs)
         unidata.separate_channels()
 
     data = MultimodalData(unidata)
@@ -239,13 +246,20 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
     if len(matrices) == 0:
         raise ValueError("Could not write empty matrix to a loom file!")
 
+    def _replace_slash(name: str) -> str:
+        """ Replace slash with |
+        """
+        if name.find('/') >= 0:
+            return name.replace('/', '|')
+        return name
+
     def _process_attrs(key_name: str, attrs: pd.DataFrame, attrs_multi: dict) -> Dict[str, object]:
         res_dict = {key_name: attrs.index.values}
         for key in attrs.columns:
-            res_dict[key] = np.array(attrs[key].values)
+            res_dict[_replace_slash(key)] = np.array(attrs[key].values)
         for key, value in attrs_multi.items():
             if value.ndim > 1: # value.ndim == 1 refers to np.recarray, which will not be written to a loom file.
-                res_dict[key] = value if value.shape[1] > 1 else value[:, 0]
+                res_dict[_replace_slash(key)] = value if value.shape[1] > 1 else value[:, 0]
         return res_dict
 
     row_attrs = _process_attrs("Gene", data.var, data.varm)
@@ -262,9 +276,16 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
     file_attrs = {}
     for key, value in data.uns.items():
         if isinstance(value, str):
-            file_attrs[key] = value
+            file_attrs[_replace_slash(key)] = value
 
     import loompy
     loompy.create(output_file, layers, row_attrs, col_attrs, file_attrs = file_attrs)
+
+    if len(data.varp) > 0 or len(data.obsp) > 0:
+        with loompy.connect(output_file) as ds:
+            for key, value in data.varp.items():
+                ds.row_graphs[_replace_slash(key)] = value
+            for key, value in data.obsp.items():
+                ds.col_graphs[_replace_slash(key)] = value
 
     logger.info(f"{output_file} is written.")
