@@ -1,4 +1,4 @@
-Version 0.3.2 `October 19, 2021`
+Version 0.4.0 `October 19, 2021`
 ---------------------------------
 
 - Add ``obsp`` and ``varp`` fields to store graph representation in terms of square matrices.
