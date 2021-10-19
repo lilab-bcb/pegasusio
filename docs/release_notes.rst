@@ -1,3 +1,10 @@
+Version 0.3.2 `October 19, 2021`
+---------------------------------
+
+- Add ``obsp`` and ``varp`` fields to store graph representation in terms of square matrices.
+- Allow copy from View of ``AnnData``.
+- In ``MultimodalData``, add ``register_attr`` function to register an attribute of a specified type in ``obs`` or ``obsm`` fields. This can be useful for adding information like gene signatures, etc.
+
 Version 0.3.1 `July 16, 2021`
 -------------------------------
 
