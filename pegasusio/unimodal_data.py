@@ -37,14 +37,14 @@ def _set_modality(metadata: dict, modality: str):
 class UnimodalData:
     def __init__(
         self,
-        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
-        feature_metadata: Union[dict, pd.DataFrame] = None,
-        matrices: Dict[str, csr_matrix] = None,
-        metadata: dict = None,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = pd.DataFrame(),
+        feature_metadata: Union[dict, pd.DataFrame] = pd.DataFrame(),
+        matrices: Dict[str, csr_matrix] = dict(),
+        metadata: dict = dict(),
+        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
+        feature_multiarrays: Dict[str, np.ndarray] = dict(),
+        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
+        feature_multigraphs: Dict[str, csr_matrix] = dict(),
         cur_matrix: str = "X",
         genome: str = None,
         modality: str = None,
@@ -55,15 +55,11 @@ class UnimodalData:
             self.from_anndata(barcode_metadata, genome = genome, modality = modality)
             return None
 
-        def replace_none_df(value):
-            return value if value is not None else pd.DataFrame()
-
-
         _set_genome(metadata, genome)
         _set_modality(metadata, modality)
 
-        self.barcode_metadata = replace_none_df(barcode_metadata) # barcode metadata
-        self.feature_metadata = replace_none_df(feature_metadata) # feature metadata
+        self.barcode_metadata = barcode_metadata # barcode metadata
+        self.feature_metadata = feature_metadata # feature metadata
 
         if len(self.barcode_metadata) > 0:
             if isinstance(self.barcode_metadata, MutableMapping):
@@ -594,7 +590,7 @@ class UnimodalData:
                             viewobj.obsm[...],
                             viewobj.varm[...],
                             viewobj.obsp[...],
-                            viewobj.varp[...],                         
+                            viewobj.varp[...],
                             viewobj._cur_matrix)
 
 
