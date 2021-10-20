@@ -66,10 +66,10 @@ class VDJData(UnimodalData):
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, csr_matrix],
         metadata: dict,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
+        feature_multiarrays: Dict[str, np.ndarray] = dict(),
+        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
+        feature_multigraphs: Dict[str, csr_matrix] = dict(),
         cur_matrix: str = "umis",
     ) -> None:
         assert metadata["modality"] in {"tcr", "bcr"}
@@ -131,7 +131,7 @@ class VDJData(UnimodalData):
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a VDJData object!")
 
-    
+
     def to_anndata(self) -> anndata.AnnData:
         raise ValueError("Cannot convert a VDJData object ot an AnnData object!")
 

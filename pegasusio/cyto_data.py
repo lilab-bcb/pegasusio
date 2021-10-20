@@ -22,10 +22,10 @@ class CytoData(UnimodalData):
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, np.ndarray],
         metadata: dict,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
+        feature_multiarrays: Dict[str, np.ndarray] = dict(),
+        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
+        feature_multigraphs: Dict[str, csr_matrix] = dict(),
         cur_matrix: str = "raw.data",
     ) -> None:
         assert metadata["modality"] == "cyto"
@@ -35,7 +35,7 @@ class CytoData(UnimodalData):
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a CytoData object!")
 
-    
+
     def to_anndata(self) -> anndata.AnnData:
         raise ValueError("Cannot convert a CytoData object ot an AnnData object!")
 
@@ -51,7 +51,7 @@ class CytoData(UnimodalData):
         assert len(self.matrices) == 1 and "raw.data" in self.matrices
         assert "_parameter_names" not in self.metadata
 
-        locs = self.feature_metadata.index.get_indexer(params) 
+        locs = self.feature_metadata.index.get_indexer(params)
         if (locs < 0).sum() > 0:
             raise ValueError(f"Detected unknown parameters {params[locs < 0]}!")
         self.barcode_multiarrays["_parameters"] = self.matrices["raw.data"][:, locs]
@@ -63,9 +63,9 @@ class CytoData(UnimodalData):
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """Conduct arcsinh transform on the raw.count matrix.
-        
+
         Add arcsinh transformed matrix 'arcsinh.transformed'. If jitter == True, instead add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)). Mimic Cytobank.
-        
+
         Parameters
         ----------
         cofactor: ``float``, optional, default: ``5.0``

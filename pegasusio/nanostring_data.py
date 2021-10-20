@@ -20,10 +20,10 @@ class NanostringData(UnimodalData):
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, np.ndarray],
         metadata: dict,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
+        feature_multiarrays: Dict[str, np.ndarray] = dict(),
+        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
+        feature_multigraphs: Dict[str, csr_matrix] = dict(),
         cur_matrix: str = "Q3Norm",
     ) -> None:
         assert metadata["modality"] == "nanostring"
@@ -33,7 +33,7 @@ class NanostringData(UnimodalData):
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a NanostringData object!")
 
-    
+
     def to_anndata(self) -> anndata.AnnData:
         raise ValueError("Cannot convert a NanostringData object ot an AnnData object!")
 
@@ -76,9 +76,9 @@ class NanostringData(UnimodalData):
 
     def log_transform(self, select: bool = True) -> None:
         """Conduct log transformation on the selected matrix: log(x + 1). Selected matrix can be either Q3Norm or HKNorm
-        
+
         Add log-transformed matrix 'LogMatrix'.
-        
+
         Parameters
         ----------
         select: ``bool``, optional, default: ``True``

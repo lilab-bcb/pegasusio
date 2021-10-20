@@ -23,20 +23,20 @@ class CITESeqData(UnimodalData):
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, csr_matrix],
         metadata: dict,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
+        feature_multiarrays: Dict[str, np.ndarray] = dict(),
+        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
+        feature_multigraphs: Dict[str, csr_matrix] = dict(),
         cur_matrix: str = "raw.count",
     ) -> None:
         assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs, cur_matrix)
-        
+
 
     def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a CITESeqData object!")
 
-    
+
     def to_anndata(self) -> anndata.AnnData:
         raise ValueError("Cannot convert a CITESeqData object ot an AnnData object!")
 
@@ -52,7 +52,7 @@ class CITESeqData(UnimodalData):
         assert len(self.matrices) == 1 and "raw.count" in self.matrices
         assert "_other_names" not in self.metadata
 
-        locs = self.feature_metadata.index.get_indexer(params) 
+        locs = self.feature_metadata.index.get_indexer(params)
         if (locs < 0).sum() > 0:
             raise ValueError(f"Detected unknown antibodies {params[locs < 0]}!")
         self.metadata["_other_names"] = self.feature_metadata.index.values[locs] # with loc: List[int], this should be a copy not a reference
@@ -61,7 +61,7 @@ class CITESeqData(UnimodalData):
         obs_keys = self.metadata.get("_obs_keys", [])
         obs_keys.append("_other_counts")
         self.metadata["_obs_keys"] = obs_keys
-        
+
         idx = np.ones(self._shape[1], dtype = bool)
         idx[locs] = False
         self._inplace_subset_var(idx)
@@ -69,9 +69,9 @@ class CITESeqData(UnimodalData):
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
         """Conduct arcsinh transform on the raw.count matrix.
-        
+
         Add arcsinh transformed matrix 'arcsinh.transformed'. If jitter == True, instead add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)). Mimic Cytobank.
-        
+
         Parameters
         ----------
         cofactor: ``float``, optional, default: ``5.0``
