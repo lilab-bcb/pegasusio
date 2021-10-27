@@ -79,7 +79,7 @@ def aggregate_matrices(
 
     This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
-    If csv_file is a dictionary, it can contains an alternative 2 columns - Sample, sample name; Object, Multimodal data object. In this case, the objects will be merged into one data object. In addition, aggregate_matrices will make copies instead of editing the objects.
+    If csv_file is a dictionary, it should contain 2 keys: ``Sample`` for sample names, and ``Object`` for Multimodal data objects. Besides, all the keys in the dictionary must keep values as lists of the same length. In this case, the objects will be merged into one data object. In addition, aggregate_matrices will make copies instead of editing the objects.
 
     The csv_file can optionally contain two columns - nUMI and nGene. These two columns define minimum number of UMIs and genes for cell selection for each sample. The values in these two columns overwrite the min_genes and min_umis arguments.
 
@@ -122,7 +122,8 @@ def aggregate_matrices(
 
     Examples
     --------
-    >>> data = aggregate_matrix('example.csv', restrictions=['Source:pbmc', 'Donor:1'], attributes=['Source', 'Platform', 'Donor'])
+    >>> data = aggregate_matrices('example.csv', restrictions=['Source:pbmc', 'Donor:1'], attributes=['Source', 'Platform', 'Donor'])
+    >>> data = aggregate_matrices({'Sample': ['sample1', 'sample2'], 'Object': [data1, data2]})
     """
     if isinstance(csv_file, str):
         df = pd.read_csv(csv_file, header=0, index_col=False) # load sample sheet
