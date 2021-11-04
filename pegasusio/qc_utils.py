@@ -157,7 +157,7 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
                 # remove categories that contain no elements
                 series = unidata.obs["assignment"].value_counts(sort = False)
                 unidata.obs["assignment"] = pd.Categorical(unidata.obs["assignment"], categories = series[series > 0].index.astype(str))
-            # del unidata.uns["__del_demux_type"]
+            del unidata.uns["__del_demux_type"]
 
         unidata.obs.drop(columns=cols, inplace=True)
         if len(unidata.obsm) > 0:
