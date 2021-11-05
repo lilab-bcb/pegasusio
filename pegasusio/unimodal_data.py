@@ -37,14 +37,14 @@ def _set_modality(metadata: dict, modality: str):
 class UnimodalData:
     def __init__(
         self,
-        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = pd.DataFrame(),
-        feature_metadata: Union[dict, pd.DataFrame] = pd.DataFrame(),
-        matrices: Dict[str, csr_matrix] = dict(),
-        metadata: dict = dict(),
-        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
-        feature_multiarrays: Dict[str, np.ndarray] = dict(),
-        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
-        feature_multigraphs: Dict[str, csr_matrix] = dict(),
+        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
+        feature_metadata: Union[dict, pd.DataFrame] = None,
+        matrices: Dict[str, csr_matrix] = None,
+        metadata: dict = None,
+        barcode_multiarrays: Dict[str, np.ndarray] = None,
+        feature_multiarrays: Dict[str, np.ndarray] = None,
+        barcode_multigraphs: Dict[str, csr_matrix] = None,
+        feature_multigraphs: Dict[str, csr_matrix] = None,
         cur_matrix: str = "X",
         genome: str = None,
         modality: str = None,
@@ -54,6 +54,19 @@ class UnimodalData:
         if isinstance(barcode_metadata, anndata.AnnData):
             self.from_anndata(barcode_metadata, genome = genome, modality = modality)
             return None
+
+        if barcode_metadata is None:
+            barcode_metadata = pd.DataFrame()
+        if feature_metadata is None:
+            feature_metadata = pd.DataFrame()
+        if barcode_multiarrays is None:
+            barcode_multiarrays = dict()
+        if feature_multiarrays is None:
+            feature_multiarrays = dict()
+        if barcode_multigraphs is None:
+            barcode_multigraphs = dict()
+        if feature_multigraphs is None:
+            feature_multigraphs = dict()
 
         _set_genome(metadata, genome)
         _set_modality(metadata, modality)
