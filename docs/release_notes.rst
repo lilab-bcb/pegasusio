@@ -1,3 +1,8 @@
+Version 0.4.1 `November 4, 2021`
+----------------------------------
+
+- Fix issues on ``UnimodalData`` object construction.
+
 Version 0.4.0 `October 19, 2021`
 ---------------------------------
 
