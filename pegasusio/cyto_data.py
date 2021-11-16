@@ -22,10 +22,10 @@ class CytoData(UnimodalData):
         feature_metadata: Union[dict, pd.DataFrame],
         matrices: Dict[str, np.ndarray],
         metadata: dict,
-        barcode_multiarrays: Dict[str, np.ndarray] = dict(),
-        feature_multiarrays: Dict[str, np.ndarray] = dict(),
-        barcode_multigraphs: Dict[str, csr_matrix] = dict(),
-        feature_multigraphs: Dict[str, csr_matrix] = dict(),
+        barcode_multiarrays: Dict[str, np.ndarray] = None,
+        feature_multiarrays: Dict[str, np.ndarray] = None,
+        barcode_multigraphs: Dict[str, csr_matrix] = None,
+        feature_multigraphs: Dict[str, csr_matrix] = None,
         cur_matrix: str = "raw.data",
     ) -> None:
         assert metadata["modality"] == "cyto"
