@@ -17,6 +17,7 @@ from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
 from .cyto_utils import load_fcs_file
 from .nanostring_utils import load_nanostring_files
+from .spatial_utils import load_visium_folder
 
 
 def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
@@ -113,7 +114,7 @@ def read_input(
     input_file : `str`
         Input file name.
     file_type : `str`, optional (default: None)
-        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring'. If None, inferred from input_file.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data), 'nanostring' or 'visium'. If None, inferred from input_file.
     mode: `str`, optional (default: 'r')
         File open mode, options are 'r' or 'a'. If mode == 'a', file_type must be zarr and ngene/select_singlets cannot be set.
     genome : `str`, optional (default: None)
@@ -140,7 +141,7 @@ def read_input(
     >>> data = io.read_input('example.h5ad')
     >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
-    
+
     if is_list_like(input_file):
         input_file = [os.path.expanduser(os.path.expandvars(x)) for x in input_file]
     else:
@@ -171,6 +172,8 @@ def read_input(
             segment_file = input_file[1]
             annotation_file = input_file[2] if len(input_file) > 2 else None
             data = load_nanostring_files(input_matrix, segment_file, annotation_file = annotation_file, genome = genome)
+        elif file_type == 'visium':
+            data = load_visium_folder(input_file)
         elif file_type == "mtx":
             data = load_mtx_file(input_file, genome = genome, modality = modality)
         else:
@@ -207,7 +210,7 @@ def write_output(
     data : MutimodalData
         data to write back.
     output_file : `str`
-        output file name. Note that for mtx files, output_file specifies a directory. For scp format, file_type must be specified. 
+        output file name. Note that for mtx files, output_file specifies a directory. For scp format, file_type must be specified.
     file_type : `str`, optional (default: None)
         File type can be 'zarr' (as folder), 'zarr.zip' (as a ZIP file), 'h5ad', 'loom', 'mtx' or 'scp'. If file_type is None, it will be inferred based on output_file.
     is_sparse : `bool`, optional (default: True)
