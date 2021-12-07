@@ -4,7 +4,8 @@ import pandas as pd
 
 from pegasusio import MultimodalData, SpatialData
 from .hdf5_utils import load_10x_h5_file
-
+from matplotlib.image import imread
+import json
 
 def process_spatial_metadata(df):
     df['in_tissue'] = df['in_tissue'].apply(lambda n: True if n == 1 else False)
@@ -34,7 +35,43 @@ def load_visium_folder(input_path) -> MultimodalData:
     matrices = {'raw.data': rna_data.X}
     metadata = {'genome': rna_data.get_genome(), 'modality': 'visium'}
 
-    spdata = SpatialData(barcode_metadata, feature_metadata, matrices, metadata)
+    #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array, 
+    # which is the spatial location info of each cell in the dataset.
+    obsm = spatial_metadata[['pxl_col_in_fullres', 'pxl_row_in_fullres']]
+    barcode_multiarrays = {"spatial_coordinates":obsm.to_numpy()}
+    
+    #  Store all the other spatial info of cells, i.e. “in_tissue”, “array_row”, and “array_col”
+    obs  = spatial_metadata[['in_tissue', 'array_row', 'array_col']]
+    barcode_metadata = obs
+
+
+     # Store image metadata as a Pandas DataFrame, with the following structure:
+    img = pd.DataFrame()
+    spatial_path = f"{input_path}/spatial"
+    scale_factors = f"{spatial_path}/scalefactors_json.json"
+
+    with open(f"{spatial_path}/scalefactors_json.json") as fp:
+        jsondata = json.load(fp)
+
+
+    # sample id should be the base name of the input path
+    arr = os.listdir(spatial_path)
+    for png in arr:
+        if "hires" in png:
+            data = imread(f"{spatial_path}/{png}")
+
+            dict = {"sample_id":"test", "image_id":"hires", "data":data, "scaleFactor":jsondata["tissue_hires_scalef"]}
+
+            img=img.append(dict, ignore_index=True)
+
+        if "lowres" in png:
+            data = imread(f"{spatial_path}/{png}")
+            dict = {"sample_id":"test", "image_id":"lowres", "data":data, "scaleFactor":jsondata["tissue_lowres_scalef"]}
+            img=img.append(dict, ignore_index=True)
+
+
+    
+    spdata = SpatialData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays=barcode_multiarrays, img=img)
     data = MultimodalData(spdata)
 
     return data

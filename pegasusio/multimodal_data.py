@@ -47,6 +47,19 @@ class MultimodalData:
             self.data[key] = data.data[key]
 
 
+
+    # Check if the img field is there
+    @property
+    def img(self) -> Union[pd.DataFrame, None]:
+        return self._unidata.img if self._unidata is not None and hasattr(self._unidata, 'img') else None
+
+    # Set the img field if needed
+    @img.setter
+    def img(self, img: pd.DataFrame):
+        assert self._unidata is not None 
+        assert self._unidata.get_modality() ==  "visium", "data needs to be spatial"
+        self._unidata.img = img
+
     @property
     def obs(self) -> Union[pd.DataFrame, None]:
         return self._unidata.obs if self._unidata is not None else None

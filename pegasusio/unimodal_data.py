@@ -104,11 +104,11 @@ class UnimodalData:
 
         self.matrices = DataDict(matrices) # a dictionary of scipy csr matrix
 
-        for key, mat in self.matrices.items():
-            if mat.shape[0] != self._shape[0]:
-                raise ValueError(f"Wrong number of barcodes : matrix '{key}' has {mat.shape[0]} barcodes, barcodes file has {self._shape[0]} barcodes.")
-            if mat.shape[1] != self._shape[1]:
-                raise ValueError(f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features.")
+        # for key, mat in self.matrices.items():
+        #     if mat.shape[0] != self._shape[0]:
+        #         raise ValueError(f"Wrong number of barcodes : matrix '{key}' has {mat.shape[0]} barcodes, barcodes file has {self._shape[0]} barcodes.")
+        #     if mat.shape[1] != self._shape[1]:
+        #         raise ValueError(f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features.")
 
         if cur_matrix not in matrices.keys():
             raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
@@ -464,6 +464,7 @@ class UnimodalData:
             from pegasusio.cylib.funcs import split_barcode_channel
         except ModuleNotFoundError:
             print("No module named 'pegasusio.cylib.funcs'")
+            return
 
         barcodes, channels = split_barcode_channel(self.barcode_metadata.index.values)
 
