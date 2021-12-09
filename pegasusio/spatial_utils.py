@@ -14,12 +14,12 @@ def process_spatial_metadata(df):
 
 def load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
-
+    sample_id = input_path.split("/")[-1]
     # Load count matrix.
     hdf5_filename = "raw_feature_bc_matrix.h5"
     assert hdf5_filename in file_list, "Raw count hdf5 file is missing!"
     rna_data = load_10x_h5_file(f"{input_path}/{hdf5_filename}")
-
+    
     # Load spatial metadata.
     assert ("spatial" in file_list) and (os.path.isdir(f"{input_path}/spatial")), "Spatial folder is missing!"
     tissue_pos_csv = "spatial/tissue_positions_list.csv"
@@ -48,25 +48,21 @@ def load_visium_folder(input_path) -> MultimodalData:
      # Store image metadata as a Pandas DataFrame, with the following structure:
     img = pd.DataFrame()
     spatial_path = f"{input_path}/spatial"
-    scale_factors = f"{spatial_path}/scalefactors_json.json"
 
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
-        jsondata = json.load(fp)
+        scale_factors = json.load(fp)
 
 
-    # sample id should be the base name of the input path
     arr = os.listdir(spatial_path)
     for png in arr:
         if "hires" in png:
             data = imread(f"{spatial_path}/{png}")
-
-            dict = {"sample_id":"test", "image_id":"hires", "data":data, "scaleFactor":jsondata["tissue_hires_scalef"]}
-
+            dict = {"sample_id":sample_id, "image_id":"hires", "data":data, "scaleFactor":scale_factors["tissue_hires_scalef"]}
             img=img.append(dict, ignore_index=True)
 
         if "lowres" in png:
             data = imread(f"{spatial_path}/{png}")
-            dict = {"sample_id":"test", "image_id":"lowres", "data":data, "scaleFactor":jsondata["tissue_lowres_scalef"]}
+            dict = {"sample_id":sample_id, "image_id":"lowres", "data":data, "scaleFactor":scale_factors["tissue_lowres_scalef"]}
             img=img.append(dict, ignore_index=True)
 
 

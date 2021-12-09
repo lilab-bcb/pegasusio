@@ -46,8 +46,6 @@ class MultimodalData:
                 raise ValueError(f"Detected duplicated key '{key}'")
             self.data[key] = data.data[key]
 
-
-
     # Check if the img field is there
     @property
     def img(self) -> Union[pd.DataFrame, None]:

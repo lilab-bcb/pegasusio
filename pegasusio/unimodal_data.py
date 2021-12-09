@@ -179,7 +179,6 @@ class UnimodalData:
         self.feature_multigraphs.clear_dirty()
         self.metadata.clear_dirty()
 
-
     @property
     def obs(self) -> pd.DataFrame:
         return self.barcode_metadata

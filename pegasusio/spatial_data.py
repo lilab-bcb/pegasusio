@@ -45,6 +45,15 @@ class SpatialData(UnimodalData):
         feature_multigraphs, 
         cur_matrix)
         self.img = img
+    
+        @property
+        def img(self) -> Union[pd.DataFrame, None]:
+            return self.img
 
-        
+        # Set the img field if needed
+        @img.setter
+        def img(self, img: pd.DataFrame):
+            self.img = img
+
+
 

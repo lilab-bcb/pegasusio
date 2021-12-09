@@ -1,32 +1,25 @@
+from operator import mul
 import unittest
 
 import pytest
-
-from pegasusio import readwrite as io
+import pandas as pd
+from pegasusio import multimodal_data, readwrite, write_output
 from pegasusio.spatial_utils import load_visium_folder
+from pandas.testing import assert_series_equal
 
 class TestSpatial(unittest.TestCase):
 
     @pytest.mark.pytest
-    def test_h5ad(self):
-        print("hello world")
+    def test_spatial_zarr(self):
         data = load_visium_folder("/Users/rocherr/dev/LIB5432879_SAM24387106")
-        # print("obsm:\n")
-        # print(data.get_data(modality='visium').obsm)
-        # print("obs:\n")
-        # print(data.get_data(modality='visium').obs)
-        # print("obs_names:\n")
-        # print(data.get_data(modality='visium').obs_names)
-        # print("feature_metadata:\n")
-        # print(data.get_data(modality='visium').feature_metadata)
-        # print("barcode_metadata:\n")
-        # print(data.get_data(modality='visium').barcode_metadata)
-        # print("barcode_multiarrays:\n")
-        # print(data.get_data(modality='visium').barcode_multiarrays.items())
-        # print(data.get_data().obsm)
-        print("img:",data.img)
+        img = data.img
+        obs = data.obs
+        write_output(data, "spatial.zarr.zip")
+        multimodal_data = readwrite.read_input("spatial.zarr.zip")
+        print(multimodal_data.img)
+        assert multimodal_data
 
-        print("obs:", data.obs)
+        assert pd.DataFrame.equals(multimodal_data.img, img)
+        assert pd.DataFrame.equals(multimodal_data.obs, obs)
 
-
-        print("obsm:", data.obsm["spatial_coordinates"])
+    

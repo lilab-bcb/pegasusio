@@ -8,6 +8,7 @@ from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, i
 from scipy.sparse import csr_matrix, issparse
 import zarr
 from zarr import Blosc
+import numcodecs
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
@@ -15,7 +16,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pegasusio import modalities
-from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData
+from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalData, SpatialData
 
 
 CHUNKSIZE = 1000000.0
@@ -143,6 +144,19 @@ class ZarrFile:
         df = pd.DataFrame(data = data, index = index) # if add columns = columns, the generation will be slow
         return df
 
+    def read_img_dataframe(self, group: zarr.Group) -> pd.DataFrame:
+        columns = group.attrs.get('columns', None)
+        if columns is None:
+            columns = [col for col in group.array_keys() if col != '_index']
+        
+        data = {col: self.read_series(group, col) for col in columns}
+        data['sample_id'] =self.read_series(group, 'sample_id')
+        data['image_id'] = self.read_series(group, 'image_id')
+        data['data'] = self.read_series(group, 'data')
+        data['scaleFactor'] = self.read_series(group, 'scaleFactor')
+        df = pd.DataFrame(data = data)
+        return df
+
 
     def read_array(self, group: zarr.Group, name: str) -> np.ndarray:
         return group[name][...]
@@ -235,6 +249,8 @@ class ZarrFile:
             DataClass = CITESeqData
         elif modality == 'cyto':
             DataClass = CytoData
+        elif modality == 'visium':
+            DataClass = SpatialData
 
         unidata = DataClass(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
                             feature_metadata = self.read_dataframe(group['feature_metadata']),
@@ -244,6 +260,7 @@ class ZarrFile:
                             feature_multiarrays = self.read_mapping(group['feature_multiarrays']),
                             barcode_multigraphs = self.read_mapping(group['barcode_multigraphs']) if 'barcode_multigraphs' in group else dict(), # for backward-compatibility
                             feature_multigraphs = self.read_mapping(group['feature_multigraphs']) if 'feature_multigraphs' in group else dict(), # for backward-compatibility
+                            img = self.read_img_dataframe(group['img']) if 'img' in group else dict(), # for backward-compatibility
                             )
 
         if group.attrs.get('_cur_matrix', None) is not None:
@@ -306,6 +323,18 @@ class ZarrFile:
             self.write_series(group, col, df[col].values)
         group.attrs.update(**attrs_dict)
 
+    def write_img_dataframe(self, parent: zarr.Group, name: str, df: pd.DataFrame) -> None:
+        group = parent.create_group(name, overwrite = True)
+        attrs_dict = {'data_type' : 'data_frame', 'columns' : list(df.columns)}
+        attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
+        self.write_series(group, '_index', df.index.values)
+        for col in df.columns:
+            if col == 'data':
+                img_data = df[col].values
+                group.create_dataset('data', data = img_data, shape = img_data.shape, chunks = calc_chunk(img_data.shape), dtype = img_data.dtype, object_codec=numcodecs.Pickle(), compressor = COMPRESSOR, overwrite = True)
+            else:
+                self.write_series(group, col, df[col].values)
+        group.attrs.update(**attrs_dict)
 
     def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
         dtype = str if array.dtype.kind == 'O' else array.dtype
@@ -426,6 +455,9 @@ class ZarrFile:
 
         self.write_dataframe(group, 'barcode_metadata', data.barcode_metadata)
         self.write_dataframe(group, 'feature_metadata', data.feature_metadata)
+
+        if hasattr(data, 'img'):
+            self.write_img_dataframe(group, 'img', data.img)
 
         if overwrite or data.matrices.is_dirty():
             self.write_mapping(group, 'matrices', data.matrices, overwrite = overwrite)
