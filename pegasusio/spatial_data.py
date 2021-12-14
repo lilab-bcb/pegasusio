@@ -56,4 +56,3 @@ class SpatialData(UnimodalData):
             self.img = img
 
 
-

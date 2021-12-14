@@ -16,7 +16,7 @@ class TestSpatial(unittest.TestCase):
         obs = data.obs
         write_output(data, "spatial.zarr.zip")
         multimodal_data = readwrite.read_input("spatial.zarr.zip")
-        print(multimodal_data.img)
+        print(multimodal_data._unidata)
         assert multimodal_data
 
         assert pd.DataFrame.equals(multimodal_data.img, img)
