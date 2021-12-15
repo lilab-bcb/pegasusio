@@ -141,7 +141,6 @@ def read_input(
     >>> data = io.read_input('example.h5ad')
     >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
-    print("*******read input file")
     if is_list_like(input_file):
         input_file = [os.path.expanduser(os.path.expandvars(x)) for x in input_file]
     else:

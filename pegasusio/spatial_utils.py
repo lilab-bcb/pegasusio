@@ -12,7 +12,7 @@ def process_spatial_metadata(df):
     df['barcodekey'] = df['barcodekey'].map(lambda s: s.split('-')[0])
     df.set_index('barcodekey', inplace=True)
 
-def load_visium_folder(input_path) -> MultimodalData:
+def  load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
     # Load count matrix.
@@ -52,7 +52,6 @@ def load_visium_folder(input_path) -> MultimodalData:
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
         scale_factors = json.load(fp)
 
-
     arr = os.listdir(spatial_path)
     for png in arr:
         if "hires" in png:
@@ -65,8 +64,7 @@ def load_visium_folder(input_path) -> MultimodalData:
             dict = {"sample_id":sample_id, "image_id":"lowres", "data":data, "scaleFactor":scale_factors["tissue_lowres_scalef"]}
             img=img.append(dict, ignore_index=True)
 
-
-    
+    assert not img.empty, "the image data frame is empty"
     spdata = SpatialData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays=barcode_multiarrays, img=img)
     data = MultimodalData(spdata)
 
