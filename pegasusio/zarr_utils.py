@@ -120,10 +120,8 @@ class ZarrFile:
 
         logger.info(f"Converted ZipStore zarr file {orig_path} to NestedDirectoryStore {dest_path}.")
 
-
     def read_csr(self, group: zarr.Group) -> csr_matrix:
         return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
-
 
     def read_series(self, group: zarr.Group, name: str) -> Union[pd.Categorical, np.ndarray]:
         if 'ordered' in group[name].attrs:
@@ -140,9 +138,6 @@ class ZarrFile:
                 npdata = np.array(ll)
                 return npdata[...]
                         
-                    
-
-
     def read_dataframe(self, group: zarr.Group) -> pd.DataFrame:
         columns = group.attrs.get('columns', None)
         if columns is None:
@@ -155,7 +150,6 @@ class ZarrFile:
 
     def read_array(self, group: zarr.Group, name: str) -> np.ndarray:
         return group[name][...]
-
 
     def read_record_array(self, group: zarr.Group) -> np.recarray:
         columns = group.attrs.get('columns', None)
@@ -247,19 +241,25 @@ class ZarrFile:
         elif modality == 'visium':
             DataClass = SpatialData
 
-        unidata = DataClass(barcode_metadata = self.read_dataframe(group['barcode_metadata']),
-                            feature_metadata = self.read_dataframe(group['feature_metadata']),
-                            matrices = self.read_mapping(group['matrices']),
-                            metadata = metadata,
-                            barcode_multiarrays = self.read_mapping(group['barcode_multiarrays']),
-                            feature_multiarrays = self.read_mapping(group['feature_multiarrays']),
-                            barcode_multigraphs = self.read_mapping(group['barcode_multigraphs']) if 'barcode_multigraphs' in group else dict(), # for backward-compatibility
-                            feature_multigraphs = self.read_mapping(group['feature_multigraphs']) if 'feature_multigraphs' in group else dict(), # for backward-compatibility
-                            img = self.read_dataframe(group['img']) if 'img' in group else dict(), # for backward-compatibility
-                            )
-
-        if group.attrs.get('_cur_matrix', None) is not None:
-            unidata.select_matrix(group.attrs['_cur_matrix'])
+        unidata = DataClass(
+            barcode_metadata=self.read_dataframe(group["barcode_metadata"]),
+            feature_metadata=self.read_dataframe(group["feature_metadata"]),
+            matrices=self.read_mapping(group["matrices"]),
+            metadata=metadata,
+            barcode_multiarrays=self.read_mapping(group["barcode_multiarrays"]),
+            feature_multiarrays=self.read_mapping(group["feature_multiarrays"]),
+            barcode_multigraphs=self.read_mapping(group["barcode_multigraphs"])
+            if "barcode_multigraphs" in group
+            else dict(),  # for backward-compatibility
+            feature_multigraphs=self.read_mapping(group["feature_multigraphs"])
+            if "feature_multigraphs" in group
+            else dict(),
+        )
+        if isinstance (unidata, SpatialData):
+            unidata.img = self.read_dataframe(group["img"]) if "img" in group else dict()
+        
+        if group.attrs.get("_cur_matrix", None) is not None:
+            unidata.select_matrix(group.attrs["_cur_matrix"])
 
         return unidata
 

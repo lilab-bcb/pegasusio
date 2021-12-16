@@ -65,7 +65,14 @@ def  load_visium_folder(input_path) -> MultimodalData:
             img=img.append(dict, ignore_index=True)
 
     assert not img.empty, "the image data frame is empty"
-    spdata = SpatialData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays=barcode_multiarrays, img=img)
+    spdata = SpatialData(
+        barcode_metadata,
+        feature_metadata,
+        matrices,
+        metadata,
+        barcode_multiarrays=barcode_multiarrays,
+    )
+    spdata.img = img
     data = MultimodalData(spdata)
 
     return data

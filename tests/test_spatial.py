@@ -12,11 +12,12 @@ class TestSpatial(unittest.TestCase):
     @pytest.mark.pytest
     def test_spatial_zarr(self):
         data = load_visium_folder("/Users/rocherr/dev/LIB5432879_SAM24387106")
+        print("1):",data)
         img = data.img
         obs = data.obs
         write_output(data, "spatial.zarr.zip")
         multimodal_data = readwrite.read_input("spatial.zarr.zip")
-        print(multimodal_data._unidata)
+        print(multimodal_data)
         assert multimodal_data
 
         assert pd.DataFrame.equals(multimodal_data.img, img)
