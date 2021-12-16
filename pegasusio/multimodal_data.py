@@ -33,7 +33,7 @@ class MultimodalData:
     def __repr__(self) -> str:
         repr_str = f"MultimodalData object with {len(self.data)} UnimodalData: {str(list(self.data))[1:-1]}"
         if self._selected is not None:
-            repr_str += f"\n    It currently binds to {self.data.__class__.__name__} object {self._selected}\n\n"
+            repr_str += f"\n    It currently binds to {self._unidata.__class__.__name__} object {self._selected}\n\n"
             repr_str += self._unidata.__repr__()
         else:
             repr_str += "\n    It currently binds to no UnimodalData object"
