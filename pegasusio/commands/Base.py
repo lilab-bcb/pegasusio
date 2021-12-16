@@ -15,7 +15,7 @@ class Base:
         return int(value) if value is not None else None
 
     def convert_to_float(self, value: str) -> float:
-        return float(value) if value is not None else None
+    	return float(value) if value is not None else None
 
     def execute(self):
         raise NotImplementedError

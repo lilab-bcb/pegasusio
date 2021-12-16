@@ -4,8 +4,8 @@ import pandas as pd
 from pegasusio import UnimodalData
 
 import logging
-
 logger = logging.getLogger(__name__)
+
 
 
 class DictWithDefault:
@@ -15,16 +15,17 @@ class DictWithDefault:
         self.default = None
 
         if string is not None:
-            fields = string.split(",")
+            fields = string.split(',')
             for field in fields:
-                if field.find(":") >= 0:
-                    key, value = field.split(":")
+                if field.find(':') >= 0:
+                    key, value = field.split(':')
                     self.mapping[key] = value
                 else:
                     self.default = field
 
     def get(self, key: str) -> str:
         return self.mapping.get(key, self.default)
+
 
 
 def calc_qc_filters(
@@ -37,7 +38,7 @@ def calc_qc_filters(
     min_umis: int = None,
     max_umis: int = None,
     mito_prefix: str = None,
-    percent_mito: float = None,
+    percent_mito: float = None
 ) -> None:
     """Calculate Quality Control (QC) metrics and mark barcodes based on the combination of QC metrics.
 
@@ -98,10 +99,9 @@ def calc_qc_filters(
                 for key in old_keys:
                     remap[key] = new_key
 
-            unidata.obs["assignment"] = pd.Categorical(
-                unidata.obs["assignment"].apply(lambda x: remap[x] if x in remap else x)
-            )
+            unidata.obs["assignment"] = pd.Categorical(unidata.obs["assignment"].apply(lambda x: remap[x] if x in remap else x))
             logger.info("Singlets are remapped.")
+
 
         if subset_string is None:
             filters.append(unidata.obs["demux_type"] == "singlet")
@@ -130,9 +130,7 @@ def calc_qc_filters(
         filters.append(unidata.obs["n_counts"] < max_umis)
 
     if (mito_prefix is not None) and (percent_mito is not None):
-        mito_genes = unidata.var_names.map(
-            lambda x: x.startswith(mito_prefix)
-        ).values.nonzero()[0]
+        mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
         unidata.obs["percent_mito"] = (
             unidata.X[:, mito_genes].sum(axis=1).A1
             / np.maximum(unidata.obs["n_counts"].values, 1.0)
@@ -147,7 +145,7 @@ def calc_qc_filters(
 
 
 def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
-    """Apply QC filters to filter out low quality cells"""
+    """ Apply QC filters to filter out low quality cells """
     if "passed_qc" in unidata.obs:
         prior_n = unidata.shape[0]
         unidata._inplace_subset_obs(unidata.obs["passed_qc"])
@@ -157,11 +155,8 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
             cols.append("demux_type")
             if "assignment" in unidata.obs:
                 # remove categories that contain no elements
-                series = unidata.obs["assignment"].value_counts(sort=False)
-                unidata.obs["assignment"] = pd.Categorical(
-                    unidata.obs["assignment"],
-                    categories=series[series > 0].index.astype(str),
-                )
+                series = unidata.obs["assignment"].value_counts(sort = False)
+                unidata.obs["assignment"] = pd.Categorical(unidata.obs["assignment"], categories = series[series > 0].index.astype(str))
             del unidata.uns["__del_demux_type"]
 
         unidata.obs.drop(columns=cols, inplace=True)
@@ -170,10 +165,8 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
         if len(unidata.varm) > 0:
             unidata.varm.clear()
         if uns_white_list is not None:
-            white_list = set(uns_white_list.split(",") + ["genome", "modality"])
+            white_list = set(uns_white_list.split(',') + ['genome', 'modality'])
             for key in list(unidata.uns):
                 if key not in white_list:
                     del unidata.uns[key]
-        logger.info(
-            f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}."
-        )
+        logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")

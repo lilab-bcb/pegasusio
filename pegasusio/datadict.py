@@ -1,16 +1,17 @@
 from collections.abc import MutableMapping
 
 
+
 class DataDict(MutableMapping):
     def __init__(self, initial_data: dict = None):
         self.mapping = initial_data if initial_data is not None else dict()
 
-        self.init_keys = set(self.mapping)  # record keys when data is loaded
-        self.modified = set()  # record keys that are modified
-        self.deleted = None  # will record keys need to be removed from file, only calculated in is_dirty
-        self._tmp = None  # temporary value to cache new init_keys
+        self.init_keys = set(self.mapping) # record keys when data is loaded
+        self.modified = set() # record keys that are modified
+        self.deleted = None # will record keys need to be removed from file, only calculated in is_dirty
+        self._tmp = None # temporary value to cache new init_keys
 
-        self._overwrite = False  # if overwrite happened
+        self._overwrite = False # if overwrite happened
 
     def __getitem__(self, key):
         return self.mapping[key]
@@ -33,7 +34,7 @@ class DataDict(MutableMapping):
         return f"DataDict object with keys: {str(list(self.mapping))[1:-1]}"
 
     def is_dirty(self):
-        """DataDict should not be updated after calling is_dirty and before calling clear_dirty"""
+        """ DataDict should not be updated after calling is_dirty and before calling clear_dirty """
         if self.deleted is None:
             self._tmp = set(self.mapping)
             self.deleted = self.init_keys - self._tmp
@@ -46,7 +47,7 @@ class DataDict(MutableMapping):
         self._overwrite = False
 
     def overwrite(self, mapping: dict):
-        """Completely overwrite the DataDict"""
+        """ Completely overwrite the DataDict """
         self._overwrite = True
         self.mapping = mapping
         self.init_keys.clear()
@@ -54,13 +55,14 @@ class DataDict(MutableMapping):
         self.deleted = self._tmp = None
 
 
+
 class MultiDataDict(MutableMapping):
     def __init__(self):
         self.mapping = dict()
 
-        self.init_keys = set()  # record keys when data is loaded
-        self.accessed = set()  # record keywords for accessed UnimodalData
-        self.modified = set()  # record keys that are modified
+        self.init_keys = set() # record keys when data is loaded
+        self.accessed = set() # record keywords for accessed UnimodalData
+        self.modified = set() # record keys that are modified
         self.deleted = self._tmp = None
 
     def __getitem__(self, key):
@@ -88,7 +90,7 @@ class MultiDataDict(MutableMapping):
         return f"MultiDataDict object with keys: {str(list(self.mapping))[1:-1]}"
 
     def kick_start(self, data_key):
-        """Since UnimodalData are added sequentially when loading the object, kick_start marks the finish of loading: we begin to track changes now"""
+        """ Since UnimodalData are added sequentially when loading the object, kick_start marks the finish of loading: we begin to track changes now """
         self.init_keys = set(self.mapping)
         self.accessed.clear()
         self.accessed.add(data_key)
