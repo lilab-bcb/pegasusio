@@ -8,21 +8,25 @@ from pandas.api.types import is_list_like
 
 INDEX1D = Union[pd.Index, List[str], List[bool], List[int], slice]
 INDEX = Union[INDEX1D, Tuple[INDEX1D, INDEX1D]]
-CINDEX = Union[slice, List[int]] # CINDEX: Converted Index
+CINDEX = Union[slice, List[int]]  # CINDEX: Converted Index
 
 
 class MetadataView(MutableMapping):
     def __init__(self, metadata: dict = None):
         self.metadata = metadata if metadata is not None else dict()
 
-    def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[object, Dict[str, object]]:
+    def __getitem__(
+        self, key: Union[str, "Ellipsis"]
+    ) -> Union[object, Dict[str, object]]:
         if key is Ellipsis:
             # Do not return any sparse matrix or multi dimentional arrays
             from copy import deepcopy
 
             res = {}
             for key, value in self.metadata.items():
-                if (not issparse(value)) and (not (isinstance(value, np.ndarray) and value.ndim > 1)):
+                if (not issparse(value)) and (
+                    not (isinstance(value, np.ndarray) and value.ndim > 1)
+                ):
                     res[key] = deepcopy(value)
             return res
 
@@ -50,7 +54,9 @@ class MultiArrayView(MutableMapping):
         self.index = index
         self.multiarrays = {}
 
-    def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[np.ndarray, Dict[str, np.ndarray]]:
+    def __getitem__(
+        self, key: Union[str, "Ellipsis"]
+    ) -> Union[np.ndarray, Dict[str, np.ndarray]]:
         if key is Ellipsis:
             for key in self.parent:
                 if key not in self.multiarrays:
@@ -86,16 +92,18 @@ class MultiGraphView(MutableMapping):
         self.index = index
         self.multigraphs = {}
 
-    def __getitem__(self, key: Union[str, "Ellipsis"]) -> Union[csr_matrix, Dict[str, csr_matrix]]:
+    def __getitem__(
+        self, key: Union[str, "Ellipsis"]
+    ) -> Union[csr_matrix, Dict[str, csr_matrix]]:
         if key is Ellipsis:
             for key in self.parent:
                 if key not in self.multigraphs:
-                    self.multigraphs[key] = self.parent[key][self.index][:,self.index] 
+                    self.multigraphs[key] = self.parent[key][self.index][:, self.index]
             return self.multigraphs
 
         if key not in self.multigraphs:
             if key in self.parent:
-                self.multigraphs[key] = self.parent[key][self.index][:,self.index]
+                self.multigraphs[key] = self.parent[key][self.index][:, self.index]
             else:
                 raise ValueError(f"Key '{key}' does not exist!")
         return self.multigraphs[key]
@@ -116,31 +124,58 @@ class MultiGraphView(MutableMapping):
         return f"View of multigraphs with keys: {str(list(self.parent))[1:-1]}"
 
 
-
-def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX) -> Tuple[CINDEX, CINDEX]:
-
-    def _extract_indices_from_parent(parent: Union["UnimodalData", "UnimodalDataView"]) -> Tuple[pd.Index, pd.Index, CINDEX, CINDEX]:
+def _parse_index(
+    parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
+) -> Tuple[CINDEX, CINDEX]:
+    def _extract_indices_from_parent(
+        parent: Union["UnimodalData", "UnimodalDataView"]
+    ) -> Tuple[pd.Index, pd.Index, CINDEX, CINDEX]:
         if hasattr(parent, "barcode_index"):
-            return parent.parent.obs_names, parent.parent.var_names, parent.barcode_index, parent.feature_index
+            return (
+                parent.parent.obs_names,
+                parent.parent.var_names,
+                parent.barcode_index,
+                parent.feature_index,
+            )
         else:
             return parent.obs_names, parent.var_names, None, None
 
     def _check_index_type(index_1d, index_name: str) -> INDEX1D:
         if isinstance(index_1d, slice):
-            if not (isinstance(index_1d.start, int) or isinstance(index_1d.start, np.integer) or isinstance(index_1d.start, str) or (index_1d.start is None)):
-                raise ValueError(f"Invalid slice.start '{index_1d.start}'. slice.start must be either None, integer or string!")
-            if not (isinstance(index_1d.stop, int) or isinstance(index_1d.stop, np.integer) or isinstance(index_1d.stop, str) or (index_1d.stop is None)):
-                raise ValueError(f"Invalid slice.stop '{index_1d.stop}'. slice.stop must be either None, integer or string!")
-            if not (isinstance(index_1d.step, int) or isinstance(index_1d.step, np.integer) or (index_1d.step is None)):
-                raise ValueError(f"Invalid slice.step '{index_1d.step}'. slice.step must be either None or integer!")
+            if not (
+                isinstance(index_1d.start, int)
+                or isinstance(index_1d.start, np.integer)
+                or isinstance(index_1d.start, str)
+                or (index_1d.start is None)
+            ):
+                raise ValueError(
+                    f"Invalid slice.start '{index_1d.start}'. slice.start must be either None, integer or string!"
+                )
+            if not (
+                isinstance(index_1d.stop, int)
+                or isinstance(index_1d.stop, np.integer)
+                or isinstance(index_1d.stop, str)
+                or (index_1d.stop is None)
+            ):
+                raise ValueError(
+                    f"Invalid slice.stop '{index_1d.stop}'. slice.stop must be either None, integer or string!"
+                )
+            if not (
+                isinstance(index_1d.step, int)
+                or isinstance(index_1d.step, np.integer)
+                or (index_1d.step is None)
+            ):
+                raise ValueError(
+                    f"Invalid slice.step '{index_1d.step}'. slice.step must be either None or integer!"
+                )
         elif not isinstance(index_1d, pd.Index):
             if not is_list_like(index_1d):
                 index_1d = np.array([index_1d])
             elif not isinstance(index_1d, np.ndarray):
-                index_1d = np.array(index_1d, copy = False)
+                index_1d = np.array(index_1d, copy=False)
             if index_1d.ndim != 1:
                 raise ValueError(f"{index_name} index must be 1 dimension!")
-            if index_1d.dtype.kind not in {'b', 'i', 'u', 'O', 'U'}:
+            if index_1d.dtype.kind not in {"b", "i", "u", "O", "U"}:
                 raise ValueError(f"Unknown {index_name} index dtype: {index_1d.dtype}!")
         return index_1d
 
@@ -151,8 +186,13 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
         indexer = indexer[indexer >= 0]
         return indexer
 
-    def _parse_one_index(base_idx: pd.Index, index_1d: Union[INDEX1D, None], index_name: str, view_index: CINDEX = None) -> CINDEX:
-        """ index_name: 'row' or 'column' """
+    def _parse_one_index(
+        base_idx: pd.Index,
+        index_1d: Union[INDEX1D, None],
+        index_name: str,
+        view_index: CINDEX = None,
+    ) -> CINDEX:
+        """index_name: 'row' or 'column'"""
         if view_index is not None:
             base_idx = base_idx[view_index]
 
@@ -164,38 +204,54 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
             start = index_1d.start
             if isinstance(start, str):
                 if start not in base_idx:
-                    raise ValueError(f"Cannot locate slice.start '{start}' in {index_name} index!")
+                    raise ValueError(
+                        f"Cannot locate slice.start '{start}' in {index_name} index!"
+                    )
                 start = base_idx.get_loc(start)
             elif start is None:
                 start = 0
             else:
                 if start < 0 or start >= base_idx.size:
-                    raise ValueError(f"slice.start '{start}' is out of the boundary [0, {base_idx.size}) for {index_name} index!")
+                    raise ValueError(
+                        f"slice.start '{start}' is out of the boundary [0, {base_idx.size}) for {index_name} index!"
+                    )
 
             stop = index_1d.stop
             if isinstance(stop, str):
                 if stop not in base_idx:
-                    raise ValueError(f"Cannot locate slice.stop '{stop}' in {index_name} index!")
-                stop = base_idx.get_loc(stop) + np.sign(step) # if str , use [] instead of [)
+                    raise ValueError(
+                        f"Cannot locate slice.stop '{stop}' in {index_name} index!"
+                    )
+                stop = base_idx.get_loc(stop) + np.sign(
+                    step
+                )  # if str , use [] instead of [)
             elif stop is None:
                 stop = base_idx.size
             else:
                 if stop - step < 0 or stop - step >= base_idx.size:
-                    raise ValueError(f"slice.stop '{stop}' is out of the boundary [0, {base_idx.size}) for {index_name} index!")
+                    raise ValueError(
+                        f"slice.stop '{stop}' is out of the boundary [0, {base_idx.size}) for {index_name} index!"
+                    )
 
             indexer = slice(start, stop, step)
-        elif isinstance(index_1d, np.ndarray) and (index_1d.dtype.kind in {'b', 'i', 'u'}):
+        elif isinstance(index_1d, np.ndarray) and (
+            index_1d.dtype.kind in {"b", "i", "u"}
+        ):
             assert index_1d.ndim == 1
 
-            if index_1d.dtype.kind == 'b':
+            if index_1d.dtype.kind == "b":
                 if index_1d.size != base_idx.size:
-                    raise ValueError(f"{index_name} index size does not match: actual size {base_idx.size}, input size {index_1d.size}!")
+                    raise ValueError(
+                        f"{index_name} index size does not match: actual size {base_idx.size}, input size {index_1d.size}!"
+                    )
                 indexer = np.where(index_1d)[0]
-            elif index_1d.dtype.kind == 'i' or index_1d.dtype.kind == 'u':
+            elif index_1d.dtype.kind == "i" or index_1d.dtype.kind == "u":
                 if np.any(index_1d < 0):
                     raise ValueError(f"Detect negative values in {index_name} index!")
                 if np.any(index_1d >= base_idx.size):
-                    raise ValueError(f"Detect values exceeding the largest valid position {base_idx.size - 1} in {index_name} index!")
+                    raise ValueError(
+                        f"Detect values exceeding the largest valid position {base_idx.size - 1} in {index_name} index!"
+                    )
                 if np.unique(index_1d).size < index_1d.size:
                     raise ValueError(f"{index_name} index values are not unique!")
                 indexer = index_1d
@@ -208,14 +264,19 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
         if view_index is not None:
             if isinstance(view_index, slice):
                 if isinstance(indexer, slice):
-                    indexer = slice(view_index.start + (view_index.step * indexer.start), view_index.start + (view_index.step * indexer.stop), view_index.step * indexer.step)
+                    indexer = slice(
+                        view_index.start + (view_index.step * indexer.start),
+                        view_index.start + (view_index.step * indexer.stop),
+                        view_index.step * indexer.step,
+                    )
                 else:
-                    indexer = np.array(range(view_index.start, view_index.stop, view_index.step))[indexer]
+                    indexer = np.array(
+                        range(view_index.start, view_index.stop, view_index.step)
+                    )[indexer]
             else:
                 indexer = view_index[indexer]
 
         return indexer
-
 
     bidx = fidx = slice(None)
     base_bidx, base_fidx, view_bidx, view_fidx = _extract_indices_from_parent(parent)
@@ -231,12 +292,20 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
     else:
         bidx = _check_index_type(index, "row")
 
-    return _parse_one_index(base_bidx, bidx, "row", view_index = view_bidx), _parse_one_index(base_fidx, fidx, "column", view_index = view_fidx)
-
+    return _parse_one_index(
+        base_bidx, bidx, "row", view_index=view_bidx
+    ), _parse_one_index(base_fidx, fidx, "column", view_index=view_fidx)
 
 
 class UnimodalDataView:
-    def __init__(self, unidata: "UnimodalData", barcode_index: CINDEX, feature_index: CINDEX, cur_matrix: str, obj_name: str = "UnimodalData"):
+    def __init__(
+        self,
+        unidata: "UnimodalData",
+        barcode_index: CINDEX,
+        feature_index: CINDEX,
+        cur_matrix: str,
+        obj_name: str = "UnimodalData",
+    ):
         self.parent = unidata
         self.barcode_index = barcode_index
         self.feature_index = feature_index
@@ -245,10 +314,18 @@ class UnimodalDataView:
         self.feature_metadata = None
         self.matrices = {}
         self.metadata = MetadataView(unidata.metadata)
-        self.barcode_multiarrays = MultiArrayView(unidata.barcode_multiarrays, barcode_index)
-        self.feature_multiarrays = MultiArrayView(unidata.feature_multiarrays, feature_index)
-        self.barcode_multigraphs = MultiGraphView(unidata.barcode_multigraphs, barcode_index)
-        self.feature_multigraphs = MultiGraphView(unidata.feature_multigraphs, feature_index)
+        self.barcode_multiarrays = MultiArrayView(
+            unidata.barcode_multiarrays, barcode_index
+        )
+        self.feature_multiarrays = MultiArrayView(
+            unidata.feature_multiarrays, feature_index
+        )
+        self.barcode_multigraphs = MultiGraphView(
+            unidata.barcode_multigraphs, barcode_index
+        )
+        self.feature_multigraphs = MultiGraphView(
+            unidata.feature_multigraphs, feature_index
+        )
 
         def _get_size(index: CINDEX) -> int:
             if isinstance(index, slice):
@@ -266,17 +343,27 @@ class UnimodalDataView:
         repr_str = f"View of {self._obj_name} object with n_obs x n_vars = {self._shape[0]} x {self._shape[1]}"
         repr_str += f"\n    Genome: {self.parent.get_genome()}; Modality: {self.parent.get_modality()}"
         repr_str += f"\n    It contains {len(self.parent.matrices)} matrices: {str(list(self.parent.matrices))[1:-1]}"
-        repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.parent.matrices) > 0 else "\n    It currently binds to no matrix\n"
+        repr_str += (
+            f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n"
+            if len(self.parent.matrices) > 0
+            else "\n    It currently binds to no matrix\n"
+        )
         for key in ["obs", "var", "obsm", "varm", "obsp", "varp", "uns"]:
-            str_out = repr_dict[key] if (repr_dict is not None) and (key in repr_dict) else self.parent._gen_repr_str_for_attrs(key)
-            if str_out != '':
+            str_out = (
+                repr_dict[key]
+                if (repr_dict is not None) and (key in repr_dict)
+                else self.parent._gen_repr_str_for_attrs(key)
+            )
+            if str_out != "":
                 repr_str += f"\n    {key}: {str_out}"
         return repr_str
 
     @property
     def obs(self) -> pd.DataFrame:
         if self.barcode_metadata is None:
-            self.barcode_metadata = self.parent.barcode_metadata.iloc[self.barcode_index].copy(deep = False)
+            self.barcode_metadata = self.parent.barcode_metadata.iloc[
+                self.barcode_index
+            ].copy(deep=False)
         return self.barcode_metadata
 
     @obs.setter
@@ -294,7 +381,9 @@ class UnimodalDataView:
     @property
     def var(self) -> pd.DataFrame:
         if self.feature_metadata is None:
-            self.feature_metadata = self.parent.feature_metadata.iloc[self.feature_index].copy(deep = False)
+            self.feature_metadata = self.parent.feature_metadata.iloc[
+                self.feature_index
+            ].copy(deep=False)
         return self.feature_metadata
 
     @var.setter
@@ -314,7 +403,9 @@ class UnimodalDataView:
         if self._cur_matrix not in self.matrices:
             X = self.parent.matrices.get(self._cur_matrix, None)
             if X is not None:
-                self.matrices[self._cur_matrix] = X[self.barcode_index][:,self.feature_index] # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]; basic test suggest X[idx][:,idxy] is as fast. May change if needed.
+                self.matrices[self._cur_matrix] = X[self.barcode_index][
+                    :, self.feature_index
+                ]  # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]; basic test suggest X[idx][:,idxy] is as fast. May change if needed.
         return self.matrices.get(self._cur_matrix, None)
 
     @X.setter
@@ -369,7 +460,7 @@ class UnimodalDataView:
     def shape(self, _shape: Tuple[int, int]):
         raise ValueError("Cannot set shape for UnimodalDataView object!")
 
-    def get_attr_type(self, attr:str) -> str:
+    def get_attr_type(self, attr: str) -> str:
         return self.parent.get_attr_type(attr)
 
     def register_attr(self, attr: str, attr_type: str = None) -> None:
@@ -385,22 +476,40 @@ class UnimodalDataView:
 
     def __getitem__(self, index: INDEX) -> "UnimodalDataView":
         barcode_index, feature_index = _parse_index(self, index)
-        return UnimodalDataView(self.parent, barcode_index, feature_index, self._cur_matrix, obj_name = self._obj_name)
+        return UnimodalDataView(
+            self.parent,
+            barcode_index,
+            feature_index,
+            self._cur_matrix,
+            obj_name=self._obj_name,
+        )
 
     def _copy_matrices(self) -> Dict[str, csr_matrix]:
         for key in self.parent.matrices:
             if key not in self.matrices:
                 X = self.parent.matrices[key]
-                self.matrices[key] = X[self.barcode_index][:,self.feature_index] # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
+                self.matrices[key] = X[self.barcode_index][
+                    :, self.feature_index
+                ]  # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
         return self.matrices
 
     def copy(self) -> "UnimodalData":
-        """ After copy, this View object becomes invalid """
+        """After copy, this View object becomes invalid"""
         data = self.parent._copy_view(self)
 
         self.parent = None
         self.barcode_index = self.feature_index = None
-        self.barcode_metadata = self.feature_metadata = self.matrices = self.metadata = self.barcode_multiarrays = self.feature_multiarrays = self.barcode_multigraphs = self.feature_multigraphs = None
+        self.barcode_metadata = (
+            self.feature_metadata
+        ) = (
+            self.matrices
+        ) = (
+            self.metadata
+        ) = (
+            self.barcode_multiarrays
+        ) = (
+            self.feature_multiarrays
+        ) = self.barcode_multigraphs = self.feature_multigraphs = None
         self._cur_matrix = self._shape = self._obj_name = None
 
         return data

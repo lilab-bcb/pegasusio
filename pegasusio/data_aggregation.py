@@ -9,6 +9,7 @@ from pegasusio import MultimodalData, AggrData
 from pegasusio import infer_file_type, read_input
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +30,7 @@ def _parse_restriction_string(rstr: str) -> Tuple[str, bool, Set[str]]:
         isin = False
         pos += 1
     content = set()
-    for item in rstr[pos + 1:].split(","):
+    for item in rstr[pos + 1 :].split(","):
         values = item.split("-")
         if len(values) == 1:
             content.add(values[0])
@@ -126,7 +127,7 @@ def aggregate_matrices(
     >>> data = aggregate_matrices({'Sample': ['sample1', 'sample2'], 'Object': [data1, data2]})
     """
     if isinstance(csv_file, str):
-        df = pd.read_csv(csv_file, header=0, index_col=False) # load sample sheet
+        df = pd.read_csv(csv_file, header=0, index_col=False)  # load sample sheet
     elif isinstance(csv_file, dict):
         df = pd.DataFrame(csv_file)
     else:
@@ -154,14 +155,14 @@ def aggregate_matrices(
     if idx.sum() == 0:
         raise ValueError("No data pass the restrictions!")
 
-    df = df.loc[idx].sort_values(by = "Sample") # sort by sample_name
+    df = df.loc[idx].sort_values(by="Sample")  # sort by sample_name
 
     # parse default_ref
     def_genome, genome_dict = _parse_genome_string(default_ref)
 
     # Load data
     tot = 0
-    dest_paths = [] # record localized file paths so that we can remove them later
+    dest_paths = []  # record localized file paths so that we can remove them later
     curr_sample = ""
     curr_row = curr_data = None
     aggrData = AggrData()
@@ -170,19 +171,36 @@ def aggregate_matrices(
         if "Object" in row:
             data = row["Object"].copy()
         else:
-            assert "Location" in row, f"Row of sample '{row['Sample']}' must contain a 'Location' column!"
-            assert not row.isnull().values.any(), f"Row of sample '{row['Sample']}' has one or more NaN/NA values!"
+            assert (
+                "Location" in row
+            ), f"Row of sample '{row['Sample']}' must contain a 'Location' column!"
+            assert (
+                not row.isnull().values.any()
+            ), f"Row of sample '{row['Sample']}' has one or more NaN/NA values!"
 
-            input_file = os.path.expanduser(os.path.expandvars(row["Location"].rstrip(os.sep))) # extend all user variables
-            file_type, copy_path, copy_type = infer_file_type(input_file) # infer file type
+            input_file = os.path.expanduser(
+                os.path.expandvars(row["Location"].rstrip(os.sep))
+            )  # extend all user variables
+            file_type, copy_path, copy_type = infer_file_type(
+                input_file
+            )  # infer file type
 
-            if row["Location"].lower().startswith('gs://'): # if Google bucket
+            if row["Location"].lower().startswith("gs://"):  # if Google bucket
                 base_name = os.path.basename(copy_path)
-                dest_path = f"{idx_num}_tmp_{base_name}" # id_num will make sure dest_path is unique in the sample sheet
-                if not os.path.exists(dest_path):  # if dest_path exists, we may try to localize it once and may have the file cached
+                dest_path = f"{idx_num}_tmp_{base_name}"  # id_num will make sure dest_path is unique in the sample sheet
+                if not os.path.exists(
+                    dest_path
+                ):  # if dest_path exists, we may try to localize it once and may have the file cached
                     if copy_type == "directory":
                         check_call(["mkdir", "-p", dest_path])
-                        call_args = ["gsutil", "-m", "rsync", "-r", copy_path, dest_path]
+                        call_args = [
+                            "gsutil",
+                            "-m",
+                            "rsync",
+                            "-r",
+                            copy_path,
+                            dest_path,
+                        ]
                     else:
                         call_args = ["gsutil", "-m", "cp", copy_path, dest_path]
                     check_call(call_args)
@@ -194,12 +212,14 @@ def aggregate_matrices(
                     input_file = os.path.join(dest_path, os.path.basename(input_file))
 
             genome = row.get("Reference", None)
-            if (genome is not None) and (not isinstance(genome, str)): # to avoid NaN
+            if (genome is not None) and (not isinstance(genome, str)):  # to avoid NaN
                 genome = None
             if genome is None:
                 genome = def_genome
             modality = row.get("Modality", None)
-            data = read_input(input_file, file_type = file_type, genome = genome, modality = modality)
+            data = read_input(
+                input_file, file_type=file_type, genome=genome, modality=modality
+            )
 
         if len(genome_dict) > 0:
             data._update_genome(genome_dict)
@@ -207,8 +227,20 @@ def aggregate_matrices(
         if row["Sample"] != curr_sample:
             if curr_data is not None:
                 curr_data._propogate_genome()
-                curr_data.filter_data(select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
-                curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
+                curr_data.filter_data(
+                    select_singlets=select_singlets,
+                    remap_string=remap_string,
+                    subset_string=subset_string,
+                    min_genes=min_genes,
+                    max_genes=max_genes,
+                    min_umis=min_umis,
+                    max_umis=max_umis,
+                    mito_prefix=mito_prefix,
+                    percent_mito=percent_mito,
+                )
+                curr_data._update_barcode_metadata_info(
+                    curr_row, attributes, append_sample_name
+                )
                 aggrData.add_data(curr_data)
             curr_data = data
             curr_row = row
@@ -224,8 +256,20 @@ def aggregate_matrices(
 
     if curr_data is not None:
         curr_data._propogate_genome()
-        curr_data.filter_data(select_singlets = select_singlets, remap_string = remap_string, subset_string = subset_string, min_genes = min_genes, max_genes = max_genes, min_umis = min_umis, max_umis = max_umis, mito_prefix = mito_prefix, percent_mito = percent_mito)
-        curr_data._update_barcode_metadata_info(curr_row, attributes, append_sample_name)
+        curr_data.filter_data(
+            select_singlets=select_singlets,
+            remap_string=remap_string,
+            subset_string=subset_string,
+            min_genes=min_genes,
+            max_genes=max_genes,
+            min_umis=min_umis,
+            max_umis=max_umis,
+            mito_prefix=mito_prefix,
+            percent_mito=percent_mito,
+        )
+        curr_data._update_barcode_metadata_info(
+            curr_row, attributes, append_sample_name
+        )
         aggrData.add_data(curr_data)
 
     # Merge data

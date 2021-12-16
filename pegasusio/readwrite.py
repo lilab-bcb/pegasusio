@@ -5,6 +5,7 @@ from typing import Tuple, Set, Union, List
 from pandas.api.types import is_list_like
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 from pegasusio import timer
@@ -21,7 +22,7 @@ from .spatial_utils import load_visium_folder
 
 
 def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
-    """ Infer file format from input_file name
+    """Infer file format from input_file name
 
     This function infer file type by inspecting the file name.
 
@@ -75,8 +76,12 @@ def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
         if os.path.basename(input_file) == "expression.csv":
             copy_path = os.path.dirname(input_file)
             copy_type = "directory"
-    elif input_file.endswith(".txt") or input_file.endswith(".tsv") or input_file.endswith(
-        ".txt.gz") or input_file.endswith(".tsv.gz"):
+    elif (
+        input_file.endswith(".txt")
+        or input_file.endswith(".tsv")
+        or input_file.endswith(".txt.gz")
+        or input_file.endswith(".tsv.gz")
+    ):
         file_type = "tsv"
     else:
         raise ValueError(f"Unrecognized file type for file {input_file}!")
@@ -87,7 +92,9 @@ def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
 def is_vdj_file(input_csv: str, file_type: str) -> bool:
     if file_type != "csv":
         return False
-    with (gzip.open(input_csv, "rt") if input_csv.endswith(".gz") else open(input_csv)) as fin:
+    with (
+        gzip.open(input_csv, "rt") if input_csv.endswith(".gz") else open(input_csv)
+    ) as fin:
         line = next(fin)
         return line.find(",chain,v_gene,d_gene,j_gene,c_gene,") >= 0
 
@@ -152,35 +159,47 @@ def read_input(
     if mode == "a":
         if file_type != "zarr":
             raise ValueError("Only Zarr file can have mode 'a'!")
-        zf = ZarrFile(input_file, mode = mode)
-        data = zf.read_multimodal_data(attach_zarrobj = True)
+        zf = ZarrFile(input_file, mode=mode)
+        data = zf.read_multimodal_data(attach_zarrobj=True)
     else:
         if file_type == "zarr":
             zf = ZarrFile(input_file)
             data = zf.read_multimodal_data()
         elif file_type == "h5ad":
-            data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, modality = modality)
+            data = MultimodalData(
+                anndata.read_h5ad(input_file), genome=genome, modality=modality
+            )
         elif file_type == "loom":
-            data = load_loom_file(input_file, genome = genome, modality = modality)
+            data = load_loom_file(input_file, genome=genome, modality=modality)
         elif file_type == "10x":
             data = load_10x_h5_file(input_file)
         elif file_type == "fcs":
-            data = load_fcs_file(input_file, genome = genome)
+            data = load_fcs_file(input_file, genome=genome)
         elif file_type == "nanostring":
             input_matrix = input_file[0]
             segment_file = input_file[1]
             annotation_file = input_file[2] if len(input_file) > 2 else None
-            data = load_nanostring_files(input_matrix, segment_file, annotation_file = annotation_file, genome = genome)
-        elif file_type == 'visium':
+            data = load_nanostring_files(
+                input_matrix,
+                segment_file,
+                annotation_file=annotation_file,
+                genome=genome,
+            )
+        elif file_type == "visium":
             data = load_visium_folder(input_file)
         elif file_type == "mtx":
-            data = load_mtx_file(input_file, genome = genome, modality = modality)
+            data = load_mtx_file(input_file, genome=genome, modality=modality)
         else:
             assert file_type == "csv" or file_type == "tsv"
             if is_vdj_file(input_file, file_type):
-                data = load_10x_vdj_file(input_file, genome = genome, modality = modality)
+                data = load_10x_vdj_file(input_file, genome=genome, modality=modality)
             else:
-                data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality)
+                data = load_csv_file(
+                    input_file,
+                    sep="," if file_type == "csv" else "\t",
+                    genome=genome,
+                    modality=modality,
+                )
 
     data.subset_data(select_data, select_genome, select_modality)
     data.kick_start()
@@ -197,9 +216,9 @@ def write_output(
     output_file: str,
     file_type: str = None,
     is_sparse: bool = True,
-    precision: int = 2
+    precision: int = 2,
 ) -> None:
-    """ Write data back to disk.
+    """Write data back to disk.
 
     This function is used to write data back to disk.
 
@@ -247,10 +266,16 @@ def write_output(
     if file_type not in {"zarr", "zarr.zip", "h5ad", "loom", "mtx", "scp"}:
         raise ValueError(f"Unsupported output file type '{file_type}'!")
 
-    _tmp_multi = data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
+    _tmp_multi = (
+        data._clean_tmp()
+    )  # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
 
     if file_type.startswith("zarr"):
-        zf = ZarrFile(output_file, mode = "w", storage_type = "ZipStore" if file_type == "zarr.zip" else None)
+        zf = ZarrFile(
+            output_file,
+            mode="w",
+            storage_type="ZipStore" if file_type == "zarr.zip" else None,
+        )
         zf.write_multimodal_data(data)
         del zf
     elif file_type == "h5ad":
@@ -258,10 +283,10 @@ def write_output(
     elif file_type == "loom":
         write_loom_file(data, output_file)
     elif file_type == "mtx":
-        write_mtx_file(data, output_file, precision = precision)
+        write_mtx_file(data, output_file, precision=precision)
     else:
         assert file_type == "scp"
-        write_scp_file(data, output_file, is_sparse = is_sparse, precision = precision)
+        write_scp_file(data, output_file, is_sparse=is_sparse, precision=precision)
 
     data._addback_tmp(_tmp_multi)
     logger.info(f"{file_type} file '{output_file}' is written.")

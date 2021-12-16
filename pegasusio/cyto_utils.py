@@ -33,12 +33,16 @@ def load_fcs_file(input_fcs: str, genome: str = None) -> MultimodalData:
     if not os.path.isfile(input_fcs):
         raise FileNotFoundError(f"File {input_fcs} does not exist!")
     feature_metadata, matrix, metadata = read_fcs(input_fcs)
-    barcode_metadata = {"barcodekey": [f"event{i}" for i in range(1, matrix.shape[0] + 1)]}
+    barcode_metadata = {
+        "barcodekey": [f"event{i}" for i in range(1, matrix.shape[0] + 1)]
+    }
     genome = "unknown" if genome is None else genome
     metadata["genome"] = genome
     metadata["modality"] = "cyto"
 
-    cytodata = CytoData(barcode_metadata, feature_metadata, {"raw.data": matrix}, metadata)
+    cytodata = CytoData(
+        barcode_metadata, feature_metadata, {"raw.data": matrix}, metadata
+    )
     data = MultimodalData(cytodata)
 
     return data

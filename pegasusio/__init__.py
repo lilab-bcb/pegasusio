@@ -11,10 +11,21 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-warnings.filterwarnings("ignore", category=FutureWarning, module='anndata')
+warnings.filterwarnings("ignore", category=FutureWarning, module="anndata")
 
 
-modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac', 'cyto', 'nanostring', 'visium']
+modalities = [
+    "rna",
+    "citeseq",
+    "hashing",
+    "tcr",
+    "bcr",
+    "crispr",
+    "atac",
+    "cyto",
+    "nanostring",
+    "visium",
+]
 
 from .decorators import timer, run_gc
 
