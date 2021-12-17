@@ -13,6 +13,9 @@ def process_spatial_metadata(df):
     df['barcodekey'] = df['barcodekey'].map(lambda s: s.split('-')[0])
     df.set_index('barcodekey', inplace=True)
 
+def is_image(filename):
+    return filename.endswith((".png", ".jpg")) 
+
 def  load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
@@ -54,6 +57,8 @@ def  load_visium_folder(input_path) -> MultimodalData:
 
     arr = os.listdir(spatial_path)
     for png in arr:
+        if not is_image(png):
+            continue
         if "hires" in png:
             data = np.array(Image.open(f"{spatial_path}/{png}"))
             dict = {"sample_id":sample_id, "image_id":"hires", "data":data, "scaleFactor":scale_factors["tissue_hires_scalef"]}
