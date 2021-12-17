@@ -3,9 +3,8 @@ import unittest
 
 import pytest
 import pandas as pd
-from pegasusio import multimodal_data, readwrite, write_output
+from pegasusio import readwrite, write_output
 from pegasusio.spatial_utils import load_visium_folder
-from pandas.testing import assert_series_equal
 
 class TestSpatial(unittest.TestCase):
 

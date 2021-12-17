@@ -9,9 +9,8 @@ from pegasusio.unimodal_data import UnimodalData
 logger = logging.getLogger(__name__)
 
 
-
 class SpatialData(UnimodalData):
-       def __init__(
+    def __init__(
         self,
         barcode_metadata: Union[dict, pd.DataFrame],
         feature_metadata: Union[dict, pd.DataFrame],
@@ -61,4 +60,4 @@ class SpatialData(UnimodalData):
             fstr = self._gen_repr_str_for_attrs(key)
             if fstr != "":
                 repr_str += f"\n    {key}: {fstr}"
-
+        return repr_str

@@ -4,8 +4,9 @@ import pandas as pd
 
 from pegasusio import MultimodalData, SpatialData
 from .hdf5_utils import load_10x_h5_file
-from matplotlib.image import imread
 import json
+import numpy as np
+from PIL import Image
 
 def process_spatial_metadata(df):
     df['in_tissue'] = df['in_tissue'].apply(lambda n: True if n == 1 else False)
@@ -44,7 +45,6 @@ def  load_visium_folder(input_path) -> MultimodalData:
     obs  = spatial_metadata[['in_tissue', 'array_row', 'array_col']]
     barcode_metadata = obs
 
-
      # Store image metadata as a Pandas DataFrame, with the following structure:
     img = pd.DataFrame()
     spatial_path = f"{input_path}/spatial"
@@ -55,12 +55,11 @@ def  load_visium_folder(input_path) -> MultimodalData:
     arr = os.listdir(spatial_path)
     for png in arr:
         if "hires" in png:
-            data = imread(f"{spatial_path}/{png}")
+            data = np.array(Image.open(f"{spatial_path}/{png}"))
             dict = {"sample_id":sample_id, "image_id":"hires", "data":data, "scaleFactor":scale_factors["tissue_hires_scalef"]}
             img=img.append(dict, ignore_index=True)
-
-        if "lowres" in png:
-            data = imread(f"{spatial_path}/{png}")
+        elif "lowres" in png:
+            data = np.array(Image.open(f"{spatial_path}/{png}"))
             dict = {"sample_id":sample_id, "image_id":"lowres", "data":data, "scaleFactor":scale_factors["tissue_lowres_scalef"]}
             img=img.append(dict, ignore_index=True)
 

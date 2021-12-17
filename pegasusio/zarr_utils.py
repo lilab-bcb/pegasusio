@@ -130,13 +130,11 @@ class ZarrFile:
         else:
             if isinstance(group[name], zarr.core.Array):
                 return group[name][...]
-                #  handle special case for img
             elif isinstance(group[name], zarr.hierarchy.Group): 
                 ll = []
                 for data in group[name].arrays():
                     ll.append(data[1][...])
-                npdata = np.array(ll)
-                return npdata[...]
+                return ll
                         
     def read_dataframe(self, group: zarr.Group) -> pd.DataFrame:
         columns = group.attrs.get('columns', None)
