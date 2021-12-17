@@ -10,7 +10,7 @@ class TestSpatial(unittest.TestCase):
 
     @pytest.mark.pytest
     def test_spatial_zarr(self):
-        data = load_visium_folder("/Users/rocherr/dev/LIB5432879_SAM24387106")
+        data = load_visium_folder("pegasusio-test-data/spatial_case/LIB5432879_SAM24387106")
         print("1):",data)
         img = data.img
         obs = data.obs
