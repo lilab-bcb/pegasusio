@@ -313,7 +313,6 @@ class ZarrFile:
         attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
         self.write_series(group, '_index', df.index.values)
         for col in df.columns:
-            # handle special for hierarchy type
             if isinstance(df[col].values[0], np.ndarray):
                 colgroup = group.create_group(col, overwrite = True)
                 x = 0
