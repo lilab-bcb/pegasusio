@@ -2,13 +2,13 @@
 
 import os
 import shutil
+import PIL
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, is_dict_like
 from scipy.sparse import csr_matrix, issparse
 import zarr
 from zarr import Blosc
-import numcodecs
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 
@@ -133,7 +133,7 @@ class ZarrFile:
             elif isinstance(group[name], zarr.hierarchy.Group): 
                 ll = []
                 for data in group[name].arrays():
-                    ll.append(data[1][...])
+                    ll.append(PIL.Image.fromarray(data[1][...]))
                 return ll
                         
     def read_dataframe(self, group: zarr.Group) -> pd.DataFrame:
@@ -313,12 +313,14 @@ class ZarrFile:
         attrs_dict['index_name'] = df.index.name if df.index.name is not None else 'index'
         self.write_series(group, '_index', df.index.values)
         for col in df.columns:
-            if isinstance(df[col].values[0], np.ndarray):
+            if isinstance(df[col].values[0], PIL.Image.Image):
+                print("1) writing:", col, type(df[col].values))
                 colgroup = group.create_group(col, overwrite = True)
                 x = 0
                 for data in df[col].values:
+                    npdata = np.array(data)
                     x = x+1
-                    self.write_series(colgroup, col + str(x), data )
+                    self.write_series(colgroup, col + str(x), npdata)
             else:
                 self.write_series(group, col, df[col].values)
         group.attrs.update(**attrs_dict)
@@ -326,7 +328,6 @@ class ZarrFile:
     def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
         dtype = str if array.dtype.kind == 'O' else array.dtype
         group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
-
 
     def write_record_array(self, parent: zarr.Group, name: str, array: np.recarray) -> None:
         group = parent.create_group(name, overwrite = True) 

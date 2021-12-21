@@ -157,7 +157,7 @@ class UnimodalData:
         mat_word = 'matrices' if len(self.matrices) > 1 else 'matrix'
         repr_str += f"\n    It contains {len(self.matrices)} {mat_word}: {str(list(self.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
-        for key in ["obs", "var", "obsm", "varm", "obsp", "varp", "uns", "img"]:
+        for key in ["obs", "var", "obsm", "varm", "obsp", "varp", "uns"]:
             fstr = self._gen_repr_str_for_attrs(key)
             if fstr != '':
                 repr_str += f"\n    {key}: {fstr}"
@@ -467,7 +467,6 @@ class UnimodalData:
             from pegasusio.cylib.funcs import split_barcode_channel
         except ModuleNotFoundError:
             print("No module named 'pegasusio.cylib.funcs'")
-            return
 
         barcodes, channels = split_barcode_channel(self.barcode_metadata.index.values)
 

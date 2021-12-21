@@ -16,7 +16,7 @@ def process_spatial_metadata(df):
 def is_image(filename):
     return filename.endswith((".png", ".jpg")) 
 
-def  load_visium_folder(input_path) -> MultimodalData:
+def load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
     # Load count matrix.
@@ -60,11 +60,15 @@ def  load_visium_folder(input_path) -> MultimodalData:
         if not is_image(png):
             continue
         if "hires" in png:
-            data = np.array(Image.open(f"{spatial_path}/{png}"))
+            with Image.open(f"{spatial_path}/{png}") as data:
+                data.load()
+            print("read img data:",type(data))
             dict = {"sample_id":sample_id, "image_id":"hires", "data":data, "scaleFactor":scale_factors["tissue_hires_scalef"]}
             img=img.append(dict, ignore_index=True)
         elif "lowres" in png:
-            data = np.array(Image.open(f"{spatial_path}/{png}"))
+            with Image.open(f"{spatial_path}/{png}") as data:
+                data.load()
+            print("read img data:",type(data))
             dict = {"sample_id":sample_id, "image_id":"lowres", "data":data, "scaleFactor":scale_factors["tissue_lowres_scalef"]}
             img=img.append(dict, ignore_index=True)
 
@@ -75,8 +79,8 @@ def  load_visium_folder(input_path) -> MultimodalData:
         matrices,
         metadata,
         barcode_multiarrays=barcode_multiarrays,
+        img=img,
     )
-    spdata.img = img
     data = MultimodalData(spdata)
 
     return data
