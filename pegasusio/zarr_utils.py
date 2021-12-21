@@ -314,7 +314,6 @@ class ZarrFile:
         self.write_series(group, '_index', df.index.values)
         for col in df.columns:
             if isinstance(df[col].values[0], PIL.Image.Image):
-                print("1) writing:", col, type(df[col].values))
                 colgroup = group.create_group(col, overwrite = True)
                 x = 0
                 for data in df[col].values:
