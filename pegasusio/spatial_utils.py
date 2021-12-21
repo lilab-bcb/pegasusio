@@ -19,6 +19,10 @@ def is_image(filename):
 
 
 def load_visium_folder(input_path) -> MultimodalData:
+    """
+    Method to read the visium spatial data folder
+    into MultimodalData object that contains SpatialData
+    """
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
     # Load count matrix.

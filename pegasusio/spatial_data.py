@@ -6,10 +6,18 @@ from typing import Dict, Optional, Union
 import logging
 
 from pegasusio.unimodal_data import UnimodalData
+
 logger = logging.getLogger(__name__)
 
 
 class SpatialData(UnimodalData):
+    """
+    Class to implement data structure to
+    manipulate spatial data with the spatial image (img) field
+    This class extends UnimodalData with additional
+    functions specific to the img field
+    """
+
     def __init__(
         self,
         barcode_metadata: Optional[Union[dict, pd.DataFrame]] = None,
@@ -21,7 +29,7 @@ class SpatialData(UnimodalData):
         barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         cur_matrix: str = "raw.data",
-        img = None,
+        img=None,
     ) -> None:
         assert metadata["modality"] == "visium"
         super().__init__(
