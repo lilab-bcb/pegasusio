@@ -1,7 +1,7 @@
 import gc
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix, hstack, vstack
+from scipy.sparse import csr_matrix, hstack
 from typing import List, Dict, Union, Set, Tuple, Optional
 
 import logging
@@ -46,6 +46,17 @@ class MultimodalData:
                 raise ValueError(f"Detected duplicated key '{key}'")
             self.data[key] = data.data[key]
 
+    # Check if the img field is there
+    @property
+    def img(self) -> Union[pd.DataFrame, None]:
+        return self._unidata.img if self._unidata is not None and hasattr(self._unidata, 'img') else None
+
+    # Set the img field if needed
+    @img.setter
+    def img(self, img: pd.DataFrame):
+        assert self._unidata is not None 
+        assert self._unidata.get_modality() ==  "visium", "data needs to be spatial"
+        self._unidata.img = img
 
     @property
     def obs(self) -> Union[pd.DataFrame, None]:
@@ -358,7 +369,6 @@ class MultimodalData:
         """
         Filter each "rna" modality UnimodalData in the focus_list separately using the set filtration parameters. Then for all other UnimodalData objects, select only barcodes that are in the union of selected barcodes from previously filtered UnimodalData objects.
         If focus_list is None, focus_list = [self._selected]
-
         Parameters
         ----------
         select_singlets: ``bool``, optional, default ``False``

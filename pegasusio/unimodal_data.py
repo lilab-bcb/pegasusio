@@ -4,7 +4,7 @@ from scipy.sparse import csr_matrix
 from collections.abc import MutableMapping
 from copy import deepcopy
 from natsort import natsorted
-from typing import List, Dict, Union, Set, Tuple
+from typing import List, Dict, Union, Set, Tuple, Optional
 
 import logging
 logger = logging.getLogger(__name__)
@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 import anndata
 
 from pegasusio import run_gc
-from pegasusio import modalities
 from .views import INDEX, _parse_index, UnimodalDataView
 from .datadict import DataDict
 
@@ -37,17 +36,17 @@ def _set_modality(metadata: dict, modality: str):
 class UnimodalData:
     def __init__(
         self,
-        barcode_metadata: Union[dict, pd.DataFrame, anndata.AnnData] = None,
-        feature_metadata: Union[dict, pd.DataFrame] = None,
-        matrices: Dict[str, csr_matrix] = None,
-        metadata: dict = None,
-        barcode_multiarrays: Dict[str, np.ndarray] = None,
-        feature_multiarrays: Dict[str, np.ndarray] = None,
-        barcode_multigraphs: Dict[str, csr_matrix] = None,
-        feature_multigraphs: Dict[str, csr_matrix] = None,
+        barcode_metadata: Optional[Union[dict, pd.DataFrame, anndata.AnnData]] = None,
+        feature_metadata: Optional[Union[dict, pd.DataFrame]] = None,
+        matrices: Optional[Dict[str, csr_matrix]] = None,
+        metadata: Optional[dict] = None,
+        barcode_multiarrays: Optional[Dict[str, np.ndarray]] = None,
+        feature_multiarrays: Optional[Dict[str, np.ndarray]] = None,
+        barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
+        feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         cur_matrix: str = "X",
-        genome: str = None,
-        modality: str = None,
+        genome: Optional[str] = None,
+        modality: Optional[str] = None,
     ) -> None:
         """ Note that metadata, barcode_mutiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs can be modified.
         """
@@ -106,9 +105,13 @@ class UnimodalData:
 
         for key, mat in self.matrices.items():
             if mat.shape[0] != self._shape[0]:
-                raise ValueError(f"Wrong number of barcodes : matrix '{key}' has {mat.shape[0]} barcodes, barcodes file has {self._shape[0]} barcodes.")
+                raise ValueError(
+                    f"Wrong number of barcodes : matrix '{key}' has {mat.shape[0]} barcodes, barcodes file has {self._shape[0]} barcodes."
+                )
             if mat.shape[1] != self._shape[1]:
-                raise ValueError(f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features.")
+                raise ValueError(
+                    f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features."
+                )
 
         if cur_matrix not in matrices.keys():
             raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
@@ -178,7 +181,6 @@ class UnimodalData:
         self.barcode_multigraphs.clear_dirty()
         self.feature_multigraphs.clear_dirty()
         self.metadata.clear_dirty()
-
 
     @property
     def obs(self) -> pd.DataFrame:
