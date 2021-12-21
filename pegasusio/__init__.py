@@ -14,7 +14,7 @@ logger.addHandler(ch)
 warnings.filterwarnings("ignore", category=FutureWarning, module='anndata')
 
 
-modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac', 'cyto', 'nanostring']
+modalities = ['rna', 'citeseq', 'hashing', 'tcr', 'bcr', 'crispr', 'atac', 'cyto', 'nanostring', 'visium']
 
 from .decorators import timer, run_gc
 
@@ -23,6 +23,7 @@ from .vdj_data import VDJData
 from .citeseq_data import CITESeqData
 from .cyto_data import CytoData
 from .nanostring_data import NanostringData
+from .spatial_data import SpatialData
 from .qc_utils import calc_qc_filters, apply_qc_filters, DictWithDefault
 from .multimodal_data import MultimodalData
 from .aggr_data import AggrData, _fillna

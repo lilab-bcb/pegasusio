@@ -17,19 +17,16 @@ from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
 from .cyto_utils import load_fcs_file
 from .nanostring_utils import load_nanostring_files
+from .spatial_utils import load_visium_folder
 
 
 def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
     """ Infer file format from input_file name
-
     This function infer file type by inspecting the file name.
-
     Parameters
     ----------
-
     input_file : `str` or `List[str]`
         Input file name.
-
     Returns
     -------
     `str`
@@ -38,7 +35,6 @@ def infer_file_type(input_file: Union[str, List[str]]) -> Tuple[str, str, str]:
         The path covering all input files. Most time this is the same as input_file. But for HCA mtx and csv, this should be parent directory.
     `str`
         Type of the path, either 'file' or 'directory'.
-
     Note: The last two `str`s are mainly used for transfer to cloud
     """
     file_type = None
@@ -104,16 +100,13 @@ def read_input(
     select_modality: Set[str] = None,
 ) -> MultimodalData:
     """Load data into memory.
-
     This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring' (Nanostring GeoMx spatial data) formats.
-
     Parameters
     ----------
-
     input_file : `str`
         Input file name.
     file_type : `str`, optional (default: None)
-        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring'. If None, inferred from input_file.
+        File type, choosing from 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data), 'nanostring' or 'visium'. If None, inferred from input_file.
     mode: `str`, optional (default: 'r')
         File open mode, options are 'r' or 'a'. If mode == 'a', file_type must be zarr and ngene/select_singlets cannot be set.
     genome : `str`, optional (default: None)
@@ -128,19 +121,15 @@ def read_input(
         Only select data with genomes in select_genome. Select_data, select_genome and select_modality are mutually exclusive.
     select_modality: `Set[str]`, optional (default: None)
         Only select data with modalities in select_modality. Select_data, select_genome and select_modality are mutually exclusive.
-
     Returns
     -------
-
     A MultimodalData object.
-
     Examples
     --------
     >>> data = io.read_input('example_10x.h5')
     >>> data = io.read_input('example.h5ad')
     >>> data = io.read_input('example_ADT.csv', genome = 'hashing_HTO', modality = 'hashing')
     """
-    
     if is_list_like(input_file):
         input_file = [os.path.expanduser(os.path.expandvars(x)) for x in input_file]
     else:
@@ -171,6 +160,8 @@ def read_input(
             segment_file = input_file[1]
             annotation_file = input_file[2] if len(input_file) > 2 else None
             data = load_nanostring_files(input_matrix, segment_file, annotation_file = annotation_file, genome = genome)
+        elif file_type == 'visium':
+            data = load_visium_folder(input_file)
         elif file_type == "mtx":
             data = load_mtx_file(input_file, genome = genome, modality = modality)
         else:
@@ -198,27 +189,22 @@ def write_output(
     precision: int = 2
 ) -> None:
     """ Write data back to disk.
-
     This function is used to write data back to disk.
-
     Parameters
     ----------
-
     data : MutimodalData
         data to write back.
     output_file : `str`
-        output file name. Note that for mtx files, output_file specifies a directory. For scp format, file_type must be specified. 
+        output file name. Note that for mtx files, output_file specifies a directory. For scp format, file_type must be specified.
     file_type : `str`, optional (default: None)
         File type can be 'zarr' (as folder), 'zarr.zip' (as a ZIP file), 'h5ad', 'loom', 'mtx' or 'scp'. If file_type is None, it will be inferred based on output_file.
     is_sparse : `bool`, optional (default: True)
         Only used for writing out SCP-compatible files, if write expression as a sparse matrix.
     precision : `int`, optional (default: 2)
         Precision after decimal point for values in mtx and scp expression matrix.
-
     Returns
     -------
     `None`
-
     Examples
     --------
     >>> io.write_output(data, 'test.zarr')
