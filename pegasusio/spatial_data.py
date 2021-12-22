@@ -29,7 +29,7 @@ class SpatialData(UnimodalData):
         barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         cur_matrix: str = "raw.data",
-        img=None,
+        img: Optional[pd.DataFrame] = None,
     ) -> None:
         assert metadata["modality"] == "visium"
         super().__init__(

@@ -32,7 +32,7 @@ def load_10x_vdj_file(input_csv: str, genome: str = None, modality: str = None) 
         from pegasusio.cylib.funcs import convert_10x_vdj_to_vdjdata
     except ModuleNotFoundError:
         print("No module named 'pegasusio.cylib.funcs'")
-        
+
     df = pd.read_csv(input_csv, na_filter = False) # Otherwise, '' will be converted to NaN
     idx = df["productive"] == (True if df["productive"].dtype.kind == "b" else "True")
     df = df[idx]

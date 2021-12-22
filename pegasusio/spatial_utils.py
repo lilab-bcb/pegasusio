@@ -1,4 +1,4 @@
-import os
+import os, re
 
 import pandas as pd
 
@@ -12,10 +12,6 @@ def process_spatial_metadata(df):
     df["in_tissue"] = df["in_tissue"].apply(lambda n: True if n == 1 else False)
     df["barcodekey"] = df["barcodekey"].map(lambda s: s.split("-")[0])
     df.set_index("barcodekey", inplace=True)
-
-
-def is_image(filename):
-    return filename.endswith((".png", ".jpg"))
 
 
 def load_visium_folder(input_path) -> MultimodalData:
@@ -70,30 +66,27 @@ def load_visium_folder(input_path) -> MultimodalData:
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
         scale_factors = json.load(fp)
 
-    arr = os.listdir(spatial_path)
-    for png in arr:
-        if not is_image(png):
-            continue
-        if "hires" in png:
-            with Image.open(f"{spatial_path}/{png}") as data:
-                data.load()
-            dict = {
-                "sample_id": sample_id,
-                "image_id": "hires",
-                "data": data,
-                "scaleFactor": scale_factors["tissue_hires_scalef"],
-            }
-            img = img.append(dict, ignore_index=True)
-        elif "lowres" in png:
-            with Image.open(f"{spatial_path}/{png}") as data:
-                data.load()
-            dict = {
-                "sample_id": sample_id,
-                "image_id": "lowres",
-                "data": data,
-                "scaleFactor": scale_factors["tissue_lowres_scalef"],
-            }
-            img = img.append(dict, ignore_index=True)
+    def get_image_data(filepath, sample_id, image_id, scaleFactor):
+        data = Image.open(filepath)
+        dict = {
+            "sample_id": sample_id,
+            "image_id": image_id,
+            "data": data,
+            "scaleFactor": scaleFactor,
+        }
+        return dict
+
+    for png in [f for f in os.listdir(spatial_path) if re.match(".*\.png", f)]:
+        if ("_hires_" in png) or ("_lowres_" in png):
+            filepath = f"{spatial_path}/{png}"
+            res_tag = "hires" if "_hires_" in png else "lowres"
+            image_item = get_image_data(
+                filepath,
+                sample_id,
+                res_tag,
+                scale_factors[f"tissue_{res_tag}_scalef"]
+            )
+            img = img.append(image_item, ignore_index=True)
 
     assert not img.empty, "the image data frame is empty"
     spdata = SpatialData(
