@@ -90,7 +90,7 @@ class MultiGraphView(MutableMapping):
         if key is Ellipsis:
             for key in self.parent:
                 if key not in self.multigraphs:
-                    self.multigraphs[key] = self.parent[key][self.index][:,self.index] 
+                    self.multigraphs[key] = self.parent[key][self.index][:,self.index]
             return self.multigraphs
 
         if key not in self.multigraphs:

@@ -54,7 +54,7 @@ class MultimodalData:
     # Set the img field if needed
     @img.setter
     def img(self, img: pd.DataFrame):
-        assert self._unidata is not None 
+        assert self._unidata is not None
         assert self._unidata.get_modality() ==  "visium", "data needs to be spatial"
         self._unidata.img = img
 
