@@ -128,14 +128,14 @@ class ZarrFile:
             # categorical column
             return pd.Categorical.from_codes(group[name][...], categories = group[f'_categories/{name}'][...], ordered = group[name].attrs['ordered'])
         else:
-            if isinstance(group[name], zarr.core.Array):
-                return group[name][...]
-            elif isinstance(group[name], zarr.hierarchy.Group): 
+            if isinstance(group[name], zarr.hierarchy.Group):
                 ll = []
                 for data in group[name].arrays():
                     ll.append(PIL.Image.fromarray(data[1][...]))
                 return ll
-                        
+            else:
+                return group[name][...]
+
     def read_dataframe(self, group: zarr.Group) -> pd.DataFrame:
         columns = group.attrs.get('columns', None)
         if columns is None:
@@ -195,10 +195,10 @@ class ZarrFile:
 
         if 'scalar' in group.attrs:
             res_dict.update(group.attrs['scalar'])
-        
+
         for key in group.array_keys():
             res_dict[key] = self.read_array(group, key)
-        
+
         for key in group.group_keys():
             sub_group = group[key]
             data_type = sub_group.attrs['data_type']
@@ -255,7 +255,7 @@ class ZarrFile:
         )
         if isinstance (unidata, SpatialData):
             unidata.img = self.read_dataframe(group["img"]) if "img" in group else dict()
-        
+
         if group.attrs.get("_cur_matrix", None) is not None:
             unidata.select_matrix(group.attrs["_cur_matrix"])
 
@@ -317,9 +317,8 @@ class ZarrFile:
                 colgroup = group.create_group(col, overwrite = True)
                 x = 0
                 for data in df[col].values:
-                    npdata = np.array(data)
                     x = x+1
-                    self.write_series(colgroup, col + str(x), npdata)
+                    self.write_series(colgroup, col + str(x), np.array(data))
             else:
                 self.write_series(group, col, df[col].values)
         group.attrs.update(**attrs_dict)
@@ -329,7 +328,7 @@ class ZarrFile:
         group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
 
     def write_record_array(self, parent: zarr.Group, name: str, array: np.recarray) -> None:
-        group = parent.create_group(name, overwrite = True) 
+        group = parent.create_group(name, overwrite = True)
         attrs_dict = {'data_type' : 'record_array', 'columns' : list(array.dtype.names)}
         for col in array.dtype.names:
             self.write_array(group, col, array[col])
@@ -470,5 +469,5 @@ class ZarrFile:
             for key in data.data.deleted:
                 del self.root[key]
             for key in data.data.accessed:
-                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = key in data.data.modified)            
+                self.write_unimodal_data(self.root, key, data.get_data(key), overwrite = key in data.data.modified)
         self.root.attrs['_selected'] = data._selected
