@@ -28,7 +28,7 @@ class SpatialData(UnimodalData):
         feature_multiarrays: Optional[Dict[str, np.ndarray]] = None,
         barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
-        cur_matrix: str = "raw.data",
+        cur_matrix: str = "X",
         img: Optional[pd.DataFrame] = None,
     ) -> None:
         assert metadata["modality"] == "visium"
