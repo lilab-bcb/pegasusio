@@ -407,7 +407,7 @@ class MultimodalData:
         unselected = []
         mito_dict = DictWithDefault(mito_prefix)
         for key, unidata in self.data.items():
-            if (key in focus_set) and (unidata.get_modality() == "rna"):
+            if (key in focus_set) and (unidata.get_modality() in {"rna", "visium"}):
                 if ("passed_qc" not in unidata.obs) or (not cache_passqc):
                     calc_qc_filters(unidata,
                         select_singlets = select_singlets,

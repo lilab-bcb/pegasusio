@@ -81,7 +81,7 @@ def calc_qc_filters(
     --------
     >>> calc_qc_filters(unidata, min_umis = 500, select_singlets = True)
     """
-    assert unidata.uns["modality"] == "rna"
+    assert unidata.uns["modality"] in {"rna", "visium"}
 
     filters = []
 
@@ -129,13 +129,14 @@ def calc_qc_filters(
     if max_umis is not None:
         filters.append(unidata.obs["n_counts"] < max_umis)
 
-    if (mito_prefix is not None) and (percent_mito is not None):
+    if mito_prefix is not None:
         mito_genes = unidata.var_names.map(lambda x: x.startswith(mito_prefix)).values.nonzero()[0]
         unidata.obs["percent_mito"] = (
             unidata.X[:, mito_genes].sum(axis=1).A1
             / np.maximum(unidata.obs["n_counts"].values, 1.0)
         ) * 100
-        filters.append(unidata.obs["percent_mito"] < percent_mito)
+        if percent_mito is not None:
+            filters.append(unidata.obs["percent_mito"] < percent_mito)
 
     if len(filters) > 0:
         selected = np.logical_and.reduce(filters)
