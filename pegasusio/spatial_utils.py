@@ -47,7 +47,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     barcode_metadata = pd.concat([rna_data.obs, spatial_metadata], axis=1)
     feature_metadata = rna_data.var
 
-    matrices = {"raw.data": rna_data.X}
+    matrices = {"X": rna_data.X}
     metadata = {"genome": rna_data.get_genome(), "modality": "visium"}
 
     #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array,
