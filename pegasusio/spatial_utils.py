@@ -52,8 +52,8 @@ def load_visium_folder(input_path) -> MultimodalData:
 
     #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array,
     # which is the spatial location info of each cell in the dataset.
-    obsm = spatial_metadata[["pxl_col_in_fullres", "pxl_row_in_fullres"]]
-    barcode_multiarrays = {"spatial_coordinates": obsm.to_numpy()}
+    obsm = spatial_metadata[["pxl_row_in_fullres", "pxl_col_in_fullres"]]
+    barcode_multiarrays = {"X_spatial": obsm.to_numpy()}
 
     #  Store all the other spatial info of cells, i.e. “in_tissue”, “array_row”, and “array_col”
     obs = spatial_metadata[["in_tissue", "array_row", "array_col"]]
