@@ -44,7 +44,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     )
     process_spatial_metadata(spatial_metadata)
 
-    barcode_metadata = pd.concat([rna_data.obs, spatial_metadata], axis=1)
+    barcode_metadata = rna_data.obs.join(spatial_metadata[['in_tissue', 'array_row', 'array_col']], how='left')
     feature_metadata = rna_data.var
 
     matrices = {"X": rna_data.X}
@@ -52,15 +52,15 @@ def load_visium_folder(input_path) -> MultimodalData:
 
     #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array,
     # which is the spatial location info of each cell in the dataset.
-    obsm = spatial_metadata[["pxl_row_in_fullres", "pxl_col_in_fullres"]]
-    barcode_multiarrays = {"X_spatial": obsm.to_numpy()}
+    spatial_coords = spatial_metadata[["pxl_row_in_fullres", "pxl_col_in_fullres"]]
+    barcode_multiarrays = {"X_spatial": spatial_coords.to_numpy()}
 
     #  Store all the other spatial info of cells, i.e. “in_tissue”, “array_row”, and “array_col”
     obs = spatial_metadata[["in_tissue", "array_row", "array_col"]]
     barcode_metadata = obs
 
     # Store image metadata as a Pandas DataFrame, with the following structure:
-    img = pd.DataFrame()
+    image_metadata = pd.DataFrame()
     spatial_path = f"{input_path}/spatial"
 
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
@@ -86,16 +86,16 @@ def load_visium_folder(input_path) -> MultimodalData:
                 res_tag,
                 scale_factors[f"tissue_{res_tag}_scalef"]
             )
-            img = img.append(image_item, ignore_index=True)
+            image_metadata = image_metadata.append(image_item, ignore_index=True)
 
-    assert not img.empty, "the image data frame is empty"
+    assert not image_metadata.empty, "the image data frame is empty"
     spdata = SpatialData(
         barcode_metadata,
         feature_metadata,
         matrices,
         metadata,
         barcode_multiarrays=barcode_multiarrays,
-        img=img,
+        image_metadata=image_metadata,
     )
     data = MultimodalData(spdata)
 
