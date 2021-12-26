@@ -66,13 +66,14 @@ def load_visium_folder(input_path) -> MultimodalData:
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
         scale_factors = json.load(fp)
 
-    def get_image_data(filepath, sample_id, image_id, scaleFactor):
+    def get_image_data(filepath, sample_id, image_id, scaleFactor, spot_diameter_fullres):
         data = Image.open(filepath)
         dict = {
             "sample_id": sample_id,
             "image_id": image_id,
             "data": data,
-            "scaleFactor": scaleFactor,
+            "scale_factor": scaleFactor,
+            "spot_diameter": spot_diameter_fullres * scaleFactor,
         }
         return dict
 
@@ -84,7 +85,8 @@ def load_visium_folder(input_path) -> MultimodalData:
                 filepath,
                 sample_id,
                 res_tag,
-                scale_factors[f"tissue_{res_tag}_scalef"]
+                scale_factors[f"tissue_{res_tag}_scalef"],
+                scale_factors["spot_diameter_fullres"]
             )
             image_metadata = image_metadata.append(image_item, ignore_index=True)
 
