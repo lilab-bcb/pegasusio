@@ -22,7 +22,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
     # Load count matrix.
-    hdf5_filename = "raw_feature_bc_matrix.h5"
+    hdf5_filename = "filtered_feature_bc_matrix.h5"
     assert hdf5_filename in file_list, "Raw count hdf5 file is missing!"
     rna_data = load_10x_h5_file(f"{input_path}/{hdf5_filename}")
 
@@ -44,7 +44,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     )
     process_spatial_metadata(spatial_metadata)
 
-    barcode_metadata = rna_data.obs.join(spatial_metadata[['in_tissue', 'array_row', 'array_col']], how='left')
+    barcode_metadata = rna_data.obs.join(spatial_metadata, how='left')
     feature_metadata = rna_data.var
 
     matrices = {"X": rna_data.X}
@@ -52,12 +52,9 @@ def load_visium_folder(input_path) -> MultimodalData:
 
     #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array,
     # which is the spatial location info of each cell in the dataset.
-    spatial_coords = spatial_metadata[["pxl_row_in_fullres", "pxl_col_in_fullres"]]
+    spatial_coords = barcode_metadata[['pxl_row_in_fullres', 'pxl_col_in_fullres']]
     barcode_multiarrays = {"X_spatial": spatial_coords.to_numpy()}
-
-    #  Store all the other spatial info of cells, i.e. “in_tissue”, “array_row”, and “array_col”
-    obs = spatial_metadata[["in_tissue", "array_row", "array_col"]]
-    barcode_metadata = obs
+    barcode_metadata.drop(columns=['pxl_row_in_fullres', 'pxl_col_in_fullres'], inplace=True)
 
     # Store image metadata as a Pandas DataFrame, with the following structure:
     image_metadata = pd.DataFrame()
