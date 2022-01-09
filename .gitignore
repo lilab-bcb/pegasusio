@@ -4,6 +4,7 @@ ext_modules/*.so
 __pycache__
 build/
 dist/
+.eggs/
 pegasusio.egg-info/
 pegasusio/cylib/*.so
 .ipynb_checkpoints

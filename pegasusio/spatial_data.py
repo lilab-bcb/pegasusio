@@ -29,7 +29,7 @@ class SpatialData(UnimodalData):
         barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         cur_matrix: str = "X",
-        img: Optional[pd.DataFrame] = None,
+        image_metadata: Optional[pd.DataFrame] = None,
     ) -> None:
         assert metadata["modality"] == "visium"
         super().__init__(
@@ -43,15 +43,15 @@ class SpatialData(UnimodalData):
             feature_multigraphs,
             cur_matrix,
         )
-        self._img = img
+        self.image_metadata = image_metadata
 
     @property
     def img(self) -> Optional[pd.DataFrame]:
-        return self._img
+        return self.image_metadata
 
     @img.setter
     def img(self, img: pd.DataFrame):
-        self._img = img
+        self.image_metadata = img
 
     def __repr__(self) -> str:
         repr_str = super().__repr__()

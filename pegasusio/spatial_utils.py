@@ -22,7 +22,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     file_list = os.listdir(input_path)
     sample_id = input_path.split("/")[-1]
     # Load count matrix.
-    hdf5_filename = "raw_feature_bc_matrix.h5"
+    hdf5_filename = "filtered_feature_bc_matrix.h5"
     assert hdf5_filename in file_list, "Raw count hdf5 file is missing!"
     rna_data = load_10x_h5_file(f"{input_path}/{hdf5_filename}")
 
@@ -44,7 +44,7 @@ def load_visium_folder(input_path) -> MultimodalData:
     )
     process_spatial_metadata(spatial_metadata)
 
-    barcode_metadata = pd.concat([rna_data.obs, spatial_metadata], axis=1)
+    barcode_metadata = rna_data.obs.join(spatial_metadata, how='left')
     feature_metadata = rna_data.var
 
     matrices = {"X": rna_data.X}
@@ -52,27 +52,25 @@ def load_visium_folder(input_path) -> MultimodalData:
 
     #  Store “pxl_col_in_fullres” and ”pxl_row_in_fullres” as a 2D array,
     # which is the spatial location info of each cell in the dataset.
-    obsm = spatial_metadata[["pxl_col_in_fullres", "pxl_row_in_fullres"]]
-    barcode_multiarrays = {"spatial_coordinates": obsm.to_numpy()}
-
-    #  Store all the other spatial info of cells, i.e. “in_tissue”, “array_row”, and “array_col”
-    obs = spatial_metadata[["in_tissue", "array_row", "array_col"]]
-    barcode_metadata = obs
+    spatial_coords = barcode_metadata[['pxl_row_in_fullres', 'pxl_col_in_fullres']]
+    barcode_multiarrays = {"X_spatial": spatial_coords.to_numpy()}
+    barcode_metadata.drop(columns=['pxl_row_in_fullres', 'pxl_col_in_fullres'], inplace=True)
 
     # Store image metadata as a Pandas DataFrame, with the following structure:
-    img = pd.DataFrame()
+    image_metadata = pd.DataFrame()
     spatial_path = f"{input_path}/spatial"
 
     with open(f"{spatial_path}/scalefactors_json.json") as fp:
         scale_factors = json.load(fp)
 
-    def get_image_data(filepath, sample_id, image_id, scaleFactor):
+    def get_image_data(filepath, sample_id, image_id, scaleFactor, spot_diameter_fullres):
         data = Image.open(filepath)
         dict = {
             "sample_id": sample_id,
             "image_id": image_id,
             "data": data,
-            "scaleFactor": scaleFactor,
+            "scale_factor": scaleFactor,
+            "spot_diameter": spot_diameter_fullres * scaleFactor,
         }
         return dict
 
@@ -84,18 +82,19 @@ def load_visium_folder(input_path) -> MultimodalData:
                 filepath,
                 sample_id,
                 res_tag,
-                scale_factors[f"tissue_{res_tag}_scalef"]
+                scale_factors[f"tissue_{res_tag}_scalef"],
+                scale_factors["spot_diameter_fullres"]
             )
-            img = img.append(image_item, ignore_index=True)
+            image_metadata = image_metadata.append(image_item, ignore_index=True)
 
-    assert not img.empty, "the image data frame is empty"
+    assert not image_metadata.empty, "the image data frame is empty"
     spdata = SpatialData(
         barcode_metadata,
         feature_metadata,
         matrices,
         metadata,
         barcode_multiarrays=barcode_multiarrays,
-        img=img,
+        image_metadata=image_metadata,
     )
     data = MultimodalData(spdata)
 

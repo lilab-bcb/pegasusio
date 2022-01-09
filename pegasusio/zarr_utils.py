@@ -254,7 +254,7 @@ class ZarrFile:
             else dict(),
         )
         if isinstance (unidata, SpatialData):
-            unidata.img = self.read_dataframe(group["img"]) if "img" in group else dict()
+            unidata.image_metadata = self.read_dataframe(group["image_metadata"]) if "image_metadata" in group else dict()
 
         if group.attrs.get("_cur_matrix", None) is not None:
             unidata.select_matrix(group.attrs["_cur_matrix"])
@@ -443,7 +443,7 @@ class ZarrFile:
         self.write_dataframe(group, 'feature_metadata', data.feature_metadata)
 
         if hasattr(data, 'img'):
-            self.write_dataframe(group, 'img', data.img)
+            self.write_dataframe(group, 'image_metadata', data.image_metadata)
 
         if overwrite or data.matrices.is_dirty():
             self.write_mapping(group, 'matrices', data.matrices, overwrite = overwrite)
