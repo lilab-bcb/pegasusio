@@ -59,6 +59,8 @@ class UnimodalData:
             barcode_metadata = pd.DataFrame()
         if feature_metadata is None:
             feature_metadata = pd.DataFrame()
+        if metadata is None:
+            metadata = dict()
         if barcode_multiarrays is None:
             barcode_multiarrays = dict()
         if feature_multiarrays is None:
