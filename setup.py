@@ -22,7 +22,7 @@ setup(
     description="Pegasusio is a Python package for reading / writing single-cell genomics data",
     long_description=long_description,
     url="https://github.com/klarman-cell-observatory/pegasusio",
-    author="Yiming Yang, Joshua Gould and Bo Li",
+    author="Yiming Yang, Rimte Rocher, Joshua Gould and Bo Li",
     author_email="cumulus-support@googlegroups.com",
     classifiers=[  # https://pypi.python.org/pypi?%3Aaction=list_classifiers
         "Development Status :: 4 - Beta",
@@ -47,6 +47,6 @@ setup(
     install_requires=[
         l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()
     ],
-    python_requires="~=3.6",
+    python_requires="~=3.7",
     entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )
