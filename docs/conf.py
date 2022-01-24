@@ -26,13 +26,13 @@ import pegasusio
 project = "PegasusIO"
 copyright = "2021 The Broad Institute, Inc. and The General Hospital Corporation. All rights reserved."
 author = (
-    "Bo Li, Yiming Yang"
+    "Bo Li, Yiming Yang, Rimte Rocher"
 )
 
 # The short X.Y version
-version = "0.4"
+version = "0.5"
 # The full version, including alpha/beta/rc tags
-release = "0.4.0"
+release = "0.5.0"
 
 
 # -- General configuration ---------------------------------------------------

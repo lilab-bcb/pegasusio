@@ -1,3 +1,12 @@
+Version 0.5.0 `January, 2022`
+----------------------------------
+
+- Add support on 10x Visium spatial data
+
+  - Read the data folder by ``read_input`` function with ``file_type="visium"`` option.
+
+  - Write 10x Visium data to Zarr format by ``write_output`` function with output file name of ``.zarr.zip`` extension.
+
 Version 0.4.1 `November 4, 2021`
 ----------------------------------
 
