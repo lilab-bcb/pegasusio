@@ -1,4 +1,4 @@
-Version 0.5.0 `January, 2022`
+Version 0.5.0 `January 24, 2022`
 ----------------------------------
 
 - Add support on 10x Visium spatial data
