@@ -161,7 +161,7 @@ class MultimodalData:
         """ Surrogate function to return registered type for an attribute
         """
         assert self._unidata is not None
-        self._unidata.get_attr_type(attr)
+        return self._unidata.get_attr_type(attr)
 
     def register_attr(self, attr: str, attr_type: str = None) -> None:
         """ Surrogate function to register an attribute (either in obs or obsm) with an attr_type (e.g. signature, cluster, basis)
