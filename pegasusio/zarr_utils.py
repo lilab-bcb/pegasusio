@@ -61,6 +61,7 @@ class ZarrFile:
         storage_type : `str`, currently only support 'ZipStore' and 'NestedDirectoryStore'. If None, use 'NestedDirectoryStore' by default.
         """
         self.store = self.root = None
+        self.write_empty_chunks = False
 
         if storage_type is None:
             storage_type = 'NestedDirectoryStore'
@@ -70,6 +71,7 @@ class ZarrFile:
             check_and_remove_existing_path(path)
             self.store = zarr.ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else zarr.NestedDirectoryStore(path)
             self.root = zarr.group(self.store, overwrite = True)
+            self.write_empty_chunks = (storage_type == 'ZipStore')
         else:
             # Load existing zarr file
             self.store = zarr.NestedDirectoryStore(path) if os.path.isdir(path) else zarr.ZipStore(path, mode = 'r')
@@ -282,9 +284,9 @@ class ZarrFile:
     def write_csr(self, parent: zarr.Group, name: str, matrix: csr_matrix) -> None:
         group = parent.create_group(name, overwrite = True)
         group.attrs.update(data_type = 'csr_matrix', shape = matrix.shape)
-        group.create_dataset('data', data = matrix.data, shape = matrix.data.shape, chunks = calc_chunk(matrix.data.shape), dtype = matrix.data.dtype, compressor = COMPRESSOR, overwrite = True)
-        group.create_dataset('indices', data = matrix.indices, shape = matrix.indices.shape, chunks = calc_chunk(matrix.indices.shape), dtype = matrix.indices.dtype, compressor = COMPRESSOR, overwrite = True)
-        group.create_dataset('indptr', data = matrix.indptr, shape = matrix.indptr.shape, chunks = calc_chunk(matrix.indptr.shape), dtype = matrix.indptr.dtype, compressor = COMPRESSOR, overwrite = True)
+        group.create_dataset('data', data = matrix.data, shape = matrix.data.shape, chunks = calc_chunk(matrix.data.shape), dtype = matrix.data.dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
+        group.create_dataset('indices', data = matrix.indices, shape = matrix.indices.shape, chunks = calc_chunk(matrix.indices.shape), dtype = matrix.indices.dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
+        group.create_dataset('indptr', data = matrix.indptr, shape = matrix.indptr.shape, chunks = calc_chunk(matrix.indptr.shape), dtype = matrix.indptr.dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
 
 
     def write_series(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
@@ -301,7 +303,7 @@ class ZarrFile:
                 values = np.array([x.decode() for x in values], dtype = object)
             self.write_array(categories, name, values)
             # write codes
-            codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True)
+            codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
             codes_arr.attrs['ordered'] = array.ordered
         else:
             self.write_array(group, name, array)
@@ -325,7 +327,7 @@ class ZarrFile:
 
     def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> None:
         dtype = str if array.dtype.kind == 'O' else array.dtype
-        group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True)
+        group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
 
     def write_record_array(self, parent: zarr.Group, name: str, array: np.recarray) -> None:
         group = parent.create_group(name, overwrite = True)
