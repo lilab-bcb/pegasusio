@@ -162,7 +162,7 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
 
         unidata.obs.drop(columns=cols, inplace=True)
         if len(unidata.obsm) > 0:
-            for key in unidata.obsm.keys():
+            for key in list(unidata.obsm):
                 if key not in ['X_spatial']:
                     del unidata.obsm[key]
         if len(unidata.varm) > 0:
