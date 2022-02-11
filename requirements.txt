@@ -8,5 +8,5 @@ pandas>=1.2.0
 scipy
 setuptools
 importlib_metadata>=0.7; python_version < '3.8'
-zarr>=2.11.0
+zarr
 Pillow

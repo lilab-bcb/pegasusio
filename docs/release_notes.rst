@@ -1,3 +1,9 @@
+Version 0.5.1 `February 10, 2022`
+----------------------------------
+
+- Make PegasusIO work with Zarr v2.11.0.
+- Bug fix in quality control. [PR `#89 <https://github.com/klarman-cell-observatory/pegasusio/pull/89>`_ by `hoondy <https://github.com/hoondy>`_]
+
 Version 0.5.0 `January 24, 2022`
 ----------------------------------
 
