@@ -101,6 +101,7 @@ def read_input(
 ) -> MultimodalData:
     """Load data into memory.
     This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring' (Nanostring GeoMx spatial data) formats.
+
     Parameters
     ----------
     input_file : `str`
@@ -121,9 +122,11 @@ def read_input(
         Only select data with genomes in select_genome. Select_data, select_genome and select_modality are mutually exclusive.
     select_modality: `Set[str]`, optional (default: None)
         Only select data with modalities in select_modality. Select_data, select_genome and select_modality are mutually exclusive.
+
     Returns
     -------
     A MultimodalData object.
+
     Examples
     --------
     >>> data = io.read_input('example_10x.h5')
@@ -190,6 +193,7 @@ def write_output(
 ) -> None:
     """ Write data back to disk.
     This function is used to write data back to disk.
+
     Parameters
     ----------
     data : MutimodalData
@@ -202,9 +206,11 @@ def write_output(
         Only used for writing out SCP-compatible files, if write expression as a sparse matrix.
     precision : `int`, optional (default: 2)
         Precision after decimal point for values in mtx and scp expression matrix.
+
     Returns
     -------
     `None`
+
     Examples
     --------
     >>> io.write_output(data, 'test.zarr')
