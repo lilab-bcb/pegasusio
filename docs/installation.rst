@@ -7,7 +7,7 @@ PegasusIO is released on PyPI_, and can be installed using pip::
 
 To install its development version, do the following::
 
-    git clone https://github.com/klarman-cell-observatory/pegasusio.git
+    git clone https://github.com/lilab-bcb/pegasusio.git
     cd pegasusio
     pip install -e .
 

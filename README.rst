@@ -12,12 +12,12 @@ PegasusIO for reading / writing single-cell genomics data
    :target: https://anaconda.org/bioconda/pegasusio
 .. |Python| image:: https://img.shields.io/pypi/pyversions/pegasusio
    :target: https://pypi.org/project/pegasusio
-.. |License| image:: https://img.shields.io/github/license/klarman-cell-observatory/pegasusio
-   :target: https://github.com/klarman-cell-observatory/pegasusio/blob/master/LICENSE
+.. |License| image:: https://img.shields.io/github/license/lilab-bcb/pegasusio
+   :target: https://github.com/lilab-bcb/pegasusio/blob/master/LICENSE
 .. |Docs| image:: https://readthedocs.org/projects/pegasusio/badge/?version=latest
    :target: https://pegasusio.readthedocs.io
-.. |Build| image:: https://github.com/klarman-cell-observatory/pegasusio/workflows/PegasusIO%20CI/badge.svg
-   :target: https://github.com/klarman-cell-observatory/pegasusio/actions?query=workflow%3A%22PegasusIO+CI%22
+.. |Build| image:: https://github.com/lilab-bcb/pegasusio/workflows/PegasusIO%20CI/badge.svg
+   :target: https://github.com/lilab-bcb/pegasusio/actions?query=workflow%3A%22PegasusIO+CI%22
 
 PegasusIO is the IO package for Pegasus.
 
