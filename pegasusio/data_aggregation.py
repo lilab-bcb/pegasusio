@@ -77,11 +77,16 @@ def aggregate_matrices(
 ) -> MultimodalData:
     """Aggregate channel-specific count matrices into one big count matrix.
 
-    This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5), and merges matrices from the same genome together. If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
+    This function takes as input a csv_file, which contains at least 2 columns — Sample, sample name; Location, file that contains the count matrices (e.g. filtered_gene_bc_matrices_h5.h5),
+    and merges matrices from the same genome together.
+    If multi-modality exists, a third Modality column might be required. An aggregated Multimodal Data will be returned.
 
-    If csv_file is a dictionary, it should contain 2 keys: ``Sample`` for sample names, and ``Object`` for Multimodal data objects. Besides, all the keys in the dictionary must keep values as lists of the same length. In this case, the objects will be merged into one data object. In addition, aggregate_matrices will make copies instead of editing the objects.
+    If csv_file is a dictionary, similarly as above, it must contain key ``Sample`` for sample names.
+    Besides, the dictionary can either take ``Location`` key for count matrix file paths for samples, or ``Object`` for the MultimodalData objects already loaded from those files.
+    All the keys in the dictionary must keep values as lists of the same length, and `aggregate_matrices` function makes copies instead of editing the provided data objects.
 
-    The csv_file can optionally contain two columns - nUMI and nGene. These two columns define minimum number of UMIs and genes for cell selection for each sample. The values in these two columns overwrite the min_genes and min_umis arguments.
+    The csv_file can optionally contain two columns - nUMI and nGene. These two columns define minimum number of UMIs and genes for cell selection for each sample.
+    The values in these two columns overwrite the `min_genes` and `min_umis` arguments.
 
     Parameters
     ----------
