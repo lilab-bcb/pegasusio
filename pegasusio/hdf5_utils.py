@@ -289,3 +289,36 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
                 ds.col_graphs[_replace_slash(key)] = value
 
     logger.info(f"{output_file} is written.")
+
+
+def write_10x_h5(data: MultimodalData, output_file: str) -> None:
+    unidata = data._unidata
+    nmat = len(unidata.matrices)
+    
+    def _write_h5(data, output_file):
+        n_obs, n_feature = data.shape
+        with h5py.File(output_file, "w") as f:
+            grp = f.create_group("matrix")
+            grp.create_dataset(name="barcodes", data=data.obs_names.map(lambda s: f"{s}".encode("ascii", "ignore")).values)
+            if not isinstance(data.X, csr_matrix):
+                data.X = csr_matrix(data.X)
+            grp.create_dataset(name="data", data=data.X.data)
+            grp.create_dataset(name="indices", data=data.X.indices)
+            grp.create_dataset(name="indptr", data=data.X.indptr)
+            grp.create_dataset(name="shape", data=(n_feature, n_obs)) # feature-by-barcode
+
+            feature_grp = grp.create_group("features")
+            feature_grp.create_dataset(name="_all_tag_keys", data=[b"genome"])
+            feature_grp.create_dataset(name="feature_type", data=data.var['featuretype'].apply(lambda s: s.encode("ascii", "ignore")).values)
+            feature_grp.create_dataset(name="genome", shape=(n_feature,), dtype=f"S{len(genome)}", fillvalue=genome.encode("ascii", "ignore"))
+            feature_grp.create_dataset(name="id", data=data.var['featureid'].apply(lambda s: s.encode("ascii", "ignore")).values)
+            feature_grp.create_dataset(name="name", data=data.var_names.map(lambda s: s.encode("ascii", "ignore")).values)
+
+    if nmat == 1:
+        _write_h5(unidata, output_file)
+    else:
+        import os
+        path = os.path.dirname(output_file)
+        for mat_key in unidata.list_keys():
+            unidata.select_matrix(mat_key)
+            _write_h5(unidata, f"{path}/{mat_key}.h5")

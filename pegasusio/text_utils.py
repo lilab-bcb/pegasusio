@@ -39,7 +39,7 @@ def _locate_barcode_and_feature_files(path: str, fname: str) -> Tuple[str, str]:
     """ Locate barcode and feature files (with path) based on mtx file name (no suffix)
     """
     barcode_file = feature_file = None
-    if fname == "matrix":
+    if (fname is None) or (fname == "matrix"):
         barcode_file = _enumerate_files(path, [''], ["cells.tsv.gz", "cells.tsv", "barcodes.tsv.gz", "barcodes.tsv"])
         feature_file = _enumerate_files(path, [''], ["genes.tsv.gz", "genes.tsv", "features.tsv.gz", "features.tsv"])
     else:
@@ -120,7 +120,7 @@ def _load_feature_metadata(feature_file: str, format_type: str, sep: str = "\t")
     return feature_metadata, format_type
 
 
-def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> UnimodalData:
+def load_one_mtx_file(path: str, file_names: List[str], genome: str, modality: str) -> UnimodalData:
     """Load one gene-count matrix in mtx format into a UnimodalData object
     """
     try:
@@ -128,41 +128,56 @@ def load_one_mtx_file(path: str, file_name: str, genome: str, modality: str) -> 
     except ModuleNotFoundError:
         print("No module named 'pegasusio.cylib.io'")
 
-    fname = re.sub('(.mtx|.mtx.gz)$', '', file_name)
+    fname = None
+    if len(file_names) == 1:
+        fname = re.sub('(.mtx|.mtx.gz)$', '', file_names[0])
     barcode_file, feature_file = _locate_barcode_and_feature_files(path, fname)
 
     barcode_metadata, format_type = _load_barcode_metadata(barcode_file)
     feature_metadata, format_type = _load_feature_metadata(feature_file, format_type)
     logger.info(f"Detected mtx file in {format_type} format.")
 
-    mtx_file = os.path.join(path, file_name)
-    if file_name.endswith(".gz"):
-        mtx_fifo = os.path.join(tempfile.gettempdir(), file_name + ".fifo")
-        if os.path.exists(mtx_fifo):
+    def _load_mtx(file_name):
+        mtx_file = os.path.join(path, file_name)
+        if file_name.endswith(".gz"):
+            mtx_fifo = os.path.join(tempfile.gettempdir(), file_name + ".fifo")
+            if os.path.exists(mtx_fifo):
+                os.unlink(mtx_fifo)
+            os.mkfifo(mtx_fifo)
+            subprocess.Popen(f"gunzip -c {shlex.quote(mtx_file)} > {shlex.quote(mtx_fifo)}", shell = True)
+            row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
             os.unlink(mtx_fifo)
-        os.mkfifo(mtx_fifo)
-        subprocess.Popen(f"gunzip -c {shlex.quote(mtx_file)} > {shlex.quote(mtx_fifo)}", shell = True)
-        row_ind, col_ind, data, shape = read_mtx(mtx_fifo)
-        os.unlink(mtx_fifo)
+        else:
+            row_ind, col_ind, data, shape = read_mtx(mtx_file)
+
+        if shape[1] == barcode_metadata.shape[0]: # Column is barcode, swap the coordinates
+            row_ind, col_ind = col_ind, row_ind
+            shape = (shape[1], shape[0])
+
+        mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
+        mat.eliminate_zeros()
+
+        return mat
+
+    if fname is None:
+        matrices = {"X": _load_mtx(file_names[0])}
+        cur_matrix = "X"
     else:
-        row_ind, col_ind, data, shape = read_mtx(mtx_file)
+        matrices = {}
+        cur_matrix = re.sub('(.mtx|.mtx.gz)$', '', file_names[0])
+        for file_name in file_names:
+            mat_key = re.sub('(.mtx|.mtx.gz)$', '', file_name)
+            matrices[mat_key] = _load_mtx(file_name)
 
-    if shape[1] == barcode_metadata.shape[0]: # Column is barcode, swap the coordinates
-        row_ind, col_ind = col_ind, row_ind
-        shape = (shape[1], shape[0])
-
-    mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
-    mat.eliminate_zeros()
-
-    unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
+    unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, {"genome": genome, "modality": modality}, cur_matrix = cur_matrix)
     if format_type == "10x v3" or format_type == "10x v2":
         unidata.separate_channels()
 
     return unidata
 
 
-def _locate_mtx_file(path: str) -> str:
-    """ Locate one mtx file in the path directory; first choose matrix.mtx.gz or matrix.mtx if multiple mtx files exist."""
+def _locate_mtx_file(path: str) -> List[str]:
+    """ Locate mtx files in the path directory, return a list"""
     file_names = []
     with os.scandir(path) as dir_iter:
         for dir_entry in dir_iter:
@@ -171,7 +186,7 @@ def _locate_mtx_file(path: str) -> str:
                 if file_name == "matrix.mtx.gz" or file_name == "matrix.mtx":
                     return file_name
                 file_names.append(file_name)
-    return file_names[0] if len(file_names) > 0 else None
+    return file_names if len(file_names) > 0 else None
 
 
 def _parse_dir_name(dirname: str, default_modality: str) -> Tuple[str, str]:
@@ -211,24 +226,25 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None) -> Multim
     orig_file = path
     if os.path.isdir(orig_file):
         path = orig_file.rstrip('/')
-        file_name = _locate_mtx_file(path)
+        file_names = _locate_mtx_file(path)
     else:
         if (not orig_file.endswith(".mtx")) and (not orig_file.endswith(".mtx.gz")):
             raise ValueError(f"File {orig_file} does not end with suffix .mtx or .mtx.gz!")
         path, file_name = os.path.split(orig_file)
+        file_names = [file_name]
 
     data = MultimodalData()
 
     if modality is None:
         modality = "rna"
 
-    if file_name is not None:
+    if file_names is not None:
         if genome is None:
             genome = "unknown"
         data.add_data(
             load_one_mtx_file(
                 path,
-                file_name,
+                file_names,
                 genome,
                 modality
             ),
@@ -236,11 +252,11 @@ def load_mtx_file(path: str, genome: str = None, modality: str = None) -> Multim
     else:
         for dir_entry in os.scandir(path):
             if dir_entry.is_dir():
-                file_name = _locate_mtx_file(dir_entry.path)
-                if file_name is None:
+                file_names = _locate_mtx_file(dir_entry.path)
+                if file_names is None:
                     raise ValueError(f"Folder {dir_entry.path} does not contain a mtx file!")
                 dgenome, dmodality = _parse_dir_name(dir_entry.name, modality)
-                data.add_data(load_one_mtx_file(dir_entry.path, file_name, dgenome, dmodality))
+                data.add_data(load_one_mtx_file(dir_entry.path, file_names, dgenome, dmodality))
 
     return data
 
