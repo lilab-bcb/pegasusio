@@ -159,15 +159,16 @@ def load_one_mtx_file(path: str, file_names: List[str], genome: str, modality: s
 
         return mat
 
+
     if fname is None:
-        matrices = {"X": _load_mtx(file_names[0])}
-        cur_matrix = "X"
-    else:
         matrices = {}
         cur_matrix = re.sub('(.mtx|.mtx.gz)$', '', file_names[0])
         for file_name in file_names:
             mat_key = re.sub('(.mtx|.mtx.gz)$', '', file_name)
             matrices[mat_key] = _load_mtx(file_name)
+    else:
+        matrices = {"X": _load_mtx(file_names[0])}
+        cur_matrix = "X"
 
     unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, {"genome": genome, "modality": modality}, cur_matrix = cur_matrix)
     if format_type == "10x v3" or format_type == "10x v2":
