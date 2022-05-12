@@ -184,7 +184,7 @@ def _locate_mtx_file(path: str) -> List[str]:
             file_name = dir_entry.name
             if file_name.endswith(".mtx.gz") or file_name.endswith(".mtx"):
                 if file_name == "matrix.mtx.gz" or file_name == "matrix.mtx":
-                    return file_name
+                    return [file_name]
                 file_names.append(file_name)
     return file_names if len(file_names) > 0 else None
 
