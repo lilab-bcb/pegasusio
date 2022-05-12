@@ -1,6 +1,7 @@
 Cython
 anndata
 loompy
+h5py>=3.0.0
 docopt
 natsort
 numpy
