@@ -5,6 +5,7 @@ import h5py
 from typing import Dict
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 from pegasusio import modalities, UnimodalData, CITESeqData, MultimodalData
@@ -46,10 +47,11 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
         ids = group["genes"][...].astype(str)
         names = group["gene_names"][...].astype(str)
 
-        unidata = UnimodalData({"barcodekey": barcodes},
+        unidata = UnimodalData(
+            {"barcodekey": barcodes},
             {"featurekey": names, "featureid": ids},
             {"X": mat},
-            {"modality": "rna", "genome": genome}
+            {"modality": "rna", "genome": genome},
         )
         unidata.separate_channels()
 
@@ -86,10 +88,14 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
         shape=(N, M),
     )
     barcodes = h5_in["matrix/barcodes"][...].astype(str)
-    df = pd.DataFrame(data = {"genome": h5_in["matrix/features/genome"][...].astype(str),
-                              "feature_type": h5_in["matrix/features/feature_type"][...].astype(str),
-                              "id": h5_in["matrix/features/id"][...].astype(str),
-                              "name": h5_in["matrix/features/name"][...].astype(str)})
+    df = pd.DataFrame(
+        data={
+            "genome": h5_in["matrix/features/genome"][...].astype(str),
+            "feature_type": h5_in["matrix/features/feature_type"][...].astype(str),
+            "id": h5_in["matrix/features/id"][...].astype(str),
+            "name": h5_in["matrix/features/name"][...].astype(str),
+        }
+    )
 
     genomes = list(df["genome"].unique())
     if "" in genomes:
@@ -97,13 +103,18 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
     default_genome = genomes[0] if len(genomes) == 1 else None
 
     data = MultimodalData()
-    gb = df.groupby(by = ["genome", "feature_type"])
+    gb = df.groupby(by=["genome", "feature_type"])
     for name, group in gb:
         barcode_metadata = {"barcodekey": barcodes}
-        feature_metadata = {"featurekey": group["name"].values, "featureid": group["id"].values}
+        feature_metadata = {
+            "featurekey": group["name"].values,
+            "featureid": group["id"].values,
+        }
         mat = bigmat[:, gb.groups[name]]
 
-        genome = name[0] if (name[0] != "" or default_genome is None) else default_genome
+        genome = (
+            name[0] if (name[0] != "" or default_genome is None) else default_genome
+        )
         modality = "custom"
         if name[1] == "Gene Expression":
             modality = "rna"
@@ -113,9 +124,19 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
             modality = "citeseq"
 
         if modality == "citeseq":
-            unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
+            unidata = CITESeqData(
+                barcode_metadata,
+                feature_metadata,
+                {"raw.count": mat},
+                {"genome": genome, "modality": modality},
+            )
         else:
-            unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
+            unidata = UnimodalData(
+                barcode_metadata,
+                feature_metadata,
+                {"X": mat},
+                {"genome": genome, "modality": modality},
+            )
         unidata.separate_channels()
 
         data.add_data(unidata)
@@ -142,14 +163,18 @@ def load_10x_h5_file(input_h5: str) -> MultimodalData:
     >>> io.load_10x_h5_file('example_10x.h5')
     """
     data = None
-    with h5py.File(input_h5, 'r') as h5_in:
-        load_file = load_10x_h5_file_v3 if "matrix" in h5_in.keys() else load_10x_h5_file_v2
+    with h5py.File(input_h5, "r") as h5_in:
+        load_file = (
+            load_10x_h5_file_v3 if "matrix" in h5_in.keys() else load_10x_h5_file_v2
+        )
         data = load_file(h5_in)
 
     return data
 
 
-def load_loom_file(input_loom: str, genome: str = None, modality: str = None) -> MultimodalData:
+def load_loom_file(
+    input_loom: str, genome: str = None, modality: str = None
+) -> MultimodalData:
     """Load count matrix from a LOOM file.
 
     Parameters
@@ -171,13 +196,22 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
     --------
     >>> io.load_loom_file('example.loom', genome = 'GRCh38')
     """
-    col_trans = {"CellID": "barcodekey", "obs_names": "barcodekey", "cell_names": "barcodekey"}
+    col_trans = {
+        "CellID": "barcodekey",
+        "obs_names": "barcodekey",
+        "cell_names": "barcodekey",
+    }
     row_trans = {
-        "Gene": "featurekey", "var_names": "featurekey", "gene_names": "featurekey",
-        "Accession": "featureid",  "gene_ids": "featureid", "ensembl_ids": "featureid",
+        "Gene": "featurekey",
+        "var_names": "featurekey",
+        "gene_names": "featurekey",
+        "Accession": "featureid",
+        "gene_ids": "featureid",
+        "ensembl_ids": "featureid",
     }
 
     import loompy
+
     with loompy.connect(input_loom) as ds:
         barcode_metadata = {}
         barcode_multiarrays = {}
@@ -188,7 +222,9 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
             elif arr.ndim > 1:
                 barcode_multiarrays[key] = arr
             else:
-                raise ValueError(f"Detected column attribute '{key}' has ndim = {arr.ndim}!")
+                raise ValueError(
+                    f"Detected column attribute '{key}' has ndim = {arr.ndim}!"
+                )
 
         feature_metadata = {}
         feature_multiarrays = {}
@@ -199,7 +235,9 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
             elif arr.ndim > 1:
                 feature_multiarrays[key] = arr
             else:
-                raise ValueError(f"Detected row attribute '{key}' has ndim = {arr.ndim}!")
+                raise ValueError(
+                    f"Detected row attribute '{key}' has ndim = {arr.ndim}!"
+                )
 
         barcode_multigraphs = {}
         for key, graph in ds.col_graphs.items():
@@ -227,7 +265,16 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
             else:
                 metadata["modality"] = "rna"
 
-        unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs)
+        unidata = UnimodalData(
+            barcode_metadata,
+            feature_metadata,
+            matrices,
+            metadata,
+            barcode_multiarrays,
+            feature_multiarrays,
+            barcode_multigraphs,
+            feature_multigraphs,
+        )
         unidata.separate_channels()
 
     data = MultimodalData(unidata)
@@ -235,8 +282,7 @@ def load_loom_file(input_loom: str, genome: str = None, modality: str = None) ->
 
 
 def write_loom_file(data: MultimodalData, output_file: str) -> None:
-    """ Write a MultimodalData to loom file. Will assert data only contain one type of experiment.
-    """
+    """Write a MultimodalData to loom file. Will assert data only contain one type of experiment."""
     keys = data.list_data()
     if len(keys) > 1:
         raise ValueError(f"Data contain multiple modalities: {','.join(keys)}!")
@@ -247,25 +293,34 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
         raise ValueError("Could not write empty matrix to a loom file!")
 
     def _replace_slash(name: str) -> str:
-        """ Replace slash with |
-        """
-        if name.find('/') >= 0:
-            return name.replace('/', '|')
+        """Replace slash with |"""
+        if name.find("/") >= 0:
+            return name.replace("/", "|")
         return name
 
-    def _process_attrs(key_name: str, attrs: pd.DataFrame, attrs_multi: dict) -> Dict[str, object]:
+    def _process_attrs(
+        key_name: str, attrs: pd.DataFrame, attrs_multi: dict
+    ) -> Dict[str, object]:
         res_dict = {key_name: attrs.index.values}
         for key in attrs.columns:
             res_dict[_replace_slash(key)] = np.array(attrs[key].values)
         for key, value in attrs_multi.items():
-            if value.ndim > 1: # value.ndim == 1 refers to np.recarray, which will not be written to a loom file.
-                res_dict[_replace_slash(key)] = value if value.shape[1] > 1 else value[:, 0]
+            if (
+                value.ndim > 1
+            ):  # value.ndim == 1 refers to np.recarray, which will not be written to a loom file.
+                res_dict[_replace_slash(key)] = (
+                    value if value.shape[1] > 1 else value[:, 0]
+                )
         return res_dict
 
     row_attrs = _process_attrs("Gene", data.var, data.varm)
     col_attrs = _process_attrs("CellID", data.obs, data.obsm)
 
-    accession_key = "featureid" if "featureid" in row_attrs else ("gene_ids" if "gene_ids" in row_attrs else None)
+    accession_key = (
+        "featureid"
+        if "featureid" in row_attrs
+        else ("gene_ids" if "gene_ids" in row_attrs else None)
+    )
     if accession_key is not None:
         row_attrs["Accession"] = row_attrs.pop(accession_key)
 
@@ -279,7 +334,8 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
             file_attrs[_replace_slash(key)] = value
 
     import loompy
-    loompy.create(output_file, layers, row_attrs, col_attrs, file_attrs = file_attrs)
+
+    loompy.create(output_file, layers, row_attrs, col_attrs, file_attrs=file_attrs)
 
     if len(data.varp) > 0 or len(data.obsp) > 0:
         with loompy.connect(output_file) as ds:
@@ -289,3 +345,100 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
                 ds.col_graphs[_replace_slash(key)] = value
 
     logger.info(f"{output_file} is written.")
+
+
+def write_10x_h5(data: MultimodalData, output_file: str) -> None:
+    unidata = data._unidata
+    nmat = len(unidata.matrices)
+    compression_method = "gzip"
+    chunk_size = 80000
+
+    assert unidata.get_modality() == "rna", "Only Gene Expression count matrix is accepted!"
+
+    def _create_h5_string_dataset(group, name, data, shape=None, fillvalue=None):
+        kwargs = {
+            'chunks': (chunk_size,),
+            'maxshape': (None,),
+            'compression': compression_method,
+            'shuffle': True,
+        }
+
+        if data is None:
+            assert fillvalue is not None, "Either data or fillvalue must be specified!"
+            dtype = f"S{len(fillvalue)}"
+            group.create_dataset(
+                name=name,
+                dtype=dtype,
+                shape=shape,
+                fillvalue=fillvalue.encode('ascii', 'xmlcharrefreplace'),
+                **kwargs,
+            )
+        else:
+            fixed_len = max(len(x) for x in data)
+            if fixed_len == 0:
+                fixed_len = 1
+            dtype = f"S{fixed_len}"
+            group.create_dataset(
+                name=name,
+                data=np.vectorize(lambda s: s.encode('ascii', 'xmlcharrefreplace'))(data),
+                dtype=dtype,
+                **kwargs,
+            )
+
+    def _write_h5(data, output_file):
+        n_obs, n_feature = data.shape
+        genome = data.uns["genome"] if "genome" in data.uns.keys() else "Unknown"
+        feature_type = "Gene Expression"
+        with h5py.File(output_file, "w") as f:
+            grp = f.create_group("matrix")
+
+            # Cell barcodes
+            _create_h5_string_dataset(grp, "barcodes", data.obs_names.values)
+
+            # Raw counts.
+            X = data.X if isinstance(data.X, csr_matrix) else csr_matrix(data.X)
+            grp.create_dataset(
+                name="data",
+                data=X.data,
+                chunks=(chunk_size,),
+                maxshape=(None,),
+                compression=compression_method,
+                shuffle=True,
+            )
+            grp.create_dataset(
+                name="indices",
+                data=X.indices,
+                chunks=(chunk_size,),
+                maxshape=(None,),
+                compression=compression_method,
+                shuffle=True,
+            )
+            grp.create_dataset(
+                name="indptr",
+                data=X.indptr,
+                chunks=(chunk_size,),
+                maxshape=(None,),
+                compression=compression_method,
+                shuffle=True,
+            )
+            grp.create_dataset(
+                name="shape", data=(n_feature, n_obs)
+            )  # feature-by-barcode
+
+            feature_grp = grp.create_group("features")
+            feature_grp.create_dataset(name="_all_tag_keys", data=[b"genome"])
+            _create_h5_string_dataset(feature_grp, "feature_type", data=None, shape=(n_feature,), fillvalue=feature_type)
+            _create_h5_string_dataset(feature_grp, "genome", data=None, shape=(n_feature,), fillvalue=genome)
+            _create_h5_string_dataset(feature_grp, "id", data=data.var["featureid"].values)
+            _create_h5_string_dataset(feature_grp, "name", data=data.var_names.values)
+
+    if nmat == 1:
+        _write_h5(unidata, output_file)
+    else:
+        import os
+
+        path = os.path.dirname(os.path.abspath(output_file))
+        outname = os.path.basename(output_file).rstrip(".h5")
+        for mat_key in unidata.list_keys():
+            unidata.select_matrix(mat_key)
+            _write_h5(unidata, f"{path}/{outname}.{mat_key}.h5")

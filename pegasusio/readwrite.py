@@ -11,7 +11,7 @@ from pegasusio import timer
 from pegasusio import UnimodalData, MultimodalData
 
 
-from .hdf5_utils import load_10x_h5_file, load_loom_file, write_loom_file
+from .hdf5_utils import load_10x_h5_file, load_loom_file, write_loom_file, write_10x_h5
 from .text_utils import load_mtx_file, write_mtx_file, load_csv_file, write_scp_file
 from .zarr_utils import ZarrFile
 from .vdj_utils import load_10x_vdj_file
@@ -201,7 +201,7 @@ def write_output(
     output_file : `str`
         output file name. Note that for mtx files, output_file specifies a directory. For scp format, file_type must be specified.
     file_type : `str`, optional (default: None)
-        File type can be 'zarr' (as folder), 'zarr.zip' (as a ZIP file), 'h5ad', 'loom', 'mtx' or 'scp'. If file_type is None, it will be inferred based on output_file.
+        File type can be 'zarr' (as folder), 'zarr.zip' (as a ZIP file), 'h5ad', 'loom', 'mtx', 'scp' or 'h5'. If file_type is None, it will be inferred based on output_file.
     is_sparse : `bool`, optional (default: True)
         Only used for writing out SCP-compatible files, if write expression as a sparse matrix.
     precision : `int`, optional (default: 2)
@@ -229,12 +229,14 @@ def write_output(
             return "h5ad"
         elif output_file.endswith(".loom"):
             return "loom"
+        elif output_file.endswith(".h5"):
+            return "h5"
         else:
             name, sep, suf = output_file.rpartition(".")
             return "mtx" if sep == "" else suf
 
     file_type = _infer_output_file_type(output_file) if file_type is None else file_type
-    if file_type not in {"zarr", "zarr.zip", "h5ad", "loom", "mtx", "scp"}:
+    if file_type not in {"zarr", "zarr.zip", "h5ad", "loom", "mtx", "scp", "h5"}:
         raise ValueError(f"Unsupported output file type '{file_type}'!")
 
     _tmp_multi = data._clean_tmp() # for each unidata, remove uns keys starting with '_tmp' and store these values to _tmp_multi
@@ -247,6 +249,8 @@ def write_output(
         data.to_anndata().write(output_file, compression="gzip")
     elif file_type == "loom":
         write_loom_file(data, output_file)
+    elif file_type == "h5":
+        write_10x_h5(data, output_file)
     elif file_type == "mtx":
         write_mtx_file(data, output_file, precision = precision)
     else:
