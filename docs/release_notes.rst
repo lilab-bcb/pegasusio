@@ -1,5 +1,10 @@
 .. role:: small
 
+Version 0.6.0 :small:`May 14, 2022`
+-------------------------------------
+
+- ``write_output`` function supports `10x hdf5 <https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/advanced/h5_matrices>`_ format. [PR `#92 <https://github.com/lilab-bcb/pegasusio/pull/92>`_]
+
 Version 0.5.1 :small:`February 10, 2022`
 ------------------------------------------
 
