@@ -380,7 +380,7 @@ def write_10x_h5(data: MultimodalData, output_file: str) -> None:
             dtype = f"S{fixed_len}"
             group.create_dataset(
                 name=name,
-                data=data.astype(dtype),
+                data=np.vectorize(lambda s: s.encode('ascii', 'xmlcharrefreplace'))(data),
                 dtype=dtype,
                 **kwargs,
             )
