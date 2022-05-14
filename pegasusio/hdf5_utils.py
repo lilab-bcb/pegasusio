@@ -350,6 +350,7 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
 def write_10x_h5(data: MultimodalData, output_file: str) -> None:
     """Follow 10x hdf5 format description (https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/advanced/h5_matrices).
     Restricted to GEX modality only.
+    Settings consistent with 10x cellranger's (https://github.com/10XGenomics/cellranger/blob/master/lib/python/cellranger/matrix.py#L428-L445).
     """
     unidata = data._unidata
     nmat = len(unidata.matrices)
