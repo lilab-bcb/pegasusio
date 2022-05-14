@@ -348,6 +348,9 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
 
 
 def write_10x_h5(data: MultimodalData, output_file: str) -> None:
+    """Follow 10x hdf5 format description (https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/advanced/h5_matrices).
+    Restricted to GEX modality only.
+    """
     unidata = data._unidata
     nmat = len(unidata.matrices)
     compression_method = "gzip"
@@ -356,6 +359,7 @@ def write_10x_h5(data: MultimodalData, output_file: str) -> None:
     assert unidata.get_modality() == "rna", "Only Gene Expression count matrix is accepted!"
 
     def _create_h5_string_dataset(group, name, data, shape=None, fillvalue=None):
+        """Inspired by 10x cellranger create_hdf5_string_dataset function (https://github.com/10XGenomics/cellranger/blob/master/lib/python/cellranger/io.py#L323-L358)"""
         kwargs = {
             'chunks': (chunk_size,),
             'maxshape': (None,),
