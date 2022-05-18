@@ -1,5 +1,10 @@
 .. role:: small
 
+Version 0.6.1 :small:`May 18, 2022`
+-------------------------------------
+
+- Make the generated ``h5`` format count matrix readable by ``read10xCount`` function in R `DropletUtil <https://bioconductor.org/packages/release/bioc/html/DropletUtils.html>`_ package. [PR `#93 <https://github.com/lilab-bcb/pegasusio/pull/93>`_]
+
 Version 0.6.0 :small:`May 14, 2022`
 -------------------------------------
 
