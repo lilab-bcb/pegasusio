@@ -427,7 +427,9 @@ def write_10x_h5(data: MultimodalData, output_file: str) -> None:
                 shuffle=True,
             )
             grp.create_dataset(
-                name="shape", data=(n_feature, n_obs)
+                name="shape",
+                dtype=np.int32,
+                data=(n_feature, n_obs),
             )  # feature-by-barcode
 
             feature_grp = grp.create_group("features")
