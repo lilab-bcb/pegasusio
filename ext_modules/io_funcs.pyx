@@ -4,7 +4,7 @@ import numpy as np
 
 from libc.stdlib cimport malloc, free, atoi
 from libc.stdio cimport fopen, fclose, getline, FILE, fscanf, sscanf, fprintf, fread, fseek, SEEK_CUR, SEEK_SET#, printf
-from libc.string cimport strncmp, strlen, strtok, strcmp, memcpy, memset
+from libc.string cimport strncmp, strlen, strtok, strchr, strcmp, memcpy, memset
 from libc.math cimport pow
 
 cimport cython
@@ -144,7 +144,13 @@ cpdef tuple read_csv(char* csv_file, char* delimiters):
     assert getline(&line, &size, fi) >= 0
     pch = strtok(line, delimiters)
     assert pch != NULL
-    row_key = pch
+
+    if strchr(delimiters, line[0]) != NULL:
+        row_key = ""
+        N = 1
+        colnames.append(pch)
+    else:
+        row_key = pch
 
     pch = strtok(NULL, delimiters)
     while pch != NULL:
