@@ -98,6 +98,7 @@ def read_input(
     select_data: Set[str] = None,
     select_genome: Set[str] = None,
     select_modality: Set[str] = None,
+    transpose: bool = False,
 ) -> MultimodalData:
     """Load data into memory.
     This function is used to load input data into memory. Inputs can be in 'zarr', 'h5ad', 'loom', '10x', 'mtx', 'csv', 'tsv', 'fcs' (for flow/mass cytometry data) or 'nanostring' (Nanostring GeoMx spatial data) formats.
@@ -122,6 +123,8 @@ def read_input(
         Only select data with genomes in select_genome. Select_data, select_genome and select_modality are mutually exclusive.
     select_modality: `Set[str]`, optional (default: None)
         Only select data with modalities in select_modality. Select_data, select_genome and select_modality are mutually exclusive.
+    transpose: `bool`, optional (default: False)
+        Only applicable if input type is 'csv' or 'tsv'. Need to turn it on if gene names are columns names.
 
     Returns
     -------
@@ -172,7 +175,7 @@ def read_input(
             if is_vdj_file(input_file, file_type):
                 data = load_10x_vdj_file(input_file, genome = genome, modality = modality)
             else:
-                data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality)
+                data = load_csv_file(input_file, sep = "," if file_type == "csv" else "\t", genome = genome, modality = modality, transpose = transpose)
 
     data.subset_data(select_data, select_genome, select_modality)
     data.kick_start()

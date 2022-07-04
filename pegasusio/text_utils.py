@@ -314,6 +314,7 @@ def load_csv_file(
     sep: str = ",",
     genome: str = None,
     modality: str = None,
+    transpose: bool = False,
 ) -> MultimodalData:
     """Load count matrix from a CSV-style file, such as CSV file or DGE style tsv file.
 
@@ -328,6 +329,8 @@ def load_csv_file(
         The genome reference. If None, use "unknown" instead.
     modality: `str`, optional (default None)
         Modality. If None, use "rna" instead.
+    transpose: `bool`, optional (default False)
+        If transpose the matrix. Transposation is needed if gene names are in the columns.
 
     Returns
     -------
@@ -382,15 +385,20 @@ def load_csv_file(
                ((barcode_metadata["barcodekey"].values != np.array(rownames)).sum() == 0) and ((feature_metadata["featureid"].values != np.array(colnames)).sum() == 0)
         mat = csr_matrix((data, (row_ind, col_ind)), shape = shape)
     else:
-        mat = csr_matrix((data, (col_ind, row_ind)), shape = (shape[1], shape[0]))
-        if barcode_metadata is None:
-            barcode_metadata = {"barcodekey": colnames}
+        if transpose:
+            mat = csr_matrix((data, (row_ind, col_ind)), shape = (shape[0], shape[1]))
+            barcode_metadata = {"barcodekey": rownames}
+            feature_metadata = {"featurekey": colnames}
         else:
-            assert (barcode_metadata.shape[0] == shape[1]) and ((barcode_metadata["barcodekey"].values != np.array(colnames)).sum() == 0)
-        if feature_metadata is None:
-            feature_metadata = {"featurekey": rownames}
-        else:
-            assert (feature_metadata.shape[0] == shape[0]) and ((feature_metadata["featurekey"].values != np.array(rownames)).sum() == 0)
+            mat = csr_matrix((data, (col_ind, row_ind)), shape = (shape[1], shape[0]))
+            if barcode_metadata is None:
+                barcode_metadata = {"barcodekey": colnames}
+            else:
+                assert (barcode_metadata.shape[0] == shape[1]) and ((barcode_metadata["barcodekey"].values != np.array(colnames)).sum() == 0)
+            if feature_metadata is None:
+                feature_metadata = {"featurekey": rownames}
+            else:
+                assert (feature_metadata.shape[0] == shape[0]) and ((feature_metadata["featurekey"].values != np.array(rownames)).sum() == 0)
 
     genome = genome if genome is not None else "unknown"
     modality = modality if modality is not None else "rna"
