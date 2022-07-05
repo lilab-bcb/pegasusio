@@ -1,5 +1,10 @@
 .. role:: small
 
+Version 0.6.2 :small:`July 5, 2022`
+-------------------------------------
+
+- In ``read_input`` function, add ``transpose`` option to transpose the loaded count matrix. Only works for CSV or TSV-format files.
+
 Version 0.6.1 :small:`May 18, 2022`
 -------------------------------------
 
