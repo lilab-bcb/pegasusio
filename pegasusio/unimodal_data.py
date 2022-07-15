@@ -33,6 +33,12 @@ def _set_modality(metadata: dict, modality: str):
     elif "modality" not in metadata:
         metadata["modality"] = "rna"
 
+def _set_uid(metadata: dict, uid: str):
+    if uid is not None:
+        metadata["uid"] = uid
+    else:
+        metadata["uid"] = f"{metadata['genome']}-{metadata['modality']}"
+
 
 class UnimodalData:
     def __init__(
@@ -48,11 +54,12 @@ class UnimodalData:
         cur_matrix: str = "X",
         genome: Optional[str] = None,
         modality: Optional[str] = None,
+        uid: Optional[str] = None,
     ) -> None:
         """ Note that metadata, barcode_mutiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs can be modified.
         """
         if isinstance(barcode_metadata, anndata.AnnData):
-            self.from_anndata(barcode_metadata, genome = genome, modality = modality)
+            self.from_anndata(barcode_metadata, genome = genome, modality = modality, uid = uid)
             return None
 
         if barcode_metadata is None:
@@ -72,6 +79,7 @@ class UnimodalData:
 
         _set_genome(metadata, genome)
         _set_modality(metadata, modality)
+        _set_uid(metadata, uid)
 
         self.barcode_metadata = barcode_metadata # barcode metadata
         self.feature_metadata = feature_metadata # feature metadata
@@ -116,7 +124,9 @@ class UnimodalData:
                     f"Wrong number of features : matrix '{key}' has {mat.shape[1]} features, features file has {self._shape[1]} features."
                 )
 
-        if cur_matrix not in matrices.keys():
+        if len(self.matrices) == 0:
+            cur_matrix = ""
+        elif cur_matrix not in self.matrices.keys():
             raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
         self._cur_matrix = cur_matrix # cur_matrix
 
@@ -155,7 +165,7 @@ class UnimodalData:
 
     def __repr__(self) -> str:
         repr_str = f"{self.__class__.__name__} object with n_obs x n_vars = {self.barcode_metadata.shape[0]} x {self.feature_metadata.shape[0]}"
-        repr_str += f"\n    Genome: {self.get_genome()}; Modality: {self.get_modality()}"
+        repr_str += f"\n    UID: {self.get_uid()}; Genome: {self.get_genome()}; Modality: {self.get_modality()}"
         mat_word = 'matrices' if len(self.matrices) > 1 else 'matrix'
         repr_str += f"\n    It contains {len(self.matrices)} {mat_word}: {str(list(self.matrices))[1:-1]}"
         repr_str += f"\n    It currently binds to matrix '{self._cur_matrix}' as X\n" if len(self.matrices) > 0 else "\n    It currently binds to no matrix\n"
@@ -345,13 +355,9 @@ class UnimodalData:
 
 
     def get_uid(self) -> str:
-        """ return uid used for indexing this object in a MultimodalData object. uid = genome + '-' + modality
+        """ return uid used for indexing this object in a MultimodalData object. 
         """
-        genome = self.get_genome()
-        modality = self.get_modality()
-        if genome is None or modality is None:
-            return None
-        return genome + "-" + modality
+        return self.metadata.get("uid", None)
 
 
     def list_keys(self, key_type: str = "matrix") -> List[str]:
@@ -508,7 +514,7 @@ class UnimodalData:
         _scan_dict(self.metadata, black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
+    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None, uid: str = None) -> None:
         """ Initialize from an anndata object, try best not to copy
             If genome/modality is not None, set 'genome'/'modality' as genome/modality
         """
@@ -550,6 +556,7 @@ class UnimodalData:
         self.metadata = _create_data_dict(data.uns)
         _set_genome(self.metadata, genome)
         _set_modality(self.metadata, modality)
+        _set_uid(self.metadata, uid)
 
 
         self._cur_matrix = "X"
