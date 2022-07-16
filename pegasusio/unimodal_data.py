@@ -51,7 +51,7 @@ class UnimodalData:
         feature_multiarrays: Optional[Dict[str, np.ndarray]] = None,
         barcode_multigraphs: Optional[Dict[str, csr_matrix]] = None,
         feature_multigraphs: Optional[Dict[str, csr_matrix]] = None,
-        cur_matrix: str = "X",
+        cur_matrix: str = None,
         genome: Optional[str] = None,
         modality: Optional[str] = None,
         uid: Optional[str] = None,
@@ -125,11 +125,13 @@ class UnimodalData:
                 )
 
         if len(self.matrices) == 0:
-            cur_matrix = ""
-        elif cur_matrix not in self.matrices.keys():
-            raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
-        self._cur_matrix = cur_matrix # cur_matrix
-
+            self._cur_matrix = ""
+        else:
+            if cur_matrix == None:
+                cur_matrix = list(self.matrices.keys())[0]
+            elif cur_matrix not in self.matrices.keys():
+                raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
+            self._cur_matrix = cur_matrix # cur_matrix
 
         # For backword compatibility, check metadata and move arrays and graphs to multiarrays/multigraphs
         for key in list(metadata.keys()):
@@ -355,7 +357,7 @@ class UnimodalData:
 
 
     def get_uid(self) -> str:
-        """ return uid used for indexing this object in a MultimodalData object. 
+        """ return uid used for indexing this object in a MultimodalData object.
         """
         return self.metadata.get("uid", None)
 

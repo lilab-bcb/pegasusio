@@ -14,7 +14,7 @@ from .views import INDEX, _parse_index, UnimodalDataView
 # According to communications with Biolegend, isotype control as background is not recommended.
 
 class CITESeqData(UnimodalData):
-    _matrix_keywords = ["arcsinh.transformed", "raw.count", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
+    _matrix_keywords = ["arcsinh.transformed", "counts", "arcsinh.jitter"] # 'arcsinh.jitter' is in dense format, np.ndarray
     _uns_keywords = ["_other_names", "_other_counts"] # '_other' are antibodies that set aside
 
     def __init__(
@@ -27,7 +27,7 @@ class CITESeqData(UnimodalData):
         feature_multiarrays: Dict[str, np.ndarray] = None,
         barcode_multigraphs: Dict[str, csr_matrix] = None,
         feature_multigraphs: Dict[str, csr_matrix] = None,
-        cur_matrix: str = "raw.count",
+        cur_matrix: str = "counts",
     ) -> None:
         assert metadata["modality"] == "citeseq"
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs, cur_matrix)
@@ -47,16 +47,16 @@ class CITESeqData(UnimodalData):
 
 
     def set_aside(self, params: List[str]) -> None:
-        """ Move antibodies in params from the raw.count matrix
+        """ Move antibodies in params from the counts matrix
         """
-        assert len(self.matrices) == 1 and "raw.count" in self.matrices
+        assert len(self.matrices) == 1 and "counts" in self.matrices
         assert "_other_names" not in self.metadata
 
         locs = self.feature_metadata.index.get_indexer(params)
         if (locs < 0).sum() > 0:
             raise ValueError(f"Detected unknown antibodies {params[locs < 0]}!")
         self.metadata["_other_names"] = self.feature_metadata.index.values[locs] # with loc: List[int], this should be a copy not a reference
-        self.metadata["_other_counts"] = self.matrices["raw.count"][:, locs]
+        self.metadata["_other_counts"] = self.matrices["counts"][:, locs]
 
         obs_keys = self.metadata.get("_obs_keys", [])
         obs_keys.append("_other_counts")
@@ -68,7 +68,7 @@ class CITESeqData(UnimodalData):
 
 
     def arcsinh_transform(self, cofactor: float = 5.0, jitter = False, random_state = 0, select: bool = True) -> None:
-        """Conduct arcsinh transform on the raw.count matrix.
+        """Conduct arcsinh transform on the counts matrix.
 
         Add arcsinh transformed matrix 'arcsinh.transformed'. If jitter == True, instead add a 'arcsinh.jitter' matrix in dense format, jittering by adding a randomized value in U([-0.5, 0.5)). Mimic Cytobank.
 
@@ -98,10 +98,10 @@ class CITESeqData(UnimodalData):
         --------
         >>> citeseq_data.arcsinh_transform(jitter = True)
         """
-        if "raw.count" not in self.matrices:
-            raise ValueError("raw.count matrix must exist in order to calculate the arcsinh transformed matrix!")
+        if "counts" not in self.matrices:
+            raise ValueError("counts matrix must exist in order to calculate the arcsinh transformed matrix!")
 
-        signal = self.matrices["raw.count"].copy()
+        signal = self.matrices["counts"].copy()
 
         if jitter:
             np.random.seed(random_state)

@@ -167,8 +167,8 @@ def load_one_mtx_file(path: str, file_names: List[str], genome: str, modality: s
             mat_key = re.sub('(.mtx|.mtx.gz)$', '', file_name)
             matrices[mat_key] = _load_mtx(file_name)
     else:
-        matrices = {"X": _load_mtx(file_names[0])}
-        cur_matrix = "X"
+        matrices = {"counts": _load_mtx(file_names[0])}
+        cur_matrix = "counts"
 
     unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, {"genome": genome, "modality": modality}, cur_matrix = cur_matrix)
     if format_type == "10x v3" or format_type == "10x v2":
@@ -276,7 +276,7 @@ def _write_mtx(unidata: UnimodalData, output_dir: str, precision: int):
 
     for key in unidata.list_keys():
         matrix = unidata.matrices[key]
-        mtx_file = os.path.join(output_dir, ("matrix" if key == "X" else key) + ".mtx.gz")
+        mtx_file = os.path.join(output_dir, ("matrix" if key == "counts" else key) + ".mtx.gz")
         fifo_file = mtx_file + ".fifo"
         if os.path.exists(fifo_file):
             os.unlink(fifo_file)
@@ -403,11 +403,13 @@ def load_csv_file(
     genome = genome if genome is not None else "unknown"
     modality = modality if modality is not None else "rna"
 
-    if modality == "citeseq":
-        unidata = CITESeqData(barcode_metadata, feature_metadata, {"raw.count": mat}, {"genome": genome, "modality": modality})
-    else:
-        unidata = UnimodalData(barcode_metadata, feature_metadata, {"X": mat}, {"genome": genome, "modality": modality})
-
+    Class = CITESeqData if modality == "citeseq" else UnimodalData
+    unidata = Class(barcode_metadata, 
+                    feature_metadata, 
+                    {"counts": mat}, 
+                    {"genome": genome, "modality": modality},
+                    cur_matrix = "counts",
+                    )
     data = MultimodalData(unidata)
 
     return data

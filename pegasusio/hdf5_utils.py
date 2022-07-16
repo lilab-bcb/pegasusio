@@ -50,8 +50,9 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
         unidata = UnimodalData(
             {"barcodekey": barcodes},
             {"featurekey": names, "featureid": ids},
-            {"X": mat},
+            {"counts": mat},
             {"modality": "rna", "genome": genome},
+            cur_matrix = "counts",
         )
         unidata.separate_channels()
 
@@ -123,20 +124,14 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
         elif name[1] == "Antibody Capture":
             modality = "citeseq"
 
-        if modality == "citeseq":
-            unidata = CITESeqData(
-                barcode_metadata,
-                feature_metadata,
-                {"raw.count": mat},
-                {"genome": genome, "modality": modality},
-            )
-        else:
-            unidata = UnimodalData(
-                barcode_metadata,
-                feature_metadata,
-                {"X": mat},
-                {"genome": genome, "modality": modality},
-            )
+        Class = CITESeqData if modality == "citeseq" else UnimodalData
+        unidata = Class(
+            barcode_metadata,
+            feature_metadata,
+            {"counts": mat},
+            {"genome": genome, "modality": modality},
+            cur_matrix = "counts",
+        )
         unidata.separate_channels()
 
         data.add_data(unidata)
@@ -274,6 +269,7 @@ def load_loom_file(
             feature_multiarrays,
             barcode_multigraphs,
             feature_multigraphs,
+            cur_matrix = "X",
         )
         unidata.separate_channels()
 
@@ -282,13 +278,13 @@ def load_loom_file(
 
 
 def write_loom_file(data: MultimodalData, output_file: str) -> None:
-    """Write a MultimodalData to loom file. Will assert data only contain one type of experiment."""
+    """Write a MultimodalData to loom file. Will assert data only contain one type of experiment. Use current matrix as the main matrix."""
     keys = data.list_data()
     if len(keys) > 1:
         raise ValueError(f"Data contain multiple modalities: {','.join(keys)}!")
     data.select_data(keys[0])
     matrices = data.list_keys()
-    assert "X" in matrices
+    main_mat_key = data.current_matrix()
     if len(matrices) == 0:
         raise ValueError("Could not write empty matrix to a loom file!")
 
@@ -326,7 +322,7 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
 
     layers = {}
     for matkey in matrices:
-        layers["" if matkey == "X" else matkey] = data.get_matrix(matkey).T
+        layers["" if matkey == main_mat_key else matkey] = data.get_matrix(matkey).T
 
     file_attrs = {}
     for key, value in data.uns.items():
