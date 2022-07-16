@@ -404,7 +404,12 @@ def load_csv_file(
     modality = modality if modality is not None else "rna"
 
     Class = CITESeqData if modality == "citeseq" else UnimodalData
-    unidata = Class(barcode_metadata, feature_metadata, {"counts": mat}, {"genome": genome, "modality": modality})
+    unidata = Class(barcode_metadata, 
+                    feature_metadata, 
+                    {"counts": mat}, 
+                    {"genome": genome, "modality": modality},
+                    cur_matrix = "counts",
+                    )
     data = MultimodalData(unidata)
 
     return data

@@ -52,6 +52,7 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
             {"featurekey": names, "featureid": ids},
             {"counts": mat},
             {"modality": "rna", "genome": genome},
+            cur_matrix = "counts",
         )
         unidata.separate_channels()
 
@@ -129,6 +130,7 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
             feature_metadata,
             {"counts": mat},
             {"genome": genome, "modality": modality},
+            cur_matrix = "counts",
         )
         unidata.separate_channels()
 
@@ -267,6 +269,7 @@ def load_loom_file(
             feature_multiarrays,
             barcode_multigraphs,
             feature_multigraphs,
+            cur_matrix = "X",
         )
         unidata.separate_channels()
 
