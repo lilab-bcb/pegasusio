@@ -128,7 +128,7 @@ class UnimodalData:
             self._cur_matrix = ""
         else:
             if cur_matrix == None:
-                cur_matrix = self.matrices.keys()[0]
+                cur_matrix = list(self.matrices.keys())[0]
             elif cur_matrix not in self.matrices.keys():
                 raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
             self._cur_matrix = cur_matrix # cur_matrix
@@ -357,7 +357,7 @@ class UnimodalData:
 
 
     def get_uid(self) -> str:
-        """ return uid used for indexing this object in a MultimodalData object. 
+        """ return uid used for indexing this object in a MultimodalData object.
         """
         return self.metadata.get("uid", None)
 
