@@ -168,7 +168,7 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
         if len(unidata.varm) > 0:
             unidata.varm.clear()
         if uns_white_list is not None:
-            white_list = set(uns_white_list.split(',') + ['genome', 'modality'])
+            white_list = set(uns_white_list.split(',') + ['genome', 'modality', 'uid'])
             for key in list(unidata.uns):
                 if key not in white_list:
                     del unidata.uns[key]
