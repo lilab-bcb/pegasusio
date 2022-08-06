@@ -567,19 +567,34 @@ class UnimodalData:
     def to_anndata(self) -> anndata.AnnData:
         """ Convert to anndata
         """
+
+        X_key = raw_key = None
+        if "X" in self.matrices:
+            X_key = "X"
+            if "raw.X" in self.matrices:
+                raw_key = "raw.X"
+        else:
+            X_key = self._cur_matrix
+            components = X_key.split(".")
+            if len(components) > 1:
+                raw_key = '.'.join(components[:-1])
+                if raw_key not in self.matrices:
+                    raw_key = None
+
         raw = None
-        if "raw.X" in self.matrices:
+        if raw_key != None:
             var_cols = []
             if "featureid" in self.feature_metadata:
                 var_cols.append("featureid")
-            raw = anndata.AnnData(X = self.matrices["raw.X"], var = self.feature_metadata[var_cols])
+            raw = anndata.AnnData(X = self.matrices[raw_key], dtype = self.matrices[raw_key].dtype, var = self.feature_metadata[var_cols])
 
         layers = {}
         for key, value in self.matrices.items():
-            if key != "X" and key != "raw.X":
+            if key != X_key and key != raw_key:
                 layers[key] = value
 
-        return anndata.AnnData(X = self.matrices.get("X", None),
+        return anndata.AnnData(X = self.matrices[X_key],
+            dtype = self.matrices[X_key].dtype,
             obs = self.barcode_metadata,
             var = self.feature_metadata,
             uns = self.metadata,
