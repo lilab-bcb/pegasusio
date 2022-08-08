@@ -1,12 +1,17 @@
 .. role:: small
 
+Version 0.7.1 :small:`August 7, 2022`
+-------------------------------------
+
+- Bug fix in ``to_anndata`` function. [PR `#97 <https://github.com/lilab-bcb/pegasusio/pull/97>`_]
+
 Version 0.7.0 :small:`July 25, 2022`
 -------------------------------------
 
 - The default count matrix of a ``UnimodalData`` object now has key ``counts`` instead of ``X``.
 - Add ``uid`` option to ``UnimodalData`` constructor.
-- Add ``get_uid`` function to ``UnimodalData`` class. 
-- 
+- Add ``get_uid`` function to ``UnimodalData`` class.
+-
 
 Version 0.6.2 :small:`July 5, 2022`
 -------------------------------------
