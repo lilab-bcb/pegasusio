@@ -23,25 +23,32 @@ def load_visium_folder(input_path) -> MultimodalData:
     sample_id = input_path.split("/")[-1]
     # Load count matrix.
     hdf5_filename = "filtered_feature_bc_matrix.h5"
-    assert hdf5_filename in file_list, "Raw count hdf5 file is missing!"
+    assert hdf5_filename in file_list, "Filtered feature-barcode matrix in HDF5 format is missing!"
     rna_data = load_10x_h5_file(f"{input_path}/{hdf5_filename}")
 
     # Load spatial metadata.
     assert ("spatial" in file_list) and (
         os.path.isdir(f"{input_path}/spatial")
     ), "Spatial folder is missing!"
-    tissue_pos_csv = "spatial/tissue_positions_list.csv"
-    spatial_metadata = pd.read_csv(
-        f"{input_path}/{tissue_pos_csv}",
-        names=[
-            "barcodekey",
-            "in_tissue",
-            "array_row",
-            "array_col",
-            "pxl_col_in_fullres",
-            "pxl_row_in_fullres",
-        ],
-    )
+
+    tissue_pos_csv = f"{input_path}/spatial/tissue_positions.csv"
+    if os.path.exists(tissue_pos_csv):
+        spatial_metadata = pd.read_csv(tissue_pos_csv)
+        spatial_metadata.rename(columns={'barcode': 'barcodekey'}, inplace=True)
+    else:
+        tissue_pos_csv = f"{input_path}/spatial/tissue_positions_list.csv"
+        assert os.path.exists(tissue_pos_csv), f"Cannot locate file {tissue_pos_csv}!"
+        spatial_metadata = pd.read_csv(
+            tissue_pos_csv,
+            names=[
+                "barcodekey",
+                "in_tissue",
+                "array_row",
+                "array_col",
+                "pxl_col_in_fullres",
+                "pxl_row_in_fullres",
+            ],
+        )
     process_spatial_metadata(spatial_metadata)
 
     barcode_metadata = rna_data.obs.join(spatial_metadata, how='left')
