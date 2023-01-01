@@ -136,7 +136,7 @@ class AggrData:
             for unidata in unilist:
                 values.update(unidata.metadata[key])
             values.discard("None") # None must be 0 for sparse matrix
-            metadata[key] = np.array(["None"] + list(values), dtype = np.object)
+            metadata[key] = np.array(["None"] + list(values), dtype = object)
             val2num = dict(zip(metadata[key], range(metadata[key].size)))
 
             mat_key = key[1:]
