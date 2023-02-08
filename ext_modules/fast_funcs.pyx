@@ -11,8 +11,8 @@ ctypedef unsigned char uint8
 cpdef tuple split_barcode_channel(str[:] arr):
     cdef Py_ssize_t size = arr.size, i
 
-    barcodes = np.empty(size, dtype = np.object)
-    channels = np.empty(size, dtype = np.object)
+    barcodes = np.empty(size, dtype = object)
+    channels = np.empty(size, dtype = object)
 
     cdef str[:] bview = barcodes, cview = channels
     cdef list res
