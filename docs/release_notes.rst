@@ -1,5 +1,12 @@
 .. role:: small
 
+Version 0.8.0 :small:`February 7, 2023`
+----------------------------------------
+
+- Fix for loading 10x Space Ranger v2 input data. [PR `98 <https://github.com/lilab-bcb/pegasusio/pull/98>`_ and `99 <https://github.com/lilab-bcb/pegasusio/pull/99>`_]
+- Improve support for ``mtx`` format input data. [PR `102 <https://github.com/lilab-bcb/pegasusio/pull/102>`_]
+- Make compatible with Numpy v1.24+. [PR `101 <https://github.com/lilab-bcb/pegasusio/pull/101>`_]
+
 Version 0.7.1 :small:`August 7, 2022`
 -------------------------------------
 

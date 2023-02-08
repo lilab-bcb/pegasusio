@@ -10,6 +10,8 @@ pegasusio/cylib/*.so
 .ipynb_checkpoints
 pegasusio/version.py
 
+.DS_Store
+
 # docs
 docs/_build
 docs/api/*.rst
