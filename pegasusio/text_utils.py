@@ -45,8 +45,8 @@ def _locate_barcode_and_feature_files(path: str, fname: str) -> Tuple[str, str]:
     else:
         p1, p2, p3 = fname.partition("matrix")
         if p2 == '' and p3 == '':
-            barcode_file = _enumerate_files(path, [p1, ''], [".barcodes.tsv.gz", ".barcodes.tsv", ".cells.tsv.gz", ".cells.tsv", "_barcode.tsv", ".barcodes.txt"])
-            feature_file = _enumerate_files(path, [p1, ''], [".genes.tsv.gz", ".genes.tsv", ".features.tsv.gz", ".features.tsv", "_gene.tsv", ".genes.txt"])
+            barcode_file = _enumerate_files(path, [p1, ''], [".barcodes.tsv.gz", ".barcodes.tsv", ".cells.tsv.gz", ".cells.tsv", "_barcodes.tsv.gz", "_barcodes.tsv", ".barcodes.txt.gz", ".barcodes.txt", "_barcode.tsv"])
+            feature_file = _enumerate_files(path, [p1, ''], [".genes.tsv.gz", ".genes.tsv", ".features.tsv.gz", ".features.tsv", "_genes.tsv.gz", "_genes.tsv", ".genes.txt.gz", ".genes.txt", "_gene.tsv"])
         else:
             barcode_file = _enumerate_files(path, [p1, '', p3, ''], ["barcodes", "cells"], [".tsv.gz", ".tsv"])
             feature_file = _enumerate_files(path, [p1, '', p3, ''], ["genes", "features"], [".tsv.gz", ".tsv"])
