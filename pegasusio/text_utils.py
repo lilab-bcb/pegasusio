@@ -308,6 +308,8 @@ def write_mtx_file(data: MultimodalData, output_directory: str, precision: int =
     logger.info("Mtx files are written.")
 
 
+def _strip_quotes(rowkey: str, rownames: List[str], colnames: List[str]) -> Tuple[str, List[str], List[str]]:
+    return rowkey.strip("\"'"), list(map(lambda x: x.strip("\"'"), rownames)), list(map(lambda x: x.strip("\"'"), colnames))
 
 def load_csv_file(
     input_csv: str,
