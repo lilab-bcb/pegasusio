@@ -147,21 +147,24 @@ cpdef tuple read_csv(char* csv_file, char* delimiters):
 
     if strchr(delimiters, line[0]) != NULL:
         row_key = ""
-        N = 1
         colnames.append(pch)
+        colnames[N] = colnames[N].strip("\"'")
+        N = 1
     else:
         row_key = pch
+        row_key = row_key.strip("\"'")
 
     pch = strtok(NULL, delimiters)
     while pch != NULL:
         colnames.append(pch)
+        colnames[N] = colnames[N].strip("\"'")
         N += 1
         pch = strtok(NULL, delimiters)
 
     if N == 0:
         raise ValueError(f"File {csv_file} contains no columns!")
 
-    colnames[N - 1] = colnames[N - 1].rstrip("\n\r")
+    colnames[N - 1] = colnames[N - 1].rstrip("\n\r").strip("\"'")
 
     while getline(&line, &size, fi) >=0:
         if line[0] < 32 or line[0] == 127:
@@ -169,6 +172,7 @@ cpdef tuple read_csv(char* csv_file, char* delimiters):
         pch = strtok(line, delimiters)
         assert pch != NULL
         rownames.append(pch)
+        rownames[M] = rownames[M].strip("\"'")
         for i in range(N):
             pch = strtok(NULL, delimiters)
             assert pch != NULL
