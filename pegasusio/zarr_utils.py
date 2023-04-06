@@ -304,7 +304,7 @@ class ZarrFile:
             self.write_array(categories, name, values)
             # write codes
             codes_arr = group.create_dataset(name, data = array.codes, shape = array.codes.shape, chunks = calc_chunk(array.codes.shape), dtype = array.codes.dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
-            codes_arr.attrs['ordered'] = array.ordered
+            codes_arr.attrs['ordered'] = bool(array.ordered)
         else:
             self.write_array(group, name, array)
 
