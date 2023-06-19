@@ -349,7 +349,11 @@ class MultimodalData:
     def drop_data(self, key: str) -> UnimodalData:
         if key not in self.data:
             raise ValueError("Key {} does not exist!".format(key))
-        return self.data.pop(key)
+        dat = self.data.pop(key)
+        if len(self.data) == 0:
+            self._selected = None
+            self._unidata = None
+        return dat
 
 
     def filter_data(self,
