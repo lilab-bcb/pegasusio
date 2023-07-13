@@ -1,5 +1,10 @@
 .. role:: small
 
+Version 0.8.1 :small:`July 13, 2023`
+--------------------------------------
+
+- Bug fix and backward compatibility support
+
 Version 0.8.0 :small:`February 7, 2023`
 ----------------------------------------
 
