@@ -127,10 +127,11 @@ class UnimodalData:
         if len(self.matrices) == 0:
             self._cur_matrix = ""
         else:
-            if cur_matrix == None:
+            if cur_matrix == None or len(list(self.matrices.keys())) == 1:
                 cur_matrix = list(self.matrices.keys())[0]
             elif cur_matrix not in self.matrices.keys():
                 raise ValueError("Cannot find the default count matrix to bind to. Please set 'cur_matrix' argument in UnimodalData constructor!")
+
             self._cur_matrix = cur_matrix # cur_matrix
 
         # For backword compatibility, check metadata and move arrays and graphs to multiarrays/multigraphs
