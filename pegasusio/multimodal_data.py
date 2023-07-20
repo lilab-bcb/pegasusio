@@ -169,11 +169,6 @@ class MultimodalData:
         assert self._unidata is not None
         self._unidata.register_attr(attr, attr_type)
 
-    def as_float(self, matkey: str = None) -> None:
-        """ Surrogate function to convert matrix to float """
-        assert self._unidata is not None
-        self._unidata.as_float(matkey)
-
     def list_keys(self, key_type: str = "matrix") -> List[str]:
         """ Surrogate function for UnimodalData, return available keys in metadata, key_type = barcode, feature, matrix, other
         """
@@ -184,12 +179,6 @@ class MultimodalData:
         """ Surrogate function for UnimodalData, return current matrix in current unimodal data
         """
         return self._unidata.current_matrix()
-
-    def add_matrix(self, key: str, mat: csr_matrix) -> None:
-        """ Surrogate function for UnimodalData, add a new matrix
-        """
-        assert self._unidata is not None
-        self._unidata.add_matrix(key, mat)
 
     def select_matrix(self, key: str) -> None:
         """ Surrogate function for UnimodalData, select a matrix
@@ -202,6 +191,34 @@ class MultimodalData:
         """
         assert self._unidata is not None
         return self._unidata.get_matrix(key)
+
+    def add_matrix(self, key: str, mat: csr_matrix) -> None:
+        """ Surrogate function for UnimodalData, add a new matrix
+        """
+        assert self._unidata is not None
+        self._unidata.add_matrix(key, mat)
+
+    def pop_matrix(self, key: str) -> csr_matrix:
+        """ Surrogate function for UnimodalData, pop up the matrix indexed with key
+        """
+        assert self._unidata is not None
+        return self._unidata.pop_matrix(key)
+
+    def update_matrix(self, key: str, mat: csr_matrix) -> None:
+        """ Surrogate function for UnimodalData, update key with matrix mat
+        """
+        assert self._unidata is not None
+        self._unidata.update_matrix(key, mat)
+
+    def as_float(self, matkey: str = None) -> None:
+        """ Surrogate function to convert matrix to float """
+        assert self._unidata is not None
+        self._unidata.as_float(matkey)
+
+    def as_int(self, matkey: str = None) -> None:
+        """ Surrogate function to convert matrix to int """
+        assert self._unidata is not None
+        self._unidata.as_int(matkey)
 
     def get_modality(self) -> str:
         """ Surrogate function for UnimodalData, return modality, can be either 'rna', 'atac', 'tcr', 'bcr', 'crispr', 'hashing', 'citeseq' or 'cyto'.
