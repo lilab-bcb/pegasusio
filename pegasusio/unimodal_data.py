@@ -388,19 +388,6 @@ class UnimodalData:
         return self._cur_matrix
 
 
-    def add_matrix(self, key: str, mat: csr_matrix) -> None:
-        """ Add a new matrix, can be raw count or others
-        """
-        if key in self.matrices:
-            raise ValueError(f"Matrix key '{key}' already exists!")
-        if mat.shape[0] != self._shape[0]:
-            raise ValueError(f"Wrong number of barcodes: matrix '{key}' has {mat.shape[0]} barcodes, which does not match with the barcode file ({self._shape[0]})!")
-        if mat.shape[1] != self._shape[1]:
-            raise ValueError(f"Wrong number of features: matrix '{key}' has {mat.shape[1]} features, which does not match with the feature file ({self._shape[1]})!")
-
-        self.matrices[key] = mat
-
-
     def select_matrix(self, key: str) -> None:
         """ Select a matrix for self.X
         """
@@ -417,15 +404,57 @@ class UnimodalData:
         return self.matrices[key]
 
 
+    def add_matrix(self, key: str, mat: csr_matrix) -> None:
+        """ Add a new matrix, can be raw count or others
+        """
+        if key in self.matrices:
+            raise ValueError(f"Matrix key '{key}' already exists!")
+        if mat.shape[0] != self._shape[0]:
+            raise ValueError(f"Wrong number of barcodes: matrix '{key}' has {mat.shape[0]} barcodes, which does not match with the barcode file ({self._shape[0]})!")
+        if mat.shape[1] != self._shape[1]:
+            raise ValueError(f"Wrong number of features: matrix '{key}' has {mat.shape[1]} features, which does not match with the feature file ({self._shape[1]})!")
+
+        self.matrices[key] = mat
+
+
+    def pop_matrix(self, key: str) -> csr_matrix:
+        """ Pop up a matrix indexed by key and return it
+        """
+        if key not in self.matrices:
+            raise ValueError(f"Matrix key '{key}' does not exist!")
+        return self.matrices.pop(key)
+
+
+    def update_matrix(self, key: str, mat: csr_matrix) -> None:
+        """ If key exists, update matrix with mat; otherwise, add a new matrix with key
+        """
+        if mat.shape[0] != self._shape[0]:
+            raise ValueError(f"Wrong number of barcodes: matrix '{key}' has {mat.shape[0]} barcodes, which does not match with the barcode file ({self._shape[0]})!")
+        if mat.shape[1] != self._shape[1]:
+            raise ValueError(f"Wrong number of features: matrix '{key}' has {mat.shape[1]} features, which does not match with the feature file ({self._shape[1]})!")
+        self.matrices[key] = mat
+
+
     def as_float(self, key: str = None) -> None:
-        """ Convert self.matrices[key] as float
+        """ Convert self.matrices[key] as np.float32, expecting np.int32
         """
         key = self._cur_matrix if key is None else key
         X = self.matrices[key]
-        if X.dtype == np.int32:
-            X.dtype = np.float32
-            orig_data = X.data.view(np.int32)
-            X.data[...] = orig_data
+        assert X.dtype == np.int32
+        X.dtype = np.float32
+        orig_data = X.data.view(np.int32)
+        X.data[...] = orig_data
+
+
+    def as_int(self, key: str = None) -> None:
+        """ Convert self.matrices[key] as np.int32, expecting np.float32
+        """
+        key = self._cur_matrix if key is None else key
+        X = self.matrices[key]
+        assert X.dtype == np.float32
+        X.dtype = np.int32
+        orig_data = X.data.view(np.float32)
+        X.data[...] = orig_data
 
 
     @run_gc
