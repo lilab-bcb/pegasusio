@@ -180,9 +180,17 @@ class AggrData:
 
         uns_dict = {}
         metadata = {"genome": unilist[0].metadata["genome"], "modality": unilist[0].metadata["modality"]}
+        cur_matrix_votes = {}
         for unidata in unilist:
             assert unidata.metadata.pop("genome") == metadata["genome"]
             assert unidata.metadata.pop("modality") == metadata["modality"]
+
+            # Count the matrix binding of each UnimodalData object.
+            if unidata._cur_matrix in cur_matrix_votes.keys():
+                cur_matrix_votes[unidata._cur_matrix] += 1
+            else:
+                cur_matrix_votes[unidata._cur_matrix] = 1
+
             if modality == "citeseq":
                 for key in CITESeqData._uns_keywords:
                     unidata.metadata.pop(key, None)
@@ -199,17 +207,19 @@ class AggrData:
         if len(uns_dict) > 0:
             metadata["uns_dict"] = uns_dict
 
+        # Majority voting for the default matrix binding in the resulting UnimodalData object.
+        cur_matrix = sorted(cur_matrix_votes.items(), key=lambda x: x[1], reverse=True)[0][0]
 
         unidata = None
         if isinstance(unilist[0], CITESeqData):
-            unidata = CITESeqData(barcode_metadata, feature_metadata, matrices, metadata)
+            unidata = CITESeqData(barcode_metadata, feature_metadata, matrices, metadata, cur_matrix=cur_matrix)
         elif isinstance(unilist[0], CytoData):
-            unidata = CytoData(barcode_metadata, feature_metadata, matrices, metadata)
+            unidata = CytoData(barcode_metadata, feature_metadata, matrices, metadata, cur_matrix=cur_matrix)
         elif isinstance(unilist[0], VDJData):
             self._vdj_update_metadata_matrices(metadata, matrices, unilist)
-            unidata = VDJData(barcode_metadata, feature_metadata, matrices, metadata)
+            unidata = VDJData(barcode_metadata, feature_metadata, matrices, metadata, cur_matrix=cur_matrix)
         else:
-            unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata)
+            unidata = UnimodalData(barcode_metadata, feature_metadata, matrices, metadata, cur_matrix=cur_matrix)
 
         return unidata
 
