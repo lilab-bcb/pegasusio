@@ -1,5 +1,11 @@
 .. role:: small
 
+Version 0.8.2 :small:`January 5, 2024`
+---------------------------------------
+
+- Add ``pop_matrix``, ``update_matrix`` and ``as_int`` functions for manipulating matrices. [PR `#107 <https://github.com/lilab-bcb/pegasusio/pull/107>`_]
+- Improve ``aggregate_matrices`` function. [PR `#108 <https://github.com/lilab-bcb/pegasusio/pull/108>`_]
+
 Version 0.8.1 :small:`July 13, 2023`
 --------------------------------------
 
