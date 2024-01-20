@@ -30,9 +30,9 @@ author = (
 )
 
 # The short X.Y version
-version = "0.8"
+version = "0.9"
 # The full version, including alpha/beta/rc tags
-release = "0.8.2"
+release = "0.9.0"
 
 
 # -- General configuration ---------------------------------------------------

@@ -1,5 +1,14 @@
 .. role:: small
 
+Version 0.9.0 :small:`January 19, 2024`
+----------------------------------------
+
+- UnimodalData's copy function now returns a MultimodalData object by default. Use cases:
+
+  - ``data[indices, :].copy()`` returns a MultimodalData object;
+
+  - ``data[indices, :].copy(to_unidata=True)`` still returns a UnimodalData object.
+
 Version 0.8.2 :small:`January 5, 2024`
 ---------------------------------------
 
@@ -29,7 +38,6 @@ Version 0.7.0 :small:`July 25, 2022`
 - The default count matrix of a ``UnimodalData`` object now has key ``counts`` instead of ``X``.
 - Add ``uid`` option to ``UnimodalData`` constructor.
 - Add ``get_uid`` function to ``UnimodalData`` class.
--
 
 Version 0.6.2 :small:`July 5, 2022`
 -------------------------------------
