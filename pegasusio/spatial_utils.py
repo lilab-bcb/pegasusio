@@ -103,7 +103,10 @@ def load_visium_folder(input_path) -> MultimodalData:
                 scale_factors[f"tissue_{res_tag}_scalef"],
                 scale_factors["spot_diameter_fullres"],
             )
-            image_metadata = pd.concat([image_metadata, image_item], ignore_index=True)
+            image_metadata = pd.concat(
+                [image_metadata if not image_metadata.empty else None, image_item],
+                ignore_index=True,
+            )
 
     assert not image_metadata.empty, "the image data frame is empty"
     spdata = SpatialData(

@@ -394,9 +394,15 @@ class UnimodalDataView:
                 self.matrices[key] = X[self.barcode_index][:,self.feature_index] # X[self.barcode_index.reshape(-1, 1), self.feature_index] if self._all_arrays else X[self.barcode_index, self.feature_index]
         return self.matrices
 
-    def copy(self) -> "UnimodalData":
+    def copy(
+        self,
+        to_unidata: bool = False,
+    ) -> Union["MultimodalData", "UnimodalData"]:
         """ After copy, this View object becomes invalid """
         data = self.parent._copy_view(self)
+        if not to_unidata:
+            from pegasusio import MultimodalData
+            data = MultimodalData(data)
 
         self.parent = None
         self.barcode_index = self.feature_index = None
