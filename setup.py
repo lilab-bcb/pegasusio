@@ -38,6 +38,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Software Development :: Build Tools",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
@@ -48,6 +49,6 @@ setup(
     install_requires=[
         l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()
     ],
-    python_requires="~=3.7",
+    python_requires="~=3.8",
     entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )
