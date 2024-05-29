@@ -656,9 +656,10 @@ class UnimodalData:
         """ In uns: Do not copy any sparse matrix or ndarrady with ndim > 1
         """
         def _clean_cat(df):
-            for name, series in df.items():
-                if isinstance(series.dtype, pd.CategoricalDtype):
-                    series.cat.remove_unused_categories()
+            for col in df.columns:
+                if isinstance(df[col].dtype, pd.CategoricalDtype):
+                    df[col] = df[col].cat.remove_unused_categories()
+            return df
         
         return UnimodalData(_clean_cat(viewobj.obs.copy()),
                             _clean_cat(viewobj.var.copy()),
