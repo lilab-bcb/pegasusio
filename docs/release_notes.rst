@@ -1,5 +1,10 @@
 .. role:: small
 
+Version 0.9.1 :small:`June 11, 2024`
+----------------------------------------
+
+- The ``copy`` function of ``MultimodalData`` and ``UnimodalData`` removes unused categories in ``obs_names`` and ``var_names``. [PR `#114 <https://github.com/lilab-bcb/pegasusio/pull/114>`_]
+
 Version 0.9.0 :small:`January 19, 2024`
 ----------------------------------------
 
