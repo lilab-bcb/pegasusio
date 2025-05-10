@@ -319,7 +319,7 @@ class UnimodalData:
             # remove genome strings for 10x chemistry if > 1 genomes exist
             import re
             prefix = re.compile(f"^{genome}_+")
-            if prefix.match(feature_metadata["featurekey"][0]):
+            if prefix.match(feature_metadata["featurekey"].iloc[0]):
                 feature_metadata["featurekey"] = np.array([prefix.sub("", x) for x in feature_metadata["featurekey"].values], dtype = object)
                 if "featureid" in feature_metadata:
                     feature_metadata["featureid"] = np.array([prefix.sub("", x) for x in feature_metadata["featureid"].values], dtype = object)
@@ -561,7 +561,9 @@ class UnimodalData:
         if "gene_ids" in self.feature_metadata:
             self.feature_metadata.rename(columns = {"gene_ids": "featureid"}, inplace = True)
 
-        self.matrices = DataDict({"X": csr_matrix(data.X)}) # csr_matrix will not copy X.data
+        self.matrices = DataDict()
+        if data.X is not None:
+            self.matrices["X"] = csr_matrix(data.X)  # csr_matrix will not copy X.data
         if data.raw is not None:
             self.matrices["raw.X"] = csr_matrix(data.raw.X)
         for key, value in data.layers.items():
@@ -590,8 +592,10 @@ class UnimodalData:
         _set_modality(self.metadata, modality)
         _set_uid(self.metadata, uid)
 
-
-        self._cur_matrix = "X"
+        cur_mat_key = list(self.matrices.keys())[0]
+        if "X" in self.matrices.keys():
+            cur_mat_key = "X"
+        self._cur_matrix = cur_mat_key
         self._shape = data.shape
 
     def to_anndata(self) -> anndata.AnnData:
@@ -660,7 +664,7 @@ class UnimodalData:
                 if isinstance(df[col].dtype, pd.CategoricalDtype):
                     df[col] = df[col].cat.remove_unused_categories()
             return df
-        
+
         return UnimodalData(_clean_cat(viewobj.obs.copy()),
                             _clean_cat(viewobj.var.copy()),
                             viewobj._copy_matrices(),

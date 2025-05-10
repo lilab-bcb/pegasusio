@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from pegasusio import UnimodalData
+from typing import Optional, List, Union
 
 import logging
 logger = logging.getLogger(__name__)
@@ -31,14 +32,16 @@ class DictWithDefault:
 def calc_qc_filters(
     unidata: UnimodalData,
     select_singlets: bool = False,
-    remap_string: str = None,
-    subset_string: str = None,
-    min_genes: int = None,
-    max_genes: int = None,
-    min_umis: int = None,
-    max_umis: int = None,
-    mito_prefix: str = None,
-    percent_mito: float = None
+    remap_string: Optional[str] = None,
+    subset_string: Optional[str] = None,
+    min_genes: Optional[int] = None,
+    max_genes: Optional[int] = None,
+    min_umis: Optional[int] = None,
+    max_umis: Optional[int] = None,
+    mito_prefix: Optional[str] = None,
+    percent_mito: Optional[float] = None,
+    ribo_prefix: Optional[Union[str, List[str]]] = None,
+    percent_ribo: Optional[float] = None,
 ) -> None:
     """Calculate Quality Control (QC) metrics and mark barcodes based on the combination of QC metrics.
 
@@ -63,7 +66,11 @@ def calc_qc_filters(
     mito_prefix: ``str``, optional, default: None
        Prefix for mitochondrial genes.
     percent_mito: ``float``, optional, default: None
-       Only keep cells with percent mitochondrial genes less than ``percent_mito`` % of total counts. Only when both mito_prefix and percent_mito set, the mitochondrial filter will be triggered.
+       Only keep cells with percent of mitochondrial genes less than ``percent_mito`` % of total counts. The mitochondrial filtering is triggered only when both ``mito_prefix`` and ``percent_mito`` are both set.
+    ribo_prefix: ``str`` or ``List[str]``, optional, default: None
+        Prefix(es) for ribosomal genes.
+    percent_ribo: ``float``, optional, default: None
+        Only keep cells with percent of ribosomal genes less than ``percent_ribo`` % of total counts. The ribosomal filtering is triggered only when both ``ribo_prefix`` and ``percent_ribo`` are both set.
 
     Returns
     -------
@@ -74,6 +81,7 @@ def calc_qc_filters(
         * ``n_genes``: Total number of genes for each cell.
         * ``n_counts``: Total number of counts for each cell.
         * ``percent_mito``: Percent of mitochondrial genes for each cell.
+        * ``percent_ribo``: Percent of ribosomal genes for each cell.
         * ``passed_qc``: Boolean type indicating if a cell passes the QC process based on the QC metrics.
         * ``demux_type``: this column might be deleted if select_singlets is on.
 
@@ -137,6 +145,18 @@ def calc_qc_filters(
         ) * 100
         if percent_mito is not None:
             filters.append(unidata.obs["percent_mito"] < percent_mito)
+
+    if ribo_prefix is not None:
+        if not isinstance(ribo_prefix, list):
+            ribo_prefix = [ribo_prefix]
+        ribo_prefix = tuple(ribo_prefix)
+        ribo_genes = unidata.var_names.map(lambda x: x.startswith(ribo_prefix)).values.nonzero()[0]
+        unidata.obs["percent_ribo"] = (
+            unidata.X[:, ribo_genes].sum(axis=1).A1
+            / np.maximum(unidata.obs["n_counts"].values, 1.0)
+        ) * 100
+        if percent_ribo is not None:
+            filters.append(unidata.obs["percent_ribo"] < percent_ribo)
 
     if len(filters) > 0:
         selected = np.logical_and.reduce(filters)
