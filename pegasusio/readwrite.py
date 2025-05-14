@@ -1,6 +1,5 @@
 import os
 import gzip
-import anndata
 from typing import Tuple, Set, Union, List
 from pandas.api.types import is_list_like
 
@@ -154,6 +153,12 @@ def read_input(
             zf = ZarrFile(input_file)
             data = zf.read_multimodal_data()
         elif file_type == "h5ad":
+            try:
+                import anndata
+            except ImportError:
+                import sys
+                logger.error("Need anndata for read_input() function on h5ad files! Try 'pip install anndata'.")
+                sys.exit(-1)
             data = MultimodalData(anndata.read_h5ad(input_file), genome = genome, modality = modality)
         elif file_type == "loom":
             data = load_loom_file(input_file, genome = genome, modality = modality)

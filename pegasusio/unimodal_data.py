@@ -4,12 +4,10 @@ from scipy.sparse import csr_matrix
 from collections.abc import MutableMapping
 from copy import deepcopy
 from natsort import natsorted
-from typing import List, Dict, Union, Set, Tuple, Optional
+from typing import List, Dict, Union, Set, Tuple, Optional, Any
 
 import logging
 logger = logging.getLogger(__name__)
-
-import anndata
 
 from pegasusio import run_gc
 from pegasusio import modalities
@@ -43,7 +41,7 @@ def _set_uid(metadata: dict, uid: str):
 class UnimodalData:
     def __init__(
         self,
-        barcode_metadata: Optional[Union[dict, pd.DataFrame, anndata.AnnData]] = None,
+        barcode_metadata: Optional[Union[dict, pd.DataFrame]] = None,
         feature_metadata: Optional[Union[dict, pd.DataFrame]] = None,
         matrices: Optional[Dict[str, csr_matrix]] = None,
         metadata: Optional[dict] = None,
@@ -58,7 +56,8 @@ class UnimodalData:
     ) -> None:
         """ Note that metadata, barcode_mutiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs can be modified.
         """
-        if isinstance(barcode_metadata, anndata.AnnData):
+        if (not isinstance(barcode_metadata, pd.DataFrame)) and (not isinstance(barcode_metadata, dict)):
+            # Try AnnData case
             self.from_anndata(barcode_metadata, genome = genome, modality = modality, uid = uid)
             return None
 
@@ -546,10 +545,17 @@ class UnimodalData:
         _scan_dict(self.metadata, black_list)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None, uid: str = None) -> None:
+    def from_anndata(self, data: Any, genome: str = None, modality: str = None, uid: str = None) -> None:
         """ Initialize from an anndata object, try best not to copy
             If genome/modality is not None, set 'genome'/'modality' as genome/modality
         """
+        try:
+            import anndata
+        except ImportError:
+            import sys
+            logger.error("Need anndata for from_anndata() function! Try 'pip install anndata'.")
+            sys.exit(-1)
+
         if data.is_view:
             data = data.copy()
 
@@ -594,9 +600,15 @@ class UnimodalData:
         self._cur_matrix = "X"
         self._shape = data.shape
 
-    def to_anndata(self) -> anndata.AnnData:
+    def to_anndata(self) -> Any:
         """ Convert to anndata
         """
+        try:
+            import anndata
+        except ImportError:
+            import sys
+            logger.error("Need anndata for to_anndata() function! Try 'pip install anndata'.")
+            sys.exit(-1)
 
         X_key = raw_key = None
         if "X" in self.matrices:
@@ -660,7 +672,7 @@ class UnimodalData:
                 if isinstance(df[col].dtype, pd.CategoricalDtype):
                     df[col] = df[col].cat.remove_unused_categories()
             return df
-        
+
         return UnimodalData(_clean_cat(viewobj.obs.copy()),
                             _clean_cat(viewobj.var.copy()),
                             viewobj._copy_matrices(),

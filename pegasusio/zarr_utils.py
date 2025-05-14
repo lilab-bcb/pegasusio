@@ -8,7 +8,13 @@ import pandas as pd
 from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, is_dict_like
 from scipy.sparse import csr_matrix, issparse
 import zarr
-from zarr import Blosc
+
+from packaging import version
+if version.parse(zarr.__version__) >= version.parse("3.0.0"):
+    from numcodecs import Blosc
+else:
+    from zarr import Blosc
+
 from natsort import natsorted
 from typing import List, Dict, Tuple, Union
 

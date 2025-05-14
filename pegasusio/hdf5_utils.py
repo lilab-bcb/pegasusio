@@ -167,6 +167,21 @@ def load_10x_h5_file(input_h5: str) -> MultimodalData:
     return data
 
 
+def read_molecule_info(molecule_info_h5: str) -> pd.DataFrame:
+    """Load molecule info from hdf5 file as a pandas DataFrame. Only support cumulus_feature_barcoding format.
+    """
+    with h5py.File(molecule_info_h5, "r") as h5_in:
+        assert "features" in h5_in.keys() and isinstance(h5_in["features"], h5py.Dataset), "H5 format not supported! Only support Cumulus Feature Barcoding's hdf5 format."
+        df_mole = pd.DataFrame({
+            "Barcode": h5_in["barcodes"][:][h5_in["barcode_idx"][:]].astype(str),
+            "Feature": h5_in["features"][:][h5_in["feature_idx"][:]].astype(str),
+            "UMI": h5_in["umi"][:].astype(str),
+            "Count": h5_in["count"][:],
+        })
+
+    return df_mole
+
+
 def load_loom_file(
     input_loom: str, genome: str = None, modality: str = None
 ) -> MultimodalData:
