@@ -121,6 +121,8 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
             modality = "rna"
         elif name[1] == "CRISPR Guide Capture":
             modality = "crispr"
+        elif name[1] == "Multiplexing Capture":
+            modality = "hashing"
         elif name[1] == "Antibody Capture":
             modality = "citeseq"
 
