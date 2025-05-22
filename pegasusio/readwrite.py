@@ -163,7 +163,7 @@ def read_input(
         elif file_type == "loom":
             data = load_loom_file(input_file, genome = genome, modality = modality)
         elif file_type == "10x":
-            data = load_10x_h5_file(input_file)
+            data = load_10x_h5_file(input_file, genome = genome, modality = modality)
         elif file_type == "fcs":
             data = load_fcs_file(input_file, genome = genome)
         elif file_type == "nanostring":

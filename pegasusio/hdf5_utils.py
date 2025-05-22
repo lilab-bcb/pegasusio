@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 import h5py
-from typing import Dict
+from typing import Dict, Optional
 
 import logging
 
@@ -61,7 +61,11 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
+def load_10x_h5_file_v3(
+    h5_in: h5py.Group,
+    genome: Optional[str] = None,
+    modality: Optional[str] = None,
+) -> MultimodalData:
     """Load 10x v3 format matrix from hdf5 file, allowing detection of crispr and citeseq libraries
 
     Parameters
@@ -69,6 +73,12 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
 
     h5_in : h5py.Group
         An instance of h5py.Group class that is connected to a 10x v3 formatted hdf5 file.
+
+    genome: ``str``, optional, default: ``None``
+        The genome reference name. Ignore if ``None`` or the h5 file contains multiple matrices.
+
+    modality: ``str``, optional, default: ``None``
+        The modality name. Ignore if ``None`` or the h5 file contains multiple matrices.
 
     Returns
     -------
@@ -113,25 +123,30 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
         }
         mat = bigmat[:, gb.groups[name]]
 
-        genome = (
-            name[0] if (name[0] != "" or default_genome is None) else default_genome
-        )
-        modality = "custom"
-        if name[1] == "Gene Expression":
-            modality = "rna"
-        elif name[1] == "CRISPR Guide Capture":
-            modality = "crispr"
-        elif name[1] == "Multiplexing Capture":
-            modality = "hashing"
-        elif name[1] == "Antibody Capture":
-            modality = "citeseq"
+        cur_genome = name[0]
+        if gb.ngroups == 1 and genome is not None:
+            cur_genome = genome
+        elif name[0] == "" and default_genome is not None:
+            cur_genome = default_genome
 
-        Class = CITESeqData if modality == "citeseq" else UnimodalData
+        cur_modality = "custom"
+        if (gb.ngroups == 1) and (modality is not None):
+            cur_modality = modality
+        elif name[1] == "Gene Expression":
+            cur_modality = "rna"
+        elif name[1] == "CRISPR Guide Capture":
+            cur_modality = "crispr"
+        elif name[1] == "Multiplexing Capture":
+            cur_modality = "hashing"
+        elif name[1] == "Antibody Capture":
+            cur_modality = "citeseq"
+
+        Class = CITESeqData if cur_modality == "citeseq" else UnimodalData
         unidata = Class(
             barcode_metadata,
             feature_metadata,
             {"counts": mat},
-            {"genome": genome, "modality": modality},
+            {"genome": cur_genome, "modality": cur_modality},
             cur_matrix = "counts",
         )
         unidata.separate_channels()
@@ -141,14 +156,24 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file(input_h5: str) -> MultimodalData:
+def load_10x_h5_file(
+    input_h5: str,
+    genome: Optional[str] = None,
+    modality: Optional[str] = None,
+) -> MultimodalData:
     """Load 10x format matrix (either v2 or v3) from hdf5 file
 
     Parameters
     ----------
 
-    input_h5 : `str`
+    input_h5 : ``str``
         The matrix in 10x v2 or v3 hdf5 format.
+
+    genome: ``str``, optional, default: ``None``
+        The genome reference name. Ignore for 10x v2 hdf5 format, and 10x v3 hdf5 file containing multiple matrices.
+
+    modality: ``str``, optional, default: ``None``
+        The modality name. Ignore for 10x v2 hdf5 format, and 10x v3 hdf5 file containing multiple matrices.
 
     Returns
     -------
@@ -161,10 +186,7 @@ def load_10x_h5_file(input_h5: str) -> MultimodalData:
     """
     data = None
     with h5py.File(input_h5, "r") as h5_in:
-        load_file = (
-            load_10x_h5_file_v3 if "matrix" in h5_in.keys() else load_10x_h5_file_v2
-        )
-        data = load_file(h5_in)
+        data = load_10x_h5_file_v3(h5_in, genome, modality) if "matrix" in h5_in.keys() else load_10x_h5_file_v2(h5_in)
 
     return data
 
