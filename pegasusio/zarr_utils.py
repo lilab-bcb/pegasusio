@@ -9,14 +9,10 @@ from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, i
 from scipy.sparse import csr_matrix, issparse
 import zarr
 
-from packaging import version
-if version.parse(zarr.__version__) >= version.parse("3.0.0"):
-    from numcodecs import Blosc
-else:
-    from zarr import Blosc
+from zarr import Blosc, ZipStore, NestedDirectoryStore
 
 from natsort import natsorted
-from typing import List, Dict, Tuple, Union
+from typing import Union
 
 import logging
 logger = logging.getLogger(__name__)
@@ -75,13 +71,13 @@ class ZarrFile:
         if mode == 'w':
             # Create a new zarr file
             check_and_remove_existing_path(path)
-            self.store = zarr.ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else zarr.NestedDirectoryStore(path)
+            self.store = ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else NestedDirectoryStore(path)
             self.root = zarr.group(self.store, overwrite = True)
             self.write_empty_chunks = (storage_type == 'ZipStore')
         else:
             # Load existing zarr file
-            self.store = zarr.NestedDirectoryStore(path) if os.path.isdir(path) else zarr.ZipStore(path, mode = 'r')
-            if mode == 'a' and isinstance(self.store, zarr.ZipStore):
+            self.store = NestedDirectoryStore(path) if os.path.isdir(path) else ZipStore(path, mode = 'r')
+            if mode == 'a' and isinstance(self.store, ZipStore):
                 self._to_directory()
             self.root = zarr.open(self.store, mode = mode)
 
@@ -92,9 +88,9 @@ class ZarrFile:
 
 
     def _to_zip(self):
-        if not isinstance(self.store, zarr.ZipStore):
+        if not isinstance(self.store, ZipStore):
             zip_path = self.store.path + '.zip'
-            zip_store = zarr.ZipStore(zip_path, mode = 'w')
+            zip_store = ZipStore(zip_path, mode = 'w')
             zarr.copy_store(self.store, zip_store)
             zip_store.close()
 
@@ -112,13 +108,13 @@ class ZarrFile:
             zip_path = orig_path + '.zip'
             check_and_remove_existing_path(zip_path)
             os.replace(orig_path, zip_path)
-            self.store = zarr.ZipStore(zip_path, mode = 'r')
+            self.store = ZipStore(zip_path, mode = 'r')
         else:
             zip_path = orig_path
 
         dest_path = zip_path[:-4]
         check_and_remove_existing_path(dest_path)
-        dir_store = zarr.NestedDirectoryStore(dest_path)
+        dir_store = NestedDirectoryStore(dest_path)
         zarr.copy_store(self.store, dir_store)
         self.store.close()
         os.remove(zip_path)
