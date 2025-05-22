@@ -3,7 +3,7 @@ loompy
 h5py>=3.0.0
 docopt
 natsort
-numpy
+numpy>=2.0.0
 pandas>=1.2.0
 scipy
 setuptools
