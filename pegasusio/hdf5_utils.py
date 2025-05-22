@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 import h5py
-from typing import Dict
+from typing import Dict, Optional
 
 import logging
 
@@ -61,7 +61,11 @@ def load_10x_h5_file_v2(h5_in: h5py.Group) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
+def load_10x_h5_file_v3(
+    h5_in: h5py.Group,
+    genome: Optional[str] = None,
+    modality: Optional[str] = None,
+) -> MultimodalData:
     """Load 10x v3 format matrix from hdf5 file, allowing detection of crispr and citeseq libraries
 
     Parameters
@@ -69,6 +73,12 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
 
     h5_in : h5py.Group
         An instance of h5py.Group class that is connected to a 10x v3 formatted hdf5 file.
+
+    genome: ``str``, optional, default: ``None``
+        The genome reference name. Ignore if ``None`` or the h5 file contains multiple matrices.
+
+    modality: ``str``, optional, default: ``None``
+        The modality name. Ignore if ``None`` or the h5 file contains multiple matrices.
 
     Returns
     -------
@@ -113,23 +123,30 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
         }
         mat = bigmat[:, gb.groups[name]]
 
-        genome = (
-            name[0] if (name[0] != "" or default_genome is None) else default_genome
-        )
-        modality = "custom"
-        if name[1] == "Gene Expression":
-            modality = "rna"
-        elif name[1] == "CRISPR Guide Capture":
-            modality = "crispr"
-        elif name[1] == "Antibody Capture":
-            modality = "citeseq"
+        cur_genome = name[0]
+        if gb.ngroups == 1 and genome is not None:
+            cur_genome = genome
+        elif name[0] == "" and default_genome is not None:
+            cur_genome = default_genome
 
-        Class = CITESeqData if modality == "citeseq" else UnimodalData
+        cur_modality = "custom"
+        if (gb.ngroups == 1) and (modality is not None):
+            cur_modality = modality
+        elif name[1] == "Gene Expression":
+            cur_modality = "rna"
+        elif name[1] == "CRISPR Guide Capture":
+            cur_modality = "crispr"
+        elif name[1] == "Multiplexing Capture":
+            cur_modality = "hashing"
+        elif name[1] == "Antibody Capture":
+            cur_modality = "citeseq"
+
+        Class = CITESeqData if cur_modality == "citeseq" else UnimodalData
         unidata = Class(
             barcode_metadata,
             feature_metadata,
             {"counts": mat},
-            {"genome": genome, "modality": modality},
+            {"genome": cur_genome, "modality": cur_modality},
             cur_matrix = "counts",
         )
         unidata.separate_channels()
@@ -139,14 +156,24 @@ def load_10x_h5_file_v3(h5_in: h5py.Group) -> MultimodalData:
     return data
 
 
-def load_10x_h5_file(input_h5: str) -> MultimodalData:
+def load_10x_h5_file(
+    input_h5: str,
+    genome: Optional[str] = None,
+    modality: Optional[str] = None,
+) -> MultimodalData:
     """Load 10x format matrix (either v2 or v3) from hdf5 file
 
     Parameters
     ----------
 
-    input_h5 : `str`
+    input_h5 : ``str``
         The matrix in 10x v2 or v3 hdf5 format.
+
+    genome: ``str``, optional, default: ``None``
+        The genome reference name. Ignore for 10x v2 hdf5 format, and 10x v3 hdf5 file containing multiple matrices.
+
+    modality: ``str``, optional, default: ``None``
+        The modality name. Ignore for 10x v2 hdf5 format, and 10x v3 hdf5 file containing multiple matrices.
 
     Returns
     -------
@@ -159,12 +186,50 @@ def load_10x_h5_file(input_h5: str) -> MultimodalData:
     """
     data = None
     with h5py.File(input_h5, "r") as h5_in:
-        load_file = (
-            load_10x_h5_file_v3 if "matrix" in h5_in.keys() else load_10x_h5_file_v2
-        )
-        data = load_file(h5_in)
+        data = load_10x_h5_file_v3(h5_in, genome, modality) if "matrix" in h5_in.keys() else load_10x_h5_file_v2(h5_in)
 
     return data
+
+
+def read_molecule_info(molecule_info_h5: str) -> pd.DataFrame:
+    """Load molecule info from hdf5 file as a pandas DataFrame. Only support cumulus_feature_barcoding format as the following structure:
+
+        - ``/barcode_idx``: Integer array of length ``n_mol`` (number of molecules). Each entry is the index of the molecule’s cell barcode, which can be found in ``/barcodes``;
+        - ``/barcodes``: String array of length ``n_cell`` (number of cell barcodes). Each entry is a cell barcode;
+        - ``/feature_idx``: Integer array of length ``n_mol``. Each entry is the index of the molecule’s feature name, which can be found in ``/features``;
+        - ``/features``: String array of length ``n_feature`` (number of features). Each entry is a feature name;
+        - ``/umi``: String array of length ``n_mol``. Each entry is the molecule’s UMI barcode;
+        - ``/count``: Integer array of length n_mol. Each entry is the molecule’s count of reads.
+
+    Parameters
+    ----------
+
+    molecule_info_h5: ``str``
+        The hdf5 format file containing UMI information.
+
+    Returns
+    --------
+
+    A data frame with each row representing a UMI, and columns as:
+        - ``Barcode`` for cell barcodes
+        - ``Feature`` for feature names
+        - ``UMI`` for UMI barcodes
+        - ``Count`` for count of reads
+
+    Examples
+    --------
+    >>> io.read_molecule_info("molecule_info.h5")
+    """
+    with h5py.File(molecule_info_h5, "r") as h5_in:
+        assert "features" in h5_in.keys() and isinstance(h5_in["features"], h5py.Dataset), "H5 format not supported! Only support Cumulus Feature Barcoding's hdf5 format."
+        df_mole = pd.DataFrame({
+            "Barcode": h5_in["barcodes"][:][h5_in["barcode_idx"][:]].astype(str),
+            "Feature": h5_in["features"][:][h5_in["feature_idx"][:]].astype(str),
+            "UMI": h5_in["umi"][:].astype(str),
+            "Count": h5_in["count"][:],
+        })
+
+    return df_mole
 
 
 def load_loom_file(

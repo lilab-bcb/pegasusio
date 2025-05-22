@@ -137,7 +137,7 @@ def _parse_index(parent: Union["UnimodalData", "UnimodalDataView"], index: INDEX
             if not is_list_like(index_1d):
                 index_1d = np.array([index_1d])
             elif not isinstance(index_1d, np.ndarray):
-                index_1d = np.array(index_1d, copy = False)
+                index_1d = np.asarray(index_1d, copy=None)  # New in Numpy v2: object is copied only if needed.
             if index_1d.ndim != 1:
                 raise ValueError(f"{index_name} index must be 1 dimension!")
             if index_1d.dtype.kind not in {'b', 'i', 'u', 'O', 'U'}:

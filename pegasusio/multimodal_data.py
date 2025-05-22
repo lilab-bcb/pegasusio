@@ -2,12 +2,10 @@ import gc
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack
-from typing import List, Dict, Union, Set, Tuple, Optional
+from typing import List, Dict, Union, Set, Tuple, Optional, Any
 
 import logging
 logger = logging.getLogger(__name__)
-
-import anndata
 
 from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, NanostringData
 from pegasusio import calc_qc_filters, apply_qc_filters, DictWithDefault
@@ -17,7 +15,7 @@ from .vdj_data import VDJDataView
 
 
 class MultimodalData:
-    def __init__(self, unidata: Union[UnimodalData, anndata.AnnData, MultiDataDict] = None, genome: str = None, modality: str = None):
+    def __init__(self, unidata: Union[UnimodalData, MultiDataDict] = None, genome: str = None, modality: str = None):
         self._selected = self._unidata = self._zarrobj = None
 
         if isinstance(unidata, MultiDataDict):
@@ -25,7 +23,7 @@ class MultimodalData:
         else:
             self.data = MultiDataDict()
             if unidata is not None:
-                if isinstance(unidata, anndata.AnnData):
+                if not isinstance(unidata, UnimodalData):
                     unidata = UnimodalData(unidata, genome = genome, modality = modality)
                 self.add_data(unidata)
 
@@ -527,7 +525,7 @@ class MultimodalData:
             self.data[key].scan_black_list(black_list)
 
 
-    def to_anndata(self) -> anndata.AnnData:
+    def to_anndata(self) -> Any:
         """ Convert current data to an anndata object
         """
         if self._unidata is None:
