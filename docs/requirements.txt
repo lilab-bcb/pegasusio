@@ -4,5 +4,5 @@ sphinx-autodoc-typehints
 numpy>=2.0.0
 pandas>=1.2.0
 scipy
-zarr>=2.18.7, <3
+zarr<=2.18.7
 Pillow
