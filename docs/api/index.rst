@@ -16,5 +16,6 @@ Read and Write
 
     infer_file_type
 	read_input
+	read_molecule_info
 	write_output
 	aggregate_matrices

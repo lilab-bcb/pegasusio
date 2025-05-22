@@ -192,7 +192,33 @@ def load_10x_h5_file(
 
 
 def read_molecule_info(molecule_info_h5: str) -> pd.DataFrame:
-    """Load molecule info from hdf5 file as a pandas DataFrame. Only support cumulus_feature_barcoding format.
+    """Load molecule info from hdf5 file as a pandas DataFrame. Only support cumulus_feature_barcoding format as the following structure:
+
+        - ``/barcode_idx``: Integer array of length ``n_mol`` (number of molecules). Each entry is the index of the molecule’s cell barcode, which can be found in ``/barcodes``;
+        - ``/barcodes``: String array of length ``n_cell`` (number of cell barcodes). Each entry is a cell barcode;
+        - ``/feature_idx``: Integer array of length ``n_mol``. Each entry is the index of the molecule’s feature name, which can be found in ``/features``;
+        - ``/features``: String array of length ``n_feature`` (number of features). Each entry is a feature name;
+        - ``/umi``: String array of length ``n_mol``. Each entry is the molecule’s UMI barcode;
+        - ``/count``: Integer array of length n_mol. Each entry is the molecule’s count of reads.
+
+    Parameters
+    ----------
+
+    molecule_info_h5: ``str``
+        The hdf5 format file containing UMI information.
+
+    Returns
+    --------
+
+    A data frame with each row representing a UMI, and columns as:
+        - ``Barcode`` for cell barcodes
+        - ``Feature`` for feature names
+        - ``UMI`` for UMI barcodes
+        - ``Count`` for count of reads
+
+    Examples
+    --------
+    >>> io.read_molecule_info("molecule_info.h5")
     """
     with h5py.File(molecule_info_h5, "r") as h5_in:
         assert "features" in h5_in.keys() and isinstance(h5_in["features"], h5py.Dataset), "H5 format not supported! Only support Cumulus Feature Barcoding's hdf5 format."
