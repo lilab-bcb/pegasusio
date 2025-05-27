@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 
 import logging
 logger = logging.getLogger(__name__)
 
-import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, _parse_index, UnimodalDataView
 
@@ -33,11 +32,11 @@ class CITESeqData(UnimodalData):
         super().__init__(barcode_metadata, feature_metadata, matrices, metadata, barcode_multiarrays, feature_multiarrays, barcode_multigraphs, feature_multigraphs, cur_matrix)
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
+    def from_anndata(self, data: Any, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a CITESeqData object!")
 
 
-    def to_anndata(self) -> anndata.AnnData:
+    def to_anndata(self) -> Any:
         raise ValueError("Cannot convert a CITESeqData object ot an AnnData object!")
 
 

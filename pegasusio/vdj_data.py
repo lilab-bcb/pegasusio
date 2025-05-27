@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 
-import anndata
 from pegasusio import UnimodalData
 from .views import INDEX, CINDEX, _parse_index, UnimodalDataView
 
@@ -128,11 +127,11 @@ class VDJData(UnimodalData):
             self.obs.loc[idxlh, "clonotype"] = df3.loc[idxlh, "cdr3"] + "|" + df1.loc[idxlh, "cdr3"]
 
 
-    def from_anndata(self, data: anndata.AnnData, genome: str = None, modality: str = None) -> None:
+    def from_anndata(self, data: Any, genome: str = None, modality: str = None) -> None:
         raise ValueError("Cannot convert an AnnData object to a VDJData object!")
 
 
-    def to_anndata(self) -> anndata.AnnData:
+    def to_anndata(self) -> Any:
         raise ValueError("Cannot convert a VDJData object ot an AnnData object!")
 
 

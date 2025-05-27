@@ -29,6 +29,7 @@ from .multimodal_data import MultimodalData
 from .aggr_data import AggrData, _fillna
 from .readwrite import infer_file_type, read_input, write_output, write_scp_file
 from .data_aggregation import aggregate_matrices
+from .hdf5_utils import read_molecule_info
 
 try:
     from importlib.metadata import version, PackageNotFoundError
