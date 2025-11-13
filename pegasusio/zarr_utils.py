@@ -9,7 +9,8 @@ from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, i
 from scipy.sparse import csr_matrix, issparse
 import zarr
 
-from zarr import Blosc, ZipStore, NestedDirectoryStore
+from zarr.codecs import BloscCodec
+from zarr.storage import ZipStore, LocalStore
 
 from natsort import natsorted
 from typing import Union
@@ -22,7 +23,7 @@ from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalDa
 
 
 CHUNKSIZE = 1000000.0
-COMPRESSOR = Blosc(cname = 'lz4', clevel = 5)
+COMPRESSOR = BloscCodec(cname = 'lz4', clevel = 5)
 
 
 def calc_chunk(shape: tuple) -> tuple:
@@ -60,23 +61,23 @@ class ZarrFile:
     def __init__(self, path: str, mode: str = 'r', storage_type: str = None) -> None:
         """ Initialize a Zarr file, if mode == 'w', create an empty one, otherwise, load from path
         path : `str`, path for the zarr object.
-        storage_type : `str`, currently only support 'ZipStore' and 'NestedDirectoryStore'. If None, use 'NestedDirectoryStore' by default.
+        storage_type : `str`, currently only support 'ZipStore' and 'LocalStore'. If None, use 'LocalStore' by default.
         """
         self.store = self.root = None
         self.write_empty_chunks = False
 
         if storage_type is None:
-            storage_type = 'NestedDirectoryStore'
+            storage_type = 'LocalStore'
 
         if mode == 'w':
             # Create a new zarr file
             check_and_remove_existing_path(path)
-            self.store = ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else NestedDirectoryStore(path)
+            self.store = ZipStore(path, mode = 'w') if storage_type == 'ZipStore' else LocalStore(path)
             self.root = zarr.group(self.store, overwrite = True)
             self.write_empty_chunks = (storage_type == 'ZipStore')
         else:
             # Load existing zarr file
-            self.store = NestedDirectoryStore(path) if os.path.isdir(path) else ZipStore(path, mode = 'r')
+            self.store = LocalStore(path) if os.path.isdir(path) else ZipStore(path, mode = 'r')
             if mode == 'a' and isinstance(self.store, ZipStore):
                 self._to_directory()
             self.root = zarr.open(self.store, mode = mode)
@@ -114,7 +115,7 @@ class ZarrFile:
 
         dest_path = zip_path[:-4]
         check_and_remove_existing_path(dest_path)
-        dir_store = NestedDirectoryStore(dest_path)
+        dir_store = LocalStore(dest_path)
         zarr.copy_store(self.store, dir_store)
         self.store.close()
         os.remove(zip_path)
@@ -122,7 +123,7 @@ class ZarrFile:
         self.store = dir_store
         self.root = zarr.open_group(self.store)
 
-        logger.info(f"Converted ZipStore zarr file {orig_path} to NestedDirectoryStore {dest_path}.")
+        logger.info(f"Converted ZipStore zarr file {orig_path} to LocalStore {dest_path}.")
 
     def read_csr(self, group: zarr.Group) -> csr_matrix:
         return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
