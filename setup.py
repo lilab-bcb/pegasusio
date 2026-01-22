@@ -34,10 +34,11 @@ setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Software Development :: Build Tools",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
@@ -48,6 +49,6 @@ setup(
     install_requires=[
         l.strip() for l in Path("requirements.txt").read_text("utf-8").splitlines()
     ],
-    python_requires="~=3.8",
+    python_requires="~=3.10",
     entry_points={"console_scripts": ["pegasusio=pegasusio.__main__:main"]},
 )
