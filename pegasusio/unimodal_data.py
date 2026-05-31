@@ -507,7 +507,7 @@ class UnimodalData:
         except ModuleNotFoundError:
             print("No module named 'pegasusio.cylib.funcs'")
 
-        barcodes, channels = split_barcode_channel(self.barcode_metadata.index.values)
+        barcodes, channels = split_barcode_channel(self.barcode_metadata.index.to_numpy(dtype=object))   # Need explicit conversion to object dtype in pandas v3
 
         if np.unique(channels).size > 1:
             # we have multiple channels
