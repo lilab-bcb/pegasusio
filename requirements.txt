@@ -7,5 +7,5 @@ numpy>=2.0.0
 pandas>=1.2.0
 scipy
 setuptools
-zarr>=3.1
+zarr>=2.18.7,!=3.0.*,<4
 Pillow

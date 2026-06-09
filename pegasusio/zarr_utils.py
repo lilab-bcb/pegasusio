@@ -11,9 +11,23 @@ from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, i
 from scipy.sparse import csr_matrix, issparse
 import zarr
 
-from zarr.codecs import BloscCodec
-from zarr.dtype import VariableLengthUTF8
-from zarr.storage import ZipStore, LocalStore
+ZARR_V3 = int(zarr.__version__.split('.')[0]) >= 3
+
+if ZARR_V3:
+    from zarr.codecs import BloscCodec
+    from zarr.dtype import VariableLengthUTF8
+    from zarr.storage import ZipStore, LocalStore
+
+    DirectoryStore = LocalStore
+    COMPRESSOR = BloscCodec(cname = 'lz4', clevel = 5)
+else:
+    from zarr import Blosc
+    from zarr.storage import ZipStore, DirectoryStore as ZarrDirectoryStore
+
+    def DirectoryStore(path: str):
+        return ZarrDirectoryStore(path, dimension_separator = '/')
+
+    COMPRESSOR = Blosc(cname = 'lz4', clevel = 5)
 
 from natsort import natsorted
 from typing import Union
@@ -26,7 +40,6 @@ from pegasusio import UnimodalData, VDJData, CITESeqData, CytoData, MultimodalDa
 
 
 CHUNKSIZE = 1000000.0
-COMPRESSOR = BloscCodec(cname = 'lz4', clevel = 5)
 
 
 def calc_chunk(shape: tuple) -> tuple:
@@ -73,18 +86,24 @@ def unzip_directory(src_path: str, dest_path: str) -> None:
         zf.extractall(dest_path)
 
 
+def get_store_path(store) -> str:
+    root = getattr(store, 'root', None)
+    return str(root if root is not None else store.path)
+
+
 class ZarrFile:
     def __init__(self, path: str, mode: str = 'r', storage_type: str = None) -> None:
         """ Initialize a Zarr file, if mode == 'w', create an empty one, otherwise, load from path
         path : `str`, path for the zarr object.
-        storage_type : `str`, currently only support 'ZipStore' and 'LocalStore'. If None, use 'LocalStore' by default.
+        storage_type : `str`, currently only support 'ZipStore' and the default directory store.
         """
         self.store = self.root = None
+        self.write_empty_chunks = False
         self._zip_path = None
         self._temp_store_path = None
 
         if storage_type is None:
-            storage_type = 'LocalStore'
+            storage_type = 'LocalStore' if ZARR_V3 else 'DirectoryStore'
 
         if mode == 'w':
             # Create a new zarr file
@@ -92,13 +111,14 @@ class ZarrFile:
             if storage_type == 'ZipStore':
                 self._zip_path = path
                 self._temp_store_path = tempfile.mkdtemp(prefix = 'pegasusio-zarr-', suffix = '.zarr')
-                self.store = LocalStore(self._temp_store_path)
+                self.store = DirectoryStore(self._temp_store_path)
+                self.write_empty_chunks = True
             else:
-                self.store = LocalStore(path)
+                self.store = DirectoryStore(path)
             self.root = zarr.group(self.store, overwrite = True)
         else:
             # Load existing zarr file
-            self.store = LocalStore(path) if os.path.isdir(path) else ZipStore(path, mode = 'r')
+            self.store = DirectoryStore(path) if os.path.isdir(path) else ZipStore(path, mode = 'r')
             if mode == 'a' and isinstance(self.store, ZipStore):
                 self._to_directory()
             self.root = zarr.open(self.store, mode = mode)
@@ -124,7 +144,7 @@ class ZarrFile:
 
     def _to_zip(self):
         if not isinstance(self.store, ZipStore):
-            dir_path = str(self.store.root)
+            dir_path = get_store_path(self.store)
             zip_path = dir_path + '.zip'
             check_and_remove_existing_path(zip_path)
             self.store.close()
@@ -160,10 +180,10 @@ class ZarrFile:
         unzip_directory(zip_path, dest_path)
         os.remove(zip_path)
 
-        self.store = LocalStore(dest_path)
+        self.store = DirectoryStore(dest_path)
         self.root = zarr.open_group(self.store, mode = 'a')
 
-        logger.info(f"Converted ZipStore zarr file {orig_path} to LocalStore {dest_path}.")
+        logger.info(f"Converted ZipStore zarr file {orig_path} to directory store {dest_path}.")
 
     def read_csr(self, group: zarr.Group) -> csr_matrix:
         return csr_matrix((group['data'][...], group['indices'][...], group['indptr'][...]), shape = group.attrs['shape'])
@@ -370,13 +390,17 @@ class ZarrFile:
 
     def write_array(self, group: zarr.Group, name: str, array: np.ndarray) -> zarr.Array:
         array = np.asarray(array)
-        if array.dtype.kind in {'O', 'U', 'S'}:
-            dtype = VariableLengthUTF8()
-            array = array.astype(str)
+        if ZARR_V3:
+            if array.dtype.kind in {'O', 'U', 'S'}:
+                dtype = VariableLengthUTF8()
+                array = array.astype(str)
+            else:
+                dtype = array.dtype
+            zarr_array = group.create_array(name, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressors = [COMPRESSOR], overwrite = True)
+            zarr_array[...] = array
         else:
-            dtype = array.dtype
-        zarr_array = group.create_array(name, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressors = [COMPRESSOR], overwrite = True)
-        zarr_array[...] = array
+            dtype = str if array.dtype.kind == 'O' else array.dtype
+            zarr_array = group.create_dataset(name, data = array, shape = array.shape, chunks = calc_chunk(array.shape), dtype = dtype, compressor = COMPRESSOR, overwrite = True, write_empty_chunks = self.write_empty_chunks)
         return zarr_array
 
     def write_record_array(self, parent: zarr.Group, name: str, array: np.recarray) -> None:
