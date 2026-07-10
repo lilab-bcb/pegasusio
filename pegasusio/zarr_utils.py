@@ -9,7 +9,8 @@ from pandas.api.types import is_categorical_dtype, is_string_dtype, is_scalar, i
 from scipy.sparse import csr_matrix, issparse
 import zarr
 
-from zarr import Blosc, ZipStore, NestedDirectoryStore
+from zarr import ZipStore, NestedDirectoryStore
+from numcodecs import Blosc
 
 from natsort import natsorted
 from typing import Union
