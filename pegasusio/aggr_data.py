@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix, vstack, coo_matrix
+from scipy.sparse import csr_matrix, vstack
 from typing import List, Dict, Union
 from collections import defaultdict
 from pandas.api.types import is_categorical_dtype, is_string_dtype
@@ -108,22 +108,29 @@ class AggrData:
                     matrices[mat_key] = np.vstack(mat_list)
             else:
                 for mat_key in mat_keys:
-                    data_list = []
-                    row_list = []
-                    col_list = []
-                    row_base = 0
+                    mat_list = []
                     for i, unidata in enumerate(unilist):
                         mat = unidata.matrices.pop(mat_key, None)
                         if mat is not None:
-                            mat = mat.tocoo(copy = False) # convert to coo format
-                            data_list.append(mat.data)
-                            row_list.append(mat.row + row_base)
-                            col_list.append(colmap[i][mat.col])
-                            row_base += mat.shape[0]
-                    data = np.concatenate(data_list)
-                    row = np.concatenate(row_list)
-                    col = np.concatenate(col_list)
-                    matrices[mat_key] = coo_matrix((data, (row, col)), shape=(row_base, feature_metadata.shape[0])).tocsr(copy = False)
+                            mat = mat.tocsr(copy = False)
+                            # Remap only the CSR column indices.  The previous COO
+                            # implementation also allocated a row index per nonzero,
+                            # concatenated copies of data/row/column, and then allocated
+                            # CSR arrays once more.  Keeping the row structure in CSR
+                            # avoids those large temporary arrays.
+                            mapped_indices = colmap[i][mat.indices]
+                            if feature_metadata.shape[0] <= np.iinfo(mat.indices.dtype).max + 1:
+                                mapped_indices = mapped_indices.astype(mat.indices.dtype, copy=False)
+                            mat = csr_matrix(
+                                (mat.data, mapped_indices, mat.indptr),
+                                shape=(mat.shape[0], feature_metadata.shape[0]),
+                                copy=False,
+                            )
+                            # COO -> CSR also canonicalized duplicate entries, so retain
+                            # that behavior while sorting the remapped column indices.
+                            mat.sum_duplicates()
+                            mat_list.append(mat)
+                    matrices[mat_key] = vstack(mat_list, format="csr")
 
         return matrices
 
