@@ -173,7 +173,7 @@ def aggregate_matrices(
 
     for idx_num, row in df.iterrows():
         if "Object" in row:
-            data = row["Object"].copy()
+            data = row["Object"].copy()     # Deep copy. Avoid if you want to save memory.
         else:
             assert "Location" in row, f"Row of sample '{row['Sample']}' must contain a 'Location' column!"
             assert not row.isnull().values.any(), f"Row of sample '{row['Sample']}' has one or more NaN/NA values!"

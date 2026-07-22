@@ -109,15 +109,11 @@ class AggrData:
             else:
                 for mat_key in mat_keys:
                     mat_list = []
+                    # Direct CSR -> CSR concatenation
                     for i, unidata in enumerate(unilist):
                         mat = unidata.matrices.pop(mat_key, None)
                         if mat is not None:
                             mat = mat.tocsr(copy = False)
-                            # Remap only the CSR column indices.  The previous COO
-                            # implementation also allocated a row index per nonzero,
-                            # concatenated copies of data/row/column, and then allocated
-                            # CSR arrays once more.  Keeping the row structure in CSR
-                            # avoids those large temporary arrays.
                             mapped_indices = colmap[i][mat.indices]
                             if feature_metadata.shape[0] <= np.iinfo(mat.indices.dtype).max + 1:
                                 mapped_indices = mapped_indices.astype(mat.indices.dtype, copy=False)
@@ -126,9 +122,7 @@ class AggrData:
                                 shape=(mat.shape[0], feature_metadata.shape[0]),
                                 copy=False,
                             )
-                            # COO -> CSR also canonicalized duplicate entries, so retain
-                            # that behavior while sorting the remapped column indices.
-                            mat.sum_duplicates()
+                            mat.sum_duplicates()    # sanity check step to canonicalize any duplicate entries if existing
                             mat_list.append(mat)
                     matrices[mat_key] = vstack(mat_list, format="csr")
 
