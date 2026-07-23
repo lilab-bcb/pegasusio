@@ -9,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: ${{ matrix.os }}, Python ${{ matrix.python-version }}, zarr v${{ matrix.zarr_version }}
 
     runs-on: ${{ matrix.os }}
     strategy:
