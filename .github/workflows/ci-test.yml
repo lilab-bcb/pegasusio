@@ -15,10 +15,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ['3.11', '3.12', '3.13', '3.14']
+        zarr_version: ['3', '2']
+        exclude:
+          - python-version: '3.11'
+            zarr_version: '3'
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python-version }} with zarr ${{ matrix.zarr_version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
@@ -26,6 +30,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest setuptools wheel anndata
+        if [[ "${{ matrix.zarr_version }}" == "3" ]]; then
+          python -m pip install "zarr>=3.1,<4"
+        else
+          python -m pip install "zarr>=2.18.7,<3"
+        fi
         python -m pip install -e .
     - name: Lint with flake8
       run: |
@@ -38,7 +47,7 @@ jobs:
         git clone https://github.com/lilab-bcb/pegasusio-test-data.git ./pegasusio-test-data
     - name: IO test
       run: |
-        pytest tests/test_io.py
+        pytest tests/test_io.py tests/test_anndata.py tests/test_zarr.py
     - name: Data aggregation test
       run: |
         bash tests/run_aggregate_matrix.sh
