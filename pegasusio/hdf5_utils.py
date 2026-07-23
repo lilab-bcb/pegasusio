@@ -362,9 +362,16 @@ def write_loom_file(data: MultimodalData, output_file: str) -> None:
     def _process_attrs(
         key_name: str, attrs: pd.DataFrame, attrs_multi: dict
     ) -> Dict[str, object]:
-        res_dict = {key_name: attrs.index.values}
+        def _as_ndarray(values, dtype=None) -> np.ndarray:
+            if hasattr(values, "to_numpy"):
+                values = values.to_numpy(dtype=dtype)
+            elif not isinstance(values, np.ndarray):
+                values = np.asarray(values, dtype=dtype)
+            return values if isinstance(values, np.ndarray) else np.asarray(values, dtype=dtype)
+
+        res_dict = {key_name: _as_ndarray(attrs.index, dtype=object)}
         for key in attrs.columns:
-            res_dict[_replace_slash(key)] = np.array(attrs[key].values)
+            res_dict[_replace_slash(key)] = _as_ndarray(attrs[key])
         for key, value in attrs_multi.items():
             if (
                 value.ndim > 1
