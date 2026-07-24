@@ -628,7 +628,7 @@ class UnimodalData:
             var_cols = []
             if "featureid" in self.feature_metadata:
                 var_cols.append("featureid")
-            raw = anndata.AnnData(X = self.matrices[raw_key], dtype = self.matrices[raw_key].dtype, var = self.feature_metadata[var_cols])
+            raw = anndata.AnnData(X = self.matrices[raw_key], var = self.feature_metadata[var_cols])
 
         layers = {}
         for key, value in self.matrices.items():
@@ -636,7 +636,6 @@ class UnimodalData:
                 layers[key] = value
 
         return anndata.AnnData(X = self.matrices[X_key],
-            dtype = self.matrices[X_key].dtype,
             obs = self.barcode_metadata,
             var = self.feature_metadata,
             uns = self.metadata,

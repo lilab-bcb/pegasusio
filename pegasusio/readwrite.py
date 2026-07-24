@@ -252,7 +252,7 @@ def write_output(
     if file_type.startswith("zarr"):
         zf = ZarrFile(output_file, mode = "w", storage_type = "ZipStore" if file_type == "zarr.zip" else None)
         zf.write_multimodal_data(data)
-        del zf
+        zf.close()
     elif file_type == "h5ad":
         data.to_anndata().write(output_file, compression="gzip")
     elif file_type == "loom":
