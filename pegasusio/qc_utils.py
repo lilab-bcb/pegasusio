@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from pegasusio import UnimodalData
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -29,7 +27,7 @@ class DictWithDefault:
 
 
 def calc_qc_filters(
-    unidata: UnimodalData,
+    unidata,
     select_singlets: bool = False,
     remap_string: str = None,
     subset_string: str = None,
@@ -44,7 +42,7 @@ def calc_qc_filters(
 
     Parameters
     ----------
-    unidata: ``UnimodalData``
+    unidata: ``UnimodalData`` or ``anndata.AnnData``
        Unimodal data matrix with rows for cells and columns for genes.
     select_singlets: ``bool``, optional, default ``False``
         If select only singlets.
@@ -81,7 +79,8 @@ def calc_qc_filters(
     --------
     >>> calc_qc_filters(unidata, min_umis = 500, select_singlets = True)
     """
-    assert unidata.uns["modality"] in {"rna", "visium"}
+    if "modality" in unidata.uns:
+        assert unidata.uns["modality"] in {"rna", "visium"}
 
     filters = []
 
@@ -145,7 +144,7 @@ def calc_qc_filters(
         unidata.obs["passed_qc"] = True
 
 
-def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
+def apply_qc_filters(unidata, uns_white_list: str = None):
     """ Apply QC filters to filter out low quality cells """
     if "passed_qc" in unidata.obs:
         prior_n = unidata.shape[0]
@@ -172,4 +171,5 @@ def apply_qc_filters(unidata: UnimodalData, uns_white_list: str = None):
             for key in list(unidata.uns):
                 if key not in white_list:
                     del unidata.uns[key]
-        logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in UnimodalData object {unidata.get_uid()}.")
+        uid = unidata.get_uid() if hasattr(unidata, 'get_uid') else ''
+        logger.info(f"After filtration, {unidata.shape[0]} out of {prior_n} cell barcodes are kept in data object {uid}.")
