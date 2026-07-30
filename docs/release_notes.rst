@@ -1,5 +1,13 @@
 .. role:: small
 
+Version 0.11.0 :small:`July 30, 2026`
+--------------------------------------
+
+- Support pandas v3.
+- Support zarr v3.
+- Add AnnData support to ``calc_qc_filters`` and ``apply_qc_filters`` functions.
+- Reduce memory usage in ``aggregate_matrices`` function.
+
 Version 0.10.0 :small:`May 22, 2025`
 -------------------------------------
 
