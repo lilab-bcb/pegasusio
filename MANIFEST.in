@@ -5,5 +5,4 @@ exclude .*
 exclude tests/*
 exclude docs/**
 exclude notebooks/*
-exclude wheel_build/*
 exclude build_linux.sh
