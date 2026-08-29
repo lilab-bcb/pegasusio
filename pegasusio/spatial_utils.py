@@ -38,19 +38,24 @@ def load_visium_folder(input_path) -> MultimodalData:
         spatial_metadata = pd.read_csv(tissue_pos_csv)
         spatial_metadata.rename(columns={"barcode": "barcodekey"}, inplace=True)
     else:
-        tissue_pos_csv = f"{input_path}/spatial/tissue_positions_list.csv"
-        assert os.path.exists(tissue_pos_csv), f"Cannot locate file {tissue_pos_csv}!"
-        spatial_metadata = pd.read_csv(
-            tissue_pos_csv,
-            names=[
-                "barcodekey",
-                "in_tissue",
-                "array_row",
-                "array_col",
-                "pxl_row_in_fullres",
-                "pxl_col_in_fullres",
-            ],
-        )
+        tissue_pos_parquet = f"{input_path}/spatial/tissue_positions.parquet"
+        if os.path.exists(tissue_pos_parquet):
+            spatial_metadata = pd.read_parquet(tissue_pos_parquet)
+            spatial_metadata.rename(columns={"barcode": "barcodekey"}, inplace=True)
+        else:
+            tissue_pos_csv = f"{input_path}/spatial/tissue_positions_list.csv"
+            assert os.path.exists(tissue_pos_csv), f"Cannot locate file {tissue_pos_csv}!"
+            spatial_metadata = pd.read_csv(
+                tissue_pos_csv,
+                names=[
+                    "barcodekey",
+                    "in_tissue",
+                    "array_row",
+                    "array_col",
+                    "pxl_row_in_fullres",
+                    "pxl_col_in_fullres",
+                ],
+            )
     process_spatial_metadata(spatial_metadata)
 
     barcode_metadata = rna_data.obs.join(spatial_metadata, how="left")
