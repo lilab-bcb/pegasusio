@@ -571,6 +571,8 @@ class UnimodalData:
         if data.raw is not None:
             self.matrices["raw.X"] = csr_matrix(data.raw.X)
         for key, value in data.layers.items():
+            if key is None:  # anndata >= 0.13 exposes .X as a None-keyed layer alias
+                continue
             self.matrices[key] = csr_matrix(value)
 
         def _create_data_dict(old_dict: dict) -> DataDict:
